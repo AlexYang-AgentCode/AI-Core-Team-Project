@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "id": "1",
+      "type": "text",
+      "text": "💻 开发者 push\n到群晖 Git",
+      "x": 0,
+      "y": 0,
+      "width": 200,
+      "height": 80
+    },
+    {
+      "id": "2",
+      "type": "text",
+      "text": "🔔 post-receive\nhook 触发",
+      "x": 250,
+      "y": 0,
+      "width": 200,
+      "height": 80
+    },
+    {
+      "id": "3",
+      "type": "text",
+      "text": "📊 更新项目状态\nKanban 卡片",
+      "x": 500,
+      "y": 0,
+      "width": 220,
+      "height": 80
+    },
+    {
+      "id": "4",
+      "type": "text",
+      "text": "🤖 生成 commit\n摘要到 vault",
+      "x": 750,
+      "y": 0,
+      "width": 220,
+      "height": 80
+    },
+    {
+      "id": "5",
+      "type": "text",
+      "text": "✅ 自动备份\n到群晖 NAS",
+      "x": 375,
+      "y": 150,
+      "width": 200,
+      "height": 80
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "1",
+      "toNode": "2"
+    },
+    {
+      "id": "e2",
+      "fromNode": "2",
+      "toNode": "3"
+    },
+    {
+      "id": "e3",
+      "fromNode": "3",
+      "toNode": "4"
+    },
+    {
+      "id": "e4",
+      "fromNode": "4",
+      "toNode": "5"
+    }
+  ]
+}

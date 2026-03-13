@@ -1,0 +1,25 @@
+{
+  "module": {
+    "name": "ActivityBridge",
+    "type": "shared",
+    "description": "Android Activity API Bridge for HarmonyOS - Provides Android Activity lifecycle compatibility layer",
+    "mainElement": "",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [],
+    "extensionAbilities": [],
+    "requestPermissions": [],
+    "metadata": [
+      {
+        "name": "ActivityBridgeVersion",
+        "value": "1.0.0"
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+api_manifest:
+  case_id: "16.1.123"
+  case_name: "UIWidgets-Calculator"
+  android_apis:
+    - api: "androidx.appcompat.app.AppCompatActivity"
+      bridge_owner: "16.4.2"
+    - api: "android.widget.Button"
+      bridge_owner: "16.4.3"
+    - api: "android.widget.TextView"
+      bridge_owner: "16.4.3"
+    - api: "android.view.View.OnClickListener"
+      bridge_owner: "16.4.3"
+  bridge_summary:
+    "16.4.2": 1
+    "16.4.3": 3
+  complexity: "LOW"
+  notes: "纯UI计算器，全部Direct Map"

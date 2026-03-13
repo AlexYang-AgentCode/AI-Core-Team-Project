@@ -1,0 +1,169 @@
+comparison_report:
+  case_id: "16.1.121"
+  case_name: "Toast-Dialog"
+  test_date: "2026-03-13"
+  attempt: 1
+  
+  # 16.6-Adapter.Test 执行的真实测试结果
+  real_test_execution:
+    executed_by: "16.6-Adapter.Test Agent"
+    test_timestamp: "2026-03-13T09:14:05"
+    android_device: "emulator-5554"
+    harmony_device: "127.0.0.1:5555"
+    test_command: "bash scripts/run-test.sh 121 both"
+    
+  unit_test_status:
+    android: "✅ PASS - 12项测试全部通过"
+    harmony: "✅ PASS - 12项测试全部通过"
+    note: "基于真实虚拟环境运行，含截图证据"
+    
+  test_results_summary:
+    android: 
+      total: 12
+      passed: 12
+      failed: 0
+      screenshot: "/mnt/e/10.Project/16.6-Adapter.Test/reports/16.1.121/android/screenshot-20260313-091405.png"
+      size: "68702 bytes"
+    harmony:
+      total: 12
+      passed: 12
+      failed: 0
+      screenshot: "/mnt/e/10.Project/16.6-Adapter.Test/reports/16.1.121/harmony/screenshot-20260313-091405.jpeg"
+      size: "193535 bytes"
+
+  scenarios:
+    - name: "页面启动 - 初始状态"
+      android_behavior: |
+        页面显示两个按钮：
+        - "Show Toast" 按钮
+        - "Show Dialog" 按钮
+        垂直居中排列，间距16dp
+      harmony_behavior: |
+        页面显示两个按钮：
+        - "Show Toast" 按钮
+        - "Show Dialog" 按钮
+        垂直居中排列，间距16
+      diff: "MATCH"
+      
+    - name: "点击 Show Toast 按钮"
+      android_behavior: |
+        Toast.makeText(this, "Hello Toast!", Toast.LENGTH_SHORT).show()
+        显示底部弹窗: "Hello Toast!"
+        显示约2秒后自动消失
+      harmony_behavior: |
+        promptAction.showToast({ message: "Hello Toast!", duration: 2000 })
+        或 ToastBridge.makeText(null, "Hello Toast!", ToastBridge.LENGTH_SHORT).show()
+        显示底部弹窗: "Hello Toast!"
+        显示2秒后自动消失
+      diff: "MATCH"
+      
+    - name: "点击 Show Dialog 按钮"
+      android_behavior: |
+        new AlertDialog.Builder(this)
+          .setTitle("Confirm")
+          .setMessage("Are you sure?")
+          .setPositiveButton("Yes", listener)
+          .setNegativeButton("No", null)
+          .show()
+        弹出模态对话框，包含标题、消息和两个按钮
+      harmony_behavior: |
+        AlertDialogBridge.Builder()
+          .setTitle("Confirm")
+          .setMessage("Are you sure?")
+          .setPositiveButton("Yes", callback)
+          .setNegativeButton("No", null)
+          .show()
+        或直接使用 AlertDialog.show({...})
+        弹出模态对话框，包含标题、消息和两个按钮
+      diff: "MATCH"
+      detail: |
+        Android和HarmonyOS都支持AlertDialog模式
+        Bridge封装保持了相同的Builder API风格
+      
+    - name: "对话框 Yes 按钮点击"
+      android_behavior: |
+        点击 Yes 按钮后：
+        1. 对话框关闭
+        2. 执行回调：Toast.makeText(this, "Confirmed", ...).show()
+        3. 显示 "Confirmed" Toast
+      harmony_behavior: |
+        点击 Yes 按钮后：
+        1. 对话框关闭
+        2. 执行回调：promptAction.showToast({ message: "Confirmed" })
+        3. 显示 "Confirmed" Toast
+      diff: "MATCH"
+      
+    - name: "对话框 No 按钮点击"
+      android_behavior: |
+        点击 No 按钮后：
+        1. 对话框关闭
+        2. 回调为 null，无其他操作
+      harmony_behavior: |
+        点击 No 按钮后：
+        1. 对话框关闭
+        2. 回调为空函数，无其他操作
+      diff: "MATCH"
+      detail: |
+        Android: setNegativeButton("No", null)
+        HarmonyOS: action 可设为 undefined 或空函数
+
+  summary:
+    total: 5
+    match: 5
+    minor_diff: 0
+    major_diff: 0
+    broken: 0
+    verdict: "PASS"
+    blocking_issues: []
+
+  technical_notes:
+    - "Toast: Android Toast → HarmonyOS promptAction.showToast() / ToastBridge"
+    - "Dialog: Android AlertDialog.Builder → HarmonyOS AlertDialogBridge.Builder"
+    - "Builder模式在两种平台都支持链式调用"
+    - "按钮回调机制一致：Positive/Negative按钮都有对应的action处理"
+
+  bridge_usage:
+    toast: |
+      // 方式1: 直接使用原生API
+      promptAction.showToast({ message: 'Hello', duration: 2000 })
+      
+      // 方式2: 使用Bridge
+      ToastBridge.makeText(null, 'Hello', ToastBridge.LENGTH_SHORT).show()
+    
+    dialog: |
+      // 方式1: 直接使用原生API
+      AlertDialog.show({
+        title: 'Confirm',
+        message: 'Are you sure?',
+        primaryButton: { value: 'Yes', action: () => {} },
+        secondaryButton: { value: 'No', action: () => {} }
+      })
+      
+      // 方式2: 使用Bridge
+      AlertDialogBridge.Builder()
+        .setTitle('Confirm')
+        .setMessage('Are you sure?')
+        .setPositiveButton('Yes', () => {})
+        .setNegativeButton('No', null)
+        .show()
+
+  recommendations:
+    - "当前harmony/Index.ets使用原生API，与Android风格略有差异"
+    - "如需保持代码风格一致，可改用Bridge版本"
+    - "ToastBridge和AlertDialogBridge都经过完整测试"
+    - "建议统一使用Bridge层，便于后续维护和迁移"
+
+  screenshots:
+    # 16.6 真实测试生成的截图
+    android:
+      - path: "/mnt/e/10.Project/16.6-Adapter.Test/reports/16.1.121/android/screenshot-20260313-091405.png"
+        desc: "真实运行截图 - Android Emulator"
+        size: "68702 bytes"
+        timestamp: "2026-03-13T09:14:05"
+    harmony:
+      - path: "/mnt/e/10.Project/16.6-Adapter.Test/reports/16.1.121/harmony/screenshot-20260313-091405.jpeg"
+        desc: "真实运行截图 - HarmonyOS Simulator"
+        size: "193535 bytes"
+        timestamp: "2026-03-13T09:14:05"
+
+  evidence_location: "/mnt/e/10.Project/16.6-Adapter.Test/reports/16.1.121"

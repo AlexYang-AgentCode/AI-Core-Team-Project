@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0.0",
+  "schema_name": "16.7-deliverable-manifest",
+  
+  "deliverable": {
+    "case_id": "{{CASE_ID}}",
+    "case_name": "{{CASE_NAME}}",
+    "version": "{{VERSION}}",
+    "build_number": "{{BUILD_NUMBER}}",
+    
+    "status": {
+      "test_status": "{{TEST_STATUS}}",
+      "test_date": "{{TEST_DATE}}",
+      "test_timestamp": "{{TEST_TIMESTAMP}}"
+    },
+    
+    "platforms": {
+      "android": {
+        "status": "{{ANDROID_STATUS}}",
+        "device": "{{ANDROID_DEVICE}}",
+        "os_version": "{{ANDROID_OS_VERSION}}",
+        "test_count": {{ANDROID_TEST_COUNT}},
+        "pass_count": {{ANDROID_PASS_COUNT}},
+        "fail_count": {{ANDROID_FAIL_COUNT}}
+      },
+      "harmony": {
+        "status": "{{HARMONY_STATUS}}",
+        "device": "{{HARMONY_DEVICE}}",
+        "os_version": "{{HARMONY_OS_VERSION}}",
+        "test_count": {{HARMONY_TEST_COUNT}},
+        "pass_count": {{HARMONY_PASS_COUNT}},
+        "fail_count": {{HARMONY_FAIL_COUNT}}
+      }
+    },
+    
+    "files": [
+      {
+        "type": "version_file",
+        "name": "TR4.version",
+        "path": "./TR4.version",
+        "required": true,
+        "generated": true
+      },
+      {
+        "type": "report",
+        "name": "e2e-report.html",
+        "path": "./e2e/report.html",
+        "required": true,
+        "generated": true
+      },
+      {
+        "type": "evidence_android",
+        "path": "./e2e/evidence/android/",
+        "required": true,
+        "min_count": 2
+      },
+      {
+        "type": "evidence_harmony",
+        "path": "./e2e/evidence/harmony/",
+        "required": true,
+        "min_count": 2
+      },
+      {
+        "type": "artifact_android",
+        "name": "{{ANDROID_APK_NAME}}",
+        "path": "./artifacts/android/{{ANDROID_APK_NAME}}",
+        "required": true,
+        "checksum": "{{ANDROID_APK_MD5}}"
+      },
+      {
+        "type": "artifact_harmony_hap",
+        "name": "entry-default-signed.hap",
+        "path": "./artifacts/harmony/signed-hap/entry-default-signed.hap",
+        "required": true,
+        "checksum": "{{HARMONY_HAP_MD5}}"
+      },
+      {
+        "type": "artifact_harmony_source",
+        "path": "./artifacts/harmony/source/",
+        "required": true,
+        "files": ["Index.ets", "module.json5"]
+      },
+      {
+        "type": "metadata_analysis",
+        "path": "./metadata/analysis.json",
+        "required": true
+      },
+      {
+        "type": "metadata_design",
+        "path": "./metadata/design.json",
+        "required": true
+      },
+      {
+        "type": "metadata_lineage",
+        "path": "./metadata/lineage.json",
+        "required": true
+      }
+    ],
+    
+    "source_references": {
+      "android_source": "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/src/",
+      "harmony_source": "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/harmony/",
+      "analysis": "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/analysis/",
+      "mapping": "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/mapping/",
+      "e2e_report_source": "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/e2e/"
+    },
+    
+    "bridges_used": [],
+    
+    "lineage": {
+      "16.1_analysis": {
+        "timestamp": "",
+        "apis_count": 0
+      },
+      "16.3_design": {
+        "timestamp": "",
+        "mapping_count": 0
+      },
+      "16.4_implementation": {
+        "bridges": []
+      },
+      "16.6_verification": {
+        "timestamp": "",
+        "test_count": 0,
+        "pass_count": 0
+      },
+      "16.7_delivery": {
+        "timestamp": "{{TEST_TIMESTAMP}}",
+        "version": "{{VERSION}}"
+      }
+    },
+    
+    "checksums": {
+      "manifest_sha256": "",
+      "tr4_sha256": ""
+    },
+    
+    "audit_trail": [
+      {
+        "action": "created",
+        "timestamp": "{{TEST_TIMESTAMP}}",
+        "actor": "16.6-Adapter.Test",
+        "details": "E2E test passed, deliverable created"
+      }
+    ]
+  }
+}

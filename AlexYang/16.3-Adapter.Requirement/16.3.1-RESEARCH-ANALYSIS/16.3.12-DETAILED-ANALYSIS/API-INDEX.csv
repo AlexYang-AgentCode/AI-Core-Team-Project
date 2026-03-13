@@ -1,0 +1,43 @@
+api_id,package,class,method,params,return_type,priority,module,status,complexity,harmonyos_mapping
+P0-001,java.lang,System,exit,int,void,P0,M13,ready,⭐,process.exit(code)
+P0-002,java.lang,Object,equals,Object,boolean,P0,M13,ready,⭐,===
+P0-003,java.lang,Object,hashCode,,int,P0,M13,ready,⭐,WeakMap模拟
+P0-004,java.lang,Object,toString,,String,P0,M13,ready,⭐,toString()
+P0-005,java.lang,Thread,run,,void,P0,M13,ready,⭐⭐,回调函数
+P0-006,java.lang,Thread,start,,void,P0,M13,ready,⭐⭐,TaskPool.execute
+P0-007,java.util,ArrayList,add,E,boolean,P0,M13,ready,⭐,array.push
+P0-008,java.util,ArrayList,get,int,E,P0,M13,ready,⭐,array[index]
+P0-009,java.util,HashMap,put,K V,V,P0,M13,ready,⭐,map.set
+P0-010,java.util,HashMap,get,Object,V,P0,M13,ready,⭐,map.get
+P0-011,java.io,File,getName,,String,P0,M13,ready,⭐,path.basename
+P0-012,java.io,File,exists,,boolean,P0,M13,ready,⭐,fs.existsSync
+P0-013,java.io,FileInputStream,read,,int,P0,M13,ready,⭐⭐,fs.readFileSync
+P0-014,java.io,FileOutputStream,write,byte[],void,P0,M13,ready,⭐⭐,fs.writeFileSync
+P0-015,android.os,Bundle,,,constructor,P0,M01,ready,⭐,Map/对象
+P0-016,android.os,Bundle,putString,String String,void,P0,M01,ready,⭐,map.set
+P0-017,android.os,Bundle,getString,String,String,P0,M01,ready,⭐,map.get
+P0-018,android.os,Bundle,putInt,String int,void,P0,M01,ready,⭐,map.set
+P0-019,android.os,Bundle,getInt,String,int,P0,M01,ready,⭐,map.get
+P0-020,android.os,Handler,,constructor,P0,M01,ready,⭐⭐⭐,EventEmitter
+P0-021,android.os,Handler,post,Runnable,boolean,P0,M01,ready,⭐⭐⭐,setImmediate
+P0-022,android.os,Looper,prepare,,void,P0,M01,ready,⭐⭐⭐,EventLoop.init
+P0-023,android.os,Looper,loop,,void,P0,M01,ready,⭐⭐⭐,EventLoop.run
+P0-024,android.os,Process,getUid,,int,P0,M01,ready,⭐,process.getuid
+P0-025,android.os,Process,getPid,,int,P0,M01,ready,⭐,process.pid
+P0-026,android.content,Context,getPackageName,,String,P0,M02,ready,⭐,bundleName
+P0-027,android.content,Context,getFilesDir,,File,P0,M02,ready,⭐⭐,context.filesDir
+P0-028,android.content,Context,getCacheDir,,File,P0,M02,ready,⭐⭐,context.cacheDir
+P0-029,android.content,Intent,,constructor,P0,M02,ready,⭐,Want构造
+P0-030,android.content,Intent,setClass,Context Class,Intent,P0,M02,ready,⭐⭐,Want.bundleName
+P0-031,android.content,Intent,putExtra,String Object,Intent,P0,M02,ready,⭐⭐,Want.parameters
+P0-032,android.content,Intent,getExtra,String,Object,P0,M02,ready,⭐⭐,Want.parameters
+P0-033,android.content,Intent,getAction,,String,P0,M02,ready,⭐,Want.action
+P0-034,android.content,Intent,setAction,String,Intent,P0,M02,ready,⭐,Want.action
+P0-035,android.content.pm,PackageManager,getPackageInfo,String int,PackageInfo,P0,M02,ready,⭐⭐,bundleManager.getBundleInfo
+P0-036,android.content.pm,PackageManager,getInstalledPackages,int,List,P0,M02,ready,⭐⭐,bundleManager.getAllBundles
+P0-037,android.app,Activity,onCreate,Bundle,void,P0,M01,ready,⭐⭐⭐,UIAbility.onCreate
+P0-038,android.app,Activity,onStart,,void,P0,M01,ready,⭐⭐⭐,UIAbility.onForeground
+P0-039,android.app,Activity,onResume,,void,P0,M01,ready,⭐⭐⭐,UIAbility.onForeground
+P0-040,android.app,Activity,onPause,,void,P0,M01,ready,⭐⭐⭐,UIAbility.onBackground
+P0-041,android.app,Activity,onStop,,void,P0,M01,ready,⭐⭐⭐,UIAbility.onBackground
+P0-042,android.app,Activity,onDestroy,,void,P0,M01,ready,⭐⭐⭐,UIAbility.onDestroy

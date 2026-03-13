@@ -1,0 +1,36 @@
+hard_id,root_cause,module,api_category,representative_api,difficulty,api_count,estimated_hours,harmony_alternative,feasibility,adapter_strategy,blocker_notes
+H001,R1,M13,JNI 本地方法调用,System.loadLibrary / native methods,5,120,NAPI (Node-API),部分可行,NAPI 桥接 + 重新编译 .so,需要逐库评估; 已有 .so 需重编译
+H002,R1,M13,反射 API,Class.forName / Method.invoke / Proxy,4,80,有限 Reflect + 装饰器,部分可行,编译时代码生成 + 注册表模式,ArkTS 反射能力有限
+H003,R1,M13,动态类加载,ClassLoader / DexClassLoader,5,30,不支持,不可行,静态打包 / Feature Ability,插件化框架无法直接翻译
+H004,R1,M01,Parcelable/AIDL IPC,Parcelable / Parcel / AIDL 接口,4,60,MessageParcel + IPC Stub,可行但工作量大,MessageParcel 适配 + IDL 转换,序列化协议需逐字段转换
+H005,R1,M01,Binder IPC,IBinder / Binder / ServiceConnection,4,40,RPC 框架 (@ohos.rpc),可行但架构不同,RPC Proxy/Stub 重写,跨进程通信架构完全不同
+H006,R2,M13,synchronized 同步原语,synchronized / ReentrantLock / Semaphore,5,50,Actor 模型 (无锁),架构不兼容,Actor 封装 / SharedArrayBuffer,共享内存多线程 vs Actor 模型根本矛盾
+H007,R2,M13,ThreadLocal,ThreadLocal / InheritableThreadLocal,5,20,Worker 级存储模拟,部分可行,Worker+Map 模拟,影响 Looper/日志/事务等框架
+H008,R2,M13,j.u.concurrent 并发包,ExecutorService / ConcurrentHashMap / BlockingQueue,4,150,TaskPool / Promise,部分可行,逐类适配; BlockingQueue 无直接替代,整个包设计前提不同
+H009,R3,M03,自定义 View 绘制,View.onDraw / onMeasure / onLayout,5,100,Canvas API + @Component,部分可行,Canvas 桥接 + XComponent,命令式绘制 → 声明式转换极难
+H010,R3,M03,SurfaceView/TextureView,SurfaceView / SurfaceHolder / GLSurfaceView,5,40,XComponent,可行但接口不同,XComponent 桥接 + EGL/GLES3,视频/游戏渲染核心
+H011,R3,M04,RecyclerView 生态,RecyclerView / Adapter / LayoutManager / ItemDecoration,4,80,List / Grid + LazyForEach,可行,声明式列表适配; 自定义 LayoutManager 极难,ViewHolder 回收机制框架自动处理
+H012,R3,M01,Fragment 系统,Fragment / FragmentManager / FragmentTransaction,4,60,Navigation + @Component,可行但复杂,Fragment → Component + Router,Fragment 生命周期 8 个状态需映射
+H013,R3,M03,LayoutInflater XML 布局,LayoutInflater.inflate / XML 布局解析,4,40,build() 声明式,不可直接翻译,编译时 XML → ArkUI 转换器,运行时 XML 解析在 ArkUI 中不存在
+H014,R4,M02,ContentProvider,ContentProvider / ContentResolver / Cursor,4,80,DataShareExtensionAbility,可行但差异大,DataShare 适配层,content:// URI 路由需完全重写
+H015,R4,M02,BroadcastReceiver,BroadcastReceiver / 有序广播 / 系统广播,4,40,CommonEvent + Emitter,部分可行,事件订阅适配; 有序广播不支持,有序广播功能缺失
+H016,R4,M01,Notification 通知,NotificationManager / NotificationChannel / PendingIntent,4,60,notificationManager / WantAgent,可行,通知构建器适配 + WantAgent 替代 PendingIntent,通知样式映射需逐一对应
+H017,R4,M01,AlarmManager 定时任务,AlarmManager.setExact / setRepeating / setAlarmClock,4,20,WorkScheduler + reminder,可行但精度不同,WorkScheduler 适配 + 系统闹钟,精确定时在省电策略下受限
+H018,R5,M11,DevicePolicyManager,DevicePolicyManager / Device Owner / Profile Owner,5,100,@ohos.enterprise.* 企业 API,部分可行,逐功能映射到企业管理 API,API 几乎没有 1:1 对应
+H019,R5,M11,Keystore/BiometricPrompt,KeyStore / Cipher / BiometricPrompt,4,50,cryptoFramework + userAuth,可行但差异大,安全框架适配层,密钥格式和认证流程不同
+H020,R5,M11,SELinux/权限模型,SELinux Policy / 权限检查 / requestPermissions,4,30,权限管理 (@ohos.abilityAccessCtrl),部分可行,权限映射表,权限名称和粒度完全不同
+H021,R6,M06,Camera2 API,CameraManager / CaptureRequest / CaptureSession,5,80,@ohos.multimedia.camera,可行但架构不同,Camera 会话适配; Pipeline → Session 转换,参数控制体系完全不同
+H022,R6,M06,MediaCodec 编解码,MediaCodec / MediaFormat / MediaExtractor,4,60,AVCodec + AVMuxer,可行但接口不同,编解码器适配层,Buffer 管理和生命周期不同
+H023,R6,M09,USB Host,UsbManager / UsbDevice / UsbDeviceConnection,5,30,@ohos.usbManager,部分可行,USB 设备管理适配,USB 类驱动可能不完整
+H024,R6,M09,BLE GATT,BluetoothGatt / GattCallback / BluetoothLeScanner,4,60,@ohos.bluetooth.ble,可行,BLE 操作适配层,扫描/连接/读写流程需逐步映射
+H025,R6,M09,NFC,NfcAdapter / NdefMessage / NdefRecord / IsoDep,4,30,@ohos.nfc.controller,部分可行,NFC 标签读写适配,部分 NFC 技术可能不支持
+H026,R7,M07,SQLite 全接口,SQLiteDatabase / SQLiteOpenHelper / Cursor,4,40,RdbStore + ResultSet,可行,RdbStore 适配 + 异步包装,同步 → 异步转换 + 查询语法差异
+H027,R7,M02,SharedPreferences,SharedPreferences.Editor / getXxx / apply/commit,3,15,@ohos.data.preferences,可行,Preferences 包装 + 缓存层,同步 → 异步 API 转换
+H028,R8,跨模块,Firebase Cloud Messaging,FirebaseMessaging / RemoteMessage,5,30,HMS Push Kit,可行但完全重写,推送服务抽象层,Google 专有服务无法直接翻译
+H029,R8,跨模块,Google Maps,GoogleMap / MapFragment / Marker / CameraUpdate,5,40,Petal Maps SDK,可行但差异大,地图服务抽象层,地图数据和 API 完全不同
+H030,R8,跨模块,Google Play Billing,BillingClient / Purchase / SkuDetails,5,30,HMS IAP Kit,可行但支付体系不同,支付服务抽象层,支付验证流程完全不同
+H031,R8,跨模块,Google Sign-In / Firebase Auth,GoogleSignInClient / FirebaseAuth,5,20,HUAWEI ID + Account Kit,可行,认证服务抽象层,OAuth 流程不同
+H032,R3,M12,属性动画系统,ObjectAnimator / ValueAnimator / AnimatorSet,4,30,animateTo / animation API,可行但模型不同,动画属性映射 + 组合适配,命令式动画 → 声明式动画
+H033,R4,M05,WebView 深度集成,WebView / WebViewClient / WebChromeClient / JavaScriptInterface,4,40,Web 组件 (@ohos.web.webview),可行但接口不同,Web 组件适配 + JS 桥接,JavaScript 交互机制不同
+H034,R6,M06,AudioRecord/AudioTrack,AudioRecord / AudioTrack / AudioEffect,4,30,AudioCapturer / AudioRenderer,可行但接口不同,音频流适配层,音频格式和回调不同
+H035,R4,M10,TelephonyManager,TelephonyManager.getDeviceId / getSubscriberId,4,20,@ohos.telephony.radio,部分可行,设备信息查询适配,部分信息因隐私限制不可获取

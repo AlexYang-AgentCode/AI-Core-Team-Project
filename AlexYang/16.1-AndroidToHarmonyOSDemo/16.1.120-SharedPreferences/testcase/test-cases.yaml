@@ -1,0 +1,90 @@
+# Test Cases for 16.1.120 SharedPreferences
+# Generated: 2026-03-13
+
+test_suite:
+  case_id: "16.1.120"
+  case_name: "SharedPreferences"
+  
+  test_cases:
+    - id: TC001
+      name: "初始加载显示默认值"
+      steps:
+        - "启动应用"
+        - "观察显示区域"
+      expected: "显示 '[SharedPreference]' 或 'SharedPreferences is null'"
+      priority: HIGH
+      
+    - id: TC002
+      name: "保存文本到SharedPreferences"
+      steps:
+        - "在输入框输入 'Test123'"
+        - "点击 SAVE 按钮"
+      expected: "显示Toast 'SharedPreferences Saved! Press Open to view'"
+      priority: HIGH
+      
+    - id: TC003
+      name: "读取保存的文本"
+      steps:
+        - "执行TC002保存'Test123'"
+        - "点击 OPEN 按钮"
+      expected: "显示区域显示 'Test123'"
+      priority: HIGH
+      
+    - id: TC004
+      name: "删除SharedPreferences数据"
+      steps:
+        - "执行TC002保存数据"
+        - "点击 DELETE 按钮"
+      expected: "显示Toast 'SharedPreferences deleted'，显示区域变为 'SharedPreferences is null'"
+      priority: HIGH
+      
+    - id: TC005
+      name: "空文本保存验证"
+      steps:
+        - "清空输入框"
+        - "点击 SAVE 按钮"
+      expected: "显示Toast 'Please set any text'，数据未被保存"
+      priority: MEDIUM
+      
+    - id: TC006
+      name: "读取不存在的数据"
+      steps:
+        - "确保无保存数据（执行DELETE）"
+        - "点击 OPEN 按钮"
+      expected: "显示 'SharedPreferences is null'"
+      priority: MEDIUM
+      
+    - id: TC007
+      name: "数据持久化验证"
+      steps:
+        - "输入 'Persistent' 并保存"
+        - "关闭应用"
+        - "重新启动应用"
+        - "点击 OPEN"
+      expected: "显示 'Persistent'，数据在应用重启后依然存在"
+      priority: HIGH
+      
+    - id: TC008
+      name: "特殊字符存储"
+      steps:
+        - "输入 '!@#$%^&*()_+-=[]{}|;':\",./<>?'"
+        - "点击 SAVE"
+        - "点击 OPEN"
+      expected: "正确显示特殊字符，无乱码或截断"
+      priority: MEDIUM
+      
+    - id: TC009
+      name: "长文本存储"
+      steps:
+        - "输入32个字符的最大长度文本"
+        - "点击 SAVE 和 OPEN"
+      expected: "完整显示32个字符"
+      priority: LOW
+      
+    - id: TC010
+      name: "连续多次保存"
+      steps:
+        - "依次保存 'Value1', 'Value2', 'Value3'"
+        - "点击 OPEN"
+      expected: "显示最后一次保存的 'Value3'"
+      priority: MEDIUM

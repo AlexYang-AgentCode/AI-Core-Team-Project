@@ -1,0 +1,13 @@
+test_suite:
+  case_id: "16.1.123"
+  case_name: "UIWidgets-Calculator"
+  test_cases:
+    - id: TC001
+      name: "数字按钮输入"
+      expected: "点击数字按钮，显示对应数字"
+    - id: TC002
+      name: "加法运算"
+      expected: "1+1=2"
+    - id: TC003
+      name: "清除功能"
+      expected: "点击C清除显示"

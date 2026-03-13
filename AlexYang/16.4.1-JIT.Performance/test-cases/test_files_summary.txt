@@ -1,0 +1,12 @@
+DEX Test Files Summary
+======================================================================
+
+TestCase1.dex: SimplePojo
+TestCase2.dex: SimpleLogic
+TestCase3.dex: WithLoop
+TestCase4.dex: Calculator
+TestCase5.dex: Person
+TestCase6.dex: AllArithmetic
+TestCase7.dex: AllBranches
+TestCase8.dex: WithArrays
+TestCase9.dex: WithStatic

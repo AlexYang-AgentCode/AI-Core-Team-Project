@@ -1,0 +1,103 @@
+api_manifest:
+  case_id: "16.1.121"
+  case_name: "Toast-Dialog"
+  source_files:
+    - "src/MainActivity.java"
+    - "src/activity_main.xml"
+
+  android_apis:
+    # Activity / Context (16.4.2)
+    - api: "androidx.appcompat.app.AppCompatActivity"
+      type: "class"
+      usage: "MainActivity继承基类"
+      bridge_owner: "16.4.2"
+      
+    - api: "android.app.Activity.setContentView(int)"
+      type: "method"
+      usage: "设置布局资源"
+      bridge_owner: "16.4.2"
+
+    # View / Widget (16.4.3)
+    - api: "android.app.Activity.findViewById(int)"
+      type: "method"
+      usage: "查找视图组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Button"
+      type: "class"
+      usage: "按钮组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.view.View.setOnClickListener(View.OnClickListener)"
+      type: "method"
+      usage: "设置点击监听"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast"
+      type: "class"
+      usage: "消息提示组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast.makeText(Context, String, int)"
+      type: "method"
+      usage: "创建Toast消息"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast.LENGTH_SHORT"
+      type: "constant"
+      usage: "Toast显示时长"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast.show()"
+      type: "method"
+      usage: "显示Toast"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog"
+      type: "class"
+      usage: "对话框组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog.Builder"
+      type: "class"
+      usage: "对话框构建器"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog.Builder.setTitle(String)"
+      type: "method"
+      usage: "设置对话框标题"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog.Builder.setMessage(String)"
+      type: "method"
+      usage: "设置对话框消息"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog.Builder.setPositiveButton(String, OnClickListener)"
+      type: "method"
+      usage: "设置确认按钮"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog.Builder.setNegativeButton(String, OnClickListener)"
+      type: "method"
+      usage: "设置取消按钮"
+      bridge_owner: "16.4.3"
+      
+    - api: "androidx.appcompat.app.AlertDialog.Builder.show()"
+      type: "method"
+      usage: "显示对话框"
+      bridge_owner: "16.4.3"
+
+  bridge_summary:
+    "16.4.2": 2  # Activity/Context
+    "16.4.3": 14 # View/Widget/Toast/Dialog
+
+  acceptance_criteria:
+    - "Toast功能：点击Show Toast按钮，应显示'Hello Toast!'消息"
+    - "Dialog功能：点击Show Dialog按钮，应显示确认对话框"
+    - "Dialog交互：点击Yes按钮应显示'Confirmed' Toast"
+    - "Dialog交互：点击No按钮应关闭对话框无其他操作"
+    - "UI布局：两个按钮垂直居中排列，间距适当"
+
+  complexity: "LOW"
+  notes: "标准Toast和AlertDialog使用场景，主要涉及16.4.3 UI组件Bridge"

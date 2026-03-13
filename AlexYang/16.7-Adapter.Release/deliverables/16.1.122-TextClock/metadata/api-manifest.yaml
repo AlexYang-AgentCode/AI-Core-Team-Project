@@ -1,0 +1,47 @@
+case_id: "16.1.122"
+case_name: "TextClock"
+source_files:
+  - "src/MainActivity.java"
+  - "src/activity_main.xml"
+
+android_apis_used:
+  - api: "androidx.appcompat.app.AppCompatActivity"
+    usage: "onCreate, setContentView"
+    bridge_owner: "16.4.2"  # Activity.Bridge
+
+  - api: "android.widget.TextClock"
+    usage: "XML widget, format12Hour='hh:mm:ss', 实时显示时间"
+    bridge_owner: "16.4.3"  # View.Bridge
+
+  - api: "android.widget.Button"
+    usage: "setOnClickListener"
+    bridge_owner: "16.4.3"
+
+  - api: "android.widget.TextView"
+    usage: "setText"
+    bridge_owner: "16.4.3"
+
+  - api: "android.view.View"
+    usage: "OnClickListener"
+    bridge_owner: "16.4.3"
+
+  - api: "java.util.TimeZone"
+    usage: "getDefault, getDisplayName(false, SHORT), getID"
+    bridge_owner: "16.4.4"  # System.Bridge (系统时区服务)
+
+  - api: "R.layout / R.id (findViewById)"
+    usage: "activity_main, idTextClock, timeZoneButton, timeZoneShow"
+    bridge_owner: "16.4.3"
+
+  - api: "androidx.constraintlayout.widget.ConstraintLayout"
+    usage: "根布局, 约束定位"
+    bridge_owner: "16.4.3"
+
+dependencies: []  # 无依赖其他案例
+
+acceptance_criteria:
+  - "页面显示实时时钟，格式 hh:mm:ss，每秒更新"
+  - "时钟文字颜色为强调色 (#FF4081 / colorAccent)"
+  - "页面有 'Get Time Zone' 按钮"
+  - "点击按钮后显示当前时区名称和时区 ID"
+  - "时钟位于页面中部偏上，按钮在顶部"

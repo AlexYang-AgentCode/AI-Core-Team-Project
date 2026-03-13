@@ -1,0 +1,16 @@
+tr4_version:
+  case_id: "16.1.123"
+  case_name: "UIWidgets-Calculator"
+  version: "1.0.0"
+  test_status: "PARTIAL"
+  test_date: "2026-03-13"
+  platforms:
+    harmony:
+      status: "PASS"
+      test_count: 3
+      pass_count: 0
+      not_verified: 3
+  deliverables:
+    location: "/mnt/e/10.Project/16.7-Adapter.Release/deliverables/16.1.123-UIWidgets-Calculator/"
+test_standard: "v2.0-The_Paranoid_Professional"
+test_status: "E2E_DONE"

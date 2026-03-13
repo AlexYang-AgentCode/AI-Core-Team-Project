@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Activity Bridge Test Entry"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Activity Bridge Test Entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Activity Bridge"
+    }
+  ]
+}

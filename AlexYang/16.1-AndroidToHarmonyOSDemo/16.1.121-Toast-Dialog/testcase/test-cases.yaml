@@ -1,0 +1,69 @@
+# Test Cases for 16.1.121 Toast-Dialog
+# Generated: 2026-03-13
+
+test_suite:
+  case_id: "16.1.121"
+  case_name: "Toast-Dialog"
+  
+  test_cases:
+    - id: TC001
+      name: "初始页面显示"
+      steps:
+        - "启动应用"
+        - "观察页面布局"
+      expected: "显示两个按钮：'Show Toast' 和 'Show Dialog'，垂直居中排列"
+      priority: HIGH
+      
+    - id: TC002
+      name: "显示Toast消息"
+      steps:
+        - "点击 'Show Toast' 按钮"
+      expected: "屏幕底部显示Toast消息'Hello Toast!'，约2秒后自动消失"
+      priority: HIGH
+      
+    - id: TC003
+      name: "显示确认对话框"
+      steps:
+        - "点击 'Show Dialog' 按钮"
+      expected: "弹出对话框，标题'Confirm'，消息'Are you sure?'，两个按钮'Yes'和'No'"
+      priority: HIGH
+      
+    - id: TC004
+      name: "对话框Yes按钮"
+      steps:
+        - "点击 'Show Dialog' 按钮"
+        - "点击对话框中的 'Yes' 按钮"
+      expected: "对话框关闭，显示Toast消息'Confirmed'"
+      priority: HIGH
+      
+    - id: TC005
+      name: "对话框No按钮"
+      steps:
+        - "点击 'Show Dialog' 按钮"
+        - "点击对话框中的 'No' 按钮"
+      expected: "对话框关闭，无其他操作，不显示Toast"
+      priority: HIGH
+      
+    - id: TC006
+      name: "连续显示Toast"
+      steps:
+        - "快速连续点击 'Show Toast' 3次"
+      expected: "Toast消息依次显示，队列处理正常"
+      priority: MEDIUM
+      
+    - id: TC007
+      name: "对话框外部点击"
+      steps:
+        - "点击 'Show Dialog' 按钮"
+        - "点击对话框外部区域"
+      expected: "对话框关闭（autoCancel=true）"
+      priority: MEDIUM
+      
+    - id: TC008
+      name: "多次显示对话框"
+      steps:
+        - "点击 'Show Dialog' 按钮"
+        - "点击 'No' 关闭"
+        - "再次点击 'Show Dialog' 按钮"
+      expected: "每次都能正常显示对话框"
+      priority: MEDIUM

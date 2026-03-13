@@ -1,0 +1,6 @@
+design_report:
+  case_id: "16.1.126"
+  api_mappings:
+    - android_api: "android.os.Handler"
+      decision: "BRIDGE_EXISTING"
+      bridge_agent: "16.4.6"

@@ -1,0 +1,23 @@
+{
+  "name": "api-16.1-e2e-test",
+  "version": "1.0.0",
+  "description": "E2E Testing for API #1: AppCompatActivity Adapter",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist coverage"
+  },
+  "keywords": ["api", "adapter", "android", "harmonyos", "e2e", "testing"],
+  "author": "Claudian",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  }
+}

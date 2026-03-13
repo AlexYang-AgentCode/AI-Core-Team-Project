@@ -1,0 +1,8 @@
+# 飞书 Webhook URL 配置文件
+# 来源: 16.1-HAND-001 配置飞书 Webhook
+# 日期: 2026-03-09
+# 说明: 粘贴你从飞书群组获取的 Webhook URL 到这里
+
+[请粘贴你的 Webhook URL，格式如下:]
+https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxxxxxxxxxxxxxxxx
+

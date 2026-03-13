@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+<!--
+    1. Define a view in the layout file and assign it a unique id.
+    2. Layouts for wrap_content tells the view to size itself to the dimensions required by its content.
+       The layout will give the position for width and height.
+    3. The Layouts for centerHorizontal and vertical, will position the Text clock in the middle of the
+        screen.
+    4. format12Hour specifies the formatting pattern used to show the time and/or date in 12-hour mode.
+    5. textColor will change the color of the output text when the program is executed.
+    6. textSize will allow you to increase the size of text by increasing the amount of dp.
+    7. The rest are all constraints for the positioning of the Text Clock. It refers to the
+        arrow connections for left, right, top and bottom.
+-->
+    <TextClock
+        android:id="@+id/idTextClock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
+        android:format12Hour="hh:mm:ss"
+        android:textColor="@color/colorAccent"
+        android:textSize="35dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.403" />
+
+
+    <!--   Attributes to display the timezone-->
+    <Button
+        android:id="@+id/timeZoneButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Get Time Zone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.067" />
+
+    <TextView
+        android:id="@+id/timeZoneShow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TimeZone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.474"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.231" />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

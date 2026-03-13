@@ -1,0 +1,76 @@
+# ============================================
+# Claude Code 生成的中间过程文件
+# ============================================
+*.md
+*.MD
+.claude/
+.claude
+todos/
+todo.txt
+notes.txt
+scratchpad.txt
+*.scratchpad
+phase-reports/
+reports/
+generated/
+output/
+screenshots/
+
+# ============================================
+# Android 构建产物
+# ============================================
+*.iml
+.gradle/
+local.properties
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ============================================
+# HarmonyOS / ArkTS / OpenHarmony
+# ============================================
+.preview/
+node_modules/
+oh_modules/
+.hvigor/
+.cache/
+default/
+*.hap
+*.app
+oh-package-lock.json5
+
+# ============================================
+# Java / Kotlin
+# ============================================
+*.class
+*.jar
+*.war
+target/
+out/
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ============================================
+# IDE / 系统
+# ============================================
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+*.swp
+*.log
+tmp/
+temp/

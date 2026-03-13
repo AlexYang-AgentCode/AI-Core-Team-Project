@@ -1,0 +1,26 @@
+test_suite:
+  case_id: "16.1.122"
+  case_name: "TextClock"
+  
+  test_cases:
+    - id: TC001
+      name: "初始页面显示时钟"
+      steps:
+        - "启动应用"
+        - "观察时钟显示"
+      expected: "显示当前时间 hh:mm:ss 格式"
+      priority: HIGH
+      
+    - id: TC002
+      name: "时区按钮显示时区信息"
+      steps:
+        - "点击 'Get Time Zone' 按钮"
+      expected: "显示当前时区信息"
+      priority: HIGH
+      
+    - id: TC003
+      name: "时钟自动更新"
+      steps:
+        - "等待5秒"
+      expected: "时间数字更新"
+      priority: MEDIUM

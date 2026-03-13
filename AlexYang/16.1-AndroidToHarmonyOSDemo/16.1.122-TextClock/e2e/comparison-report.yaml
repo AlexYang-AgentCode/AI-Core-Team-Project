@@ -1,0 +1,71 @@
+comparison_report:
+  case_id: "16.1.122"
+  test_date: "2026-03-13"
+  attempt: 1
+
+  unit_test_status:
+    note: "全部 DIRECT_MAP，无 Bridge 代码，不涉及 16.4.x 单元测试"
+
+  scenarios:
+    - name: "页面启动 — 显示实时时钟"
+      android_behavior: |
+        TextClock 组件显示 hh:mm:ss 格式时间，每秒更新，
+        文字颜色 colorAccent，字号 35dp，居中偏上
+      harmony_behavior: |
+        TextClock 组件 .format('hh:mm:ss')，
+        fontColor('#FF4081'), fontSize(35), margin top 80
+        通过 onDateChange 回调更新
+      diff: "MATCH"
+
+    - name: "Get Time Zone 按钮 — 位置和外观"
+      android_behavior: |
+        Button 文字 'Get Time Zone'，宽度 match_parent，
+        位于顶部 (verticalBias 0.067)
+      harmony_behavior: |
+        Button('Get Time Zone')，width('100%')，
+        位于 Column 顶部
+      diff: "MATCH"
+
+    - name: "点击 Get Time Zone — 显示时区信息"
+      android_behavior: |
+        TimeZone.getDefault() 获取默认时区
+        显示: "Time Zone : [SHORT_NAME]TimeZone Id: [ID]"
+        注意: 原 Android 代码中 SHORT_NAME 和 TimeZone Id 之间没有空格
+      harmony_behavior: |
+        i18n.System.getSystemTimezone() 获取时区 ID
+        i18n.getTimeZone(id).getDisplayName() 获取名称
+        显示: "Time Zone : [DISPLAY_NAME] TimeZone Id: [ID]"
+      diff: "MINOR_DIFF"
+      detail: |
+        1. Android 用 getDisplayName(false, SHORT) 返回短名称如 "CST"
+           HarmonyOS 用 getDisplayName() 返回完整名称如 "China Standard Time"
+           → 功能等价，显示格式略有不同
+        2. Android 原代码拼接有 typo: "SHORT) + \"TimeZone Id" 缺少空格
+           HarmonyOS 版本修正了这个问题，加了空格
+           → 实际上 HarmonyOS 版本更合理
+
+    - name: "时区信息默认文字"
+      android_behavior: "TextView 默认显示 'TimeZone'"
+      harmony_behavior: "@State timeZoneInfo 默认值 'TimeZone'"
+      diff: "MATCH"
+
+    - name: "TextClock 时区偏移"
+      android_behavior: "TextClock 使用系统默认时区（无硬编码偏移）"
+      harmony_behavior: "TextClock({ timeZoneOffset: -8, ... }) 硬编码 UTC-8"
+      diff: "MAJOR_DIFF"
+      detail: |
+        Android TextClock 自动使用系统时区。
+        HarmonyOS 版本硬编码 timeZoneOffset: -8 (UTC+8 东八区)。
+        如果用户不在东八区，时钟显示将不正确。
+        应改为动态获取系统时区偏移。
+      action: "修复 harmony/Index.ets 中的 timeZoneOffset 硬编码问题"
+
+  summary:
+    total: 5
+    match: 3
+    minor_diff: 1
+    major_diff: 1
+    broken: 0
+    verdict: "CONDITIONAL_PASS"
+    blocking_issues:
+      - "TextClock timeZoneOffset 硬编码 -8，应动态获取系统时区"

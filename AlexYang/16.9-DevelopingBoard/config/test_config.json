@@ -1,0 +1,47 @@
+{
+  "device_config": {
+    "ip": "192.168.1.100",
+    "serial_port": "/dev/ttyUSB0",
+    "baudrate": 115200,
+    "ssh_username": "root",
+    "ssh_password": "123456",
+    "ssh_key_file": null
+  },
+  "flash_config": {
+    "method": "fel",
+    "auto_enter_fel": true,
+    "power_control": {
+      "enabled": false,
+      "type": "usb_hub",
+      "hub_port": 1
+    }
+  },
+  "test_config": {
+    "timeout": 300,
+    "retry_count": 3,
+    "tests": [
+      "boot",
+      "system_info",
+      "network",
+      "storage",
+      "memory",
+      "cpu",
+      "gpu",
+      "gpio",
+      "logs",
+      "processes"
+    ]
+  },
+  "notifications": {
+    "enabled": true,
+    "webhook": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+    "email": {
+      "enabled": true,
+      "smtp_server": "smtp.example.com",
+      "smtp_port": 587,
+      "username": "notify@example.com",
+      "password": "your-password",
+      "recipients": ["developer@example.com"]
+    }
+  }
+}

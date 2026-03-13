@@ -1,0 +1,9 @@
+api_manifest:
+  case_id: "16.1.125"
+  case_name: "Intent"
+  android_apis:
+    - api: "android.content.Intent"
+      bridge_owner: "16.4.2"
+    - api: "android.app.Activity.startActivity"
+      bridge_owner: "16.4.2"
+  complexity: "MEDIUM"

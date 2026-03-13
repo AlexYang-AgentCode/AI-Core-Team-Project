@@ -1,0 +1,23 @@
+case_id: "16.1.122"
+attempt: 2
+date: "2026-03-13"
+status: "DELIVERABLE_INCOMPLETE"
+
+deliverable_check:
+  "16.1_analysis": "PASS"
+  "16.3_design": "PASS"
+  "16.4.x_bridge": "N/A — 全部 DIRECT_MAP"
+  "16.6_test":
+    comparison_report: true
+    test_method: "MISSING"
+    environment: "MISSING"
+    android_screenshots: 0      # ← REJECT
+    harmony_screenshots: 0      # ← REJECT
+    scenario_evidence: "MISSING"
+    verdict: "REJECTED — 16.6 未执行实际运行时测试"
+
+fix_applied:
+  - file: "harmony/Index.ets"
+    change: "移除 timeZoneOffset: -8 硬编码，改用系统默认时区"
+
+next_action: "需要 16.6 在仿真器/真机上执行 /test-compare 122，提供双端截屏"

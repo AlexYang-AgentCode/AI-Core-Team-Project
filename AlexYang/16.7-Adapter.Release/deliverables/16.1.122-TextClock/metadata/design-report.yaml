@@ -1,0 +1,68 @@
+case_id: "16.1.122"
+case_name: "TextClock"
+designer: "16.3-R&D"
+date: "2026-03-13"
+
+global_context:
+  note: |
+    TextClock 是 Android 原生 Widget，HarmonyOS ArkUI 有同名组件 TextClock。
+    TimeZone 在 HarmonyOS 中由 @kit.LocalizationKit (i18n) 提供。
+    本案例复杂度低，所有 API 都有直接映射。
+
+design_decisions:
+  - api: "AppCompatActivity.onCreate + setContentView"
+    decision: "DIRECT_MAP"
+    harmony_api: "@Entry @Component struct + build()"
+    rationale: |
+      单页面应用，Activity 生命周期映射为 ArkUI Component 生命周期。
+      onCreate → aboutToAppear, setContentView → build()。
+      本案例足够简单，不需要 16.4.2 Activity.Bridge 介入。
+
+  - api: "android.widget.TextClock"
+    decision: "DIRECT_MAP"
+    harmony_api: "ArkUI TextClock 组件"
+    rationale: |
+      HarmonyOS ArkUI 原生提供 TextClock 组件，支持 .format() 设定格式，
+      支持 TextClockController 控制，功能等价。
+      format12Hour='hh:mm:ss' → .format('hh:mm:ss')
+
+  - api: "android.widget.Button + OnClickListener"
+    decision: "DIRECT_MAP"
+    harmony_api: "ArkUI Button + .onClick()"
+    rationale: "Button 和点击事件是 ArkUI 基础组件，1:1 映射。"
+
+  - api: "android.widget.TextView + setText"
+    decision: "DIRECT_MAP"
+    harmony_api: "ArkUI Text 组件 + @State 绑定"
+    rationale: |
+      Android 的 TextView.setText() 在声明式 UI 中通过 @State 数据绑定实现。
+      Text(this.timeZoneInfo) 绑定 @State 变量即可。
+
+  - api: "java.util.TimeZone (getDefault, getDisplayName, getID)"
+    decision: "DIRECT_MAP"
+    harmony_api: "@kit.LocalizationKit i18n.System.getSystemTimezone() + i18n.getTimeZone()"
+    rationale: |
+      i18n.System.getSystemTimezone() 对应 TimeZone.getDefault().getID()。
+      i18n.getTimeZone(id).getDisplayName() 对应 TimeZone.getDisplayName()。
+      参数差异: Android getDisplayName(false, SHORT) 返回短名称，
+      HarmonyOS getDisplayName() 返回默认格式，功能等价可接受。
+
+  - api: "R.id.findViewById"
+    decision: "DIRECT_MAP"
+    harmony_api: "不需要 — 声明式 UI 通过 @State 绑定"
+    rationale: "ArkUI 是声明式，不需要 findViewById，UI 直接绑定状态变量。"
+
+  - api: "ConstraintLayout"
+    decision: "DIRECT_MAP"
+    harmony_api: "ArkUI Column + 布局属性"
+    rationale: "本案例布局简单（垂直排列），Column 即可满足，不需要复杂约束布局。"
+
+new_module_proposals: []
+forward_looking_notes: []
+
+summary:
+  total_apis: 7
+  direct_map: 7
+  bridge_existing: 0
+  new_module_needed: 0
+  verdict: "全部 DIRECT_MAP，无需 Bridge Agent 介入。harmony/Index.ets 可直接实现。"

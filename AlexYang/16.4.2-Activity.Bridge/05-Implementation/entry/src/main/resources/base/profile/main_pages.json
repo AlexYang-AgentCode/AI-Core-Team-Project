@@ -1,0 +1,9 @@
+{
+  "module": {
+    "name": "entry",
+    "type": "entry"
+  },
+  "target_dirs": [
+    "./src/main/resources"
+  ]
+}

@@ -1,0 +1,253 @@
+pipeline {
+    agent any
+    
+    environment {
+        SOURCE_DIR = "${HOME}/ohos-p7885"
+        OUTPUT_DIR = "/opt/ohos-images"
+        LOG_DIR = "/var/log/p7885-cicd"
+        DEVICE_IP = "192.168.1.100"
+        DEVICE_SERIAL = "/dev/ttyUSB0"
+    }
+    
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        timeout(time: 2, unit: 'HOURS')
+    }
+    
+    stages {
+        stage('Environment Check') {
+            steps {
+                script {
+                    echo "Checking build environment..."
+                    sh '''
+                        python3 --version
+                        node --version
+                        git --version
+                        gn --version
+                        ninja --version
+                        clang --version
+                        df -h
+                        free -h
+                    '''
+                }
+            }
+        }
+        
+        stage('Compile') {
+            steps {
+                script {
+                    echo "Starting OpenHarmony compilation..."
+                    sh '''
+                        cd ${SOURCE_DIR}
+                        source build/envsetup.sh
+                        lunch hihope_p7885-userdebug
+                        ./build.sh --product hihope_p7885 --ccache --jobs 8
+                    '''
+                }
+            }
+            post {
+                success {
+                    script {
+                        // 打包镜像
+                        sh '''
+                            BUILD_TIME=$(date +%Y%m%d-%H%M%S)
+                            PACKAGE_DIR="${OUTPUT_DIR}/hihope_p7885-${BUILD_TIME}"
+                            mkdir -p ${PACKAGE_DIR}
+                            cp ${SOURCE_DIR}/out/hihope_p7885/packages/phone/images/*.img ${PACKAGE_DIR}/
+                            
+                            # 生成构建信息
+                            cat > ${PACKAGE_DIR}/build_info.txt <<EOF
+Build Time: $(date -Iseconds)
+Build Number: ${BUILD_NUMBER}
+Git Commit: $(cd ${SOURCE_DIR} && git log -1 --oneline)
+Jenkins Job: ${JOB_NAME}
+EOF
+                            
+                            # 创建latest链接
+                            ln -sfn ${PACKAGE_DIR} ${OUTPUT_DIR}/latest
+                            
+                            echo "Images packaged to: ${PACKAGE_DIR}"
+                        '''
+                    }
+                    
+                    // 归档镜像
+                    archiveArtifacts artifacts: '/opt/ohos-images/latest/*.img', 
+                                    fingerprint: true,
+                                    allowEmptyArchive: false
+                }
+                failure {
+                    echo "Compilation failed!"
+                }
+            }
+        }
+        
+        stage('Flash Device') {
+            steps {
+                script {
+                    echo "Flashing images to P7885 device..."
+                    sh '''
+                        python3 ${WORKSPACE}/scripts/flash_p7885.py \
+                            --method fel \
+                            --image-dir ${OUTPUT_DIR}/latest \
+                            --serial ${DEVICE_SERIAL} \
+                            --wait 60
+                    '''
+                }
+            }
+            post {
+                success {
+                    echo "Flash completed successfully!"
+                }
+                failure {
+                    echo "Flash failed!"
+                }
+            }
+        }
+        
+        stage('Wait for Boot') {
+            steps {
+                script {
+                    echo "Waiting for device to boot..."
+                    sh '''
+                        # 等待系统启动
+                        sleep 30
+                        
+                        # 等待网络就绪
+                        timeout=120
+                        elapsed=0
+                        while [ $elapsed -lt $timeout ]; do
+                            if ping -c 1 -W 2 ${DEVICE_IP} >/dev/null 2>&1; then
+                                echo "Device is online!"
+                                exit 0
+                            fi
+                            sleep 1
+                            elapsed=$((elapsed + 1))
+                        done
+                        echo "Timeout waiting for device"
+                        exit 1
+                    '''
+                }
+            }
+        }
+        
+        stage('Automated Test') {
+            steps {
+                script {
+                    echo "Running automated tests..."
+                    sh '''
+                        python3 ${WORKSPACE}/scripts/remote_test.py \
+                            --method ssh \
+                            --host ${DEVICE_IP} \
+                            --report ${OUTPUT_DIR}/latest/test_report.json
+                    '''
+                }
+            }
+            post {
+                always {
+                    // 归档测试报告
+                    archiveArtifacts artifacts: '/opt/ohos-images/latest/test_report.json',
+                                    fingerprint: true,
+                                    allowEmptyArchive: true
+                }
+                success {
+                    script {
+                        // 解析并显示测试结果
+                        sh '''
+                            python3 <<EOF
+import json
+import sys
+
+try:
+    with open('${OUTPUT_DIR}/latest/test_report.json', 'r') as f:
+        report = json.load(f)
+    
+    summary = report.get('summary', {})
+    print(f"\\nTest Summary:")
+    print(f"  Total:   {summary.get('total', 0)}")
+    print(f"  Passed:  {summary.get('passed', 0)}")
+    print(f"  Failed:  {summary.get('failed', 0)}")
+    print(f"  Skipped: {summary.get('skipped', 0)}")
+    
+    if summary.get('failed', 0) > 0:
+        print("\\nFailed Tests:")
+        for r in report.get('results', []):
+            if r['status'] == 'FAIL':
+                print(f"  - {r['test_name']}: {r.get('error', '')}")
+        sys.exit(1)
+        
+except Exception as e:
+    print(f"Error reading report: {e}")
+    sys.exit(1)
+EOF
+                        '''
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                // 生成HTML报告
+                sh '''
+                    cat > ${LOG_DIR}/report-${BUILD_NUMBER}.html <<EOF
+<!DOCTYPE html>
+<html>
+<head>
+    <title>P7885 Build #${BUILD_NUMBER}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        .status-success { color: green; }
+        .status-failure { color: red; }
+        .status-unstable { color: orange; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #4CAF50; color: white; }
+    </style>
+</head>
+<body>
+    <h1>P7885 Build Report #${BUILD_NUMBER}</h1>
+    <p>Build Time: ${BUILD_TIMESTAMP}</p>
+    <p>Status: <span class="status-${currentBuild.currentResult.toLowerCase()}">${currentBuild.currentResult}</span></p>
+    
+    <h2>Artifacts</h2>
+    <ul>
+        <li>Images: ${OUTPUT_DIR}/latest/</li>
+        <li>Test Report: ${OUTPUT_DIR}/latest/test_report.json</li>
+    </ul>
+    
+    <h2>Console Log</h2>
+    <pre>${BUILD_URL}console</pre>
+</body>
+</html>
+EOF
+                '''
+            }
+            
+            // 发送通知
+            emailext (
+                subject: "P7885 Build #${BUILD_NUMBER} - ${currentBuild.currentResult}",
+                body: """
+                Build #${BUILD_NUMBER} ${currentBuild.currentResult}
+                
+                Job: ${JOB_NAME}
+                Build URL: ${BUILD_URL}
+                
+                Images: ${OUTPUT_DIR}/latest/
+                """,
+                to: "${env.CHANGE_AUTHOR_EMAIL ?: 'developer@example.com'}"
+            )
+        }
+        
+        cleanup {
+            // 清理旧构建
+            sh '''
+                cd ${OUTPUT_DIR}
+                ls -t | tail -n +11 | xargs -r rm -rf
+            '''
+        }
+    }
+}

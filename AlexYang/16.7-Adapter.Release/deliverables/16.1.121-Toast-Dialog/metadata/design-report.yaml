@@ -1,0 +1,197 @@
+design_report:
+  case_id: "16.1.121"
+  case_name: "Toast-Dialog"
+  design_date: "2026-03-13"
+  designed_by: "16.3-Adapter.Requirement"
+
+  # API 映射决策表
+  api_mappings:
+    # ==================== 16.4.2 Activity/Context Bridge ====================
+    - android_api: "androidx.appcompat.app.AppCompatActivity"
+      decision: "DIRECT_MAP"
+      harmony_api: "@Entry @Component struct MainPage"
+      bridge_agent: null
+      rationale: "ArkUI的@Entry装饰器直接对应Android的Activity入口，无需Bridge"
+
+    - android_api: "android.app.Activity.setContentView(int)"
+      decision: "DIRECT_MAP"
+      harmony_api: "build() { Column() { ... } }"
+      bridge_agent: null
+      rationale: "ArkUI的build()方法直接构建UI，无需setContentView"
+
+    # ==================== 16.4.3 View/Widget Bridge ====================
+    - android_api: "android.app.Activity.findViewById(int)"
+      decision: "DIRECT_MAP"
+      harmony_api: "@State变量直接绑定"
+      bridge_agent: null
+      rationale: "ArkUI使用声明式UI，通过@State变量绑定组件，无需findViewById"
+
+    - android_api: "android.widget.Button"
+      decision: "DIRECT_MAP"
+      harmony_api: "Button('label')"
+      bridge_agent: null
+      rationale: "HarmonyOS Button组件直接对应Android Button"
+
+    - android_api: "android.view.View.setOnClickListener"
+      decision: "DIRECT_MAP"
+      harmony_api: "Button().onClick(() => { ... })"
+      bridge_agent: null
+      rationale: "ArkUI在组件定义时直接绑定点击事件"
+
+    - android_api: "android.widget.Toast"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "ToastBridge.makeText(context, message, duration).show()"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        使用已实现的ToastBridge:
+        - ToastBridge.makeText(context, message, duration): ToastMessage
+        - ToastMessage.show(): void
+        - 常量: ToastBridge.LENGTH_SHORT = 2000
+      rationale: "16.4.3已提供ToastBridge，保持API风格一致"
+
+    - android_api: "android.widget.Toast.makeText"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "ToastBridge.makeText()"
+      bridge_agent: "16.4.3"
+      interface_requirement: "同上"
+      rationale: "使用现有Bridge"
+
+    - android_api: "android.widget.Toast.LENGTH_SHORT"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "ToastBridge.LENGTH_SHORT"
+      bridge_agent: "16.4.3"
+      interface_requirement: "常量值2000毫秒"
+      rationale: "使用现有Bridge常量"
+
+    - android_api: "android.widget.Toast.show()"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "ToastMessage.show()"
+      bridge_agent: "16.4.3"
+      interface_requirement: "ToastMessage对象的show方法"
+      rationale: "使用现有Bridge"
+
+    - android_api: "androidx.appcompat.app.AlertDialog"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBridge"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        封装 @kit.ArkUI.promptAction.showDialog() 为类Android AlertDialog API:
+        class AlertDialogBridge {
+          static Builder(context: Context): AlertDialogBuilder;
+        }
+        
+        class AlertDialogBuilder {
+          setTitle(title: string): this;
+          setMessage(message: string): this;
+          setPositiveButton(text: string, callback: () => void): this;
+          setNegativeButton(text: string, callback?: () => void): this;
+          show(): void;
+        }
+      rationale: "HarmonyOS的promptAction.showDialog()是简化版，需要Bridge封装成Android风格的Builder模式"
+
+    - android_api: "androidx.appcompat.app.AlertDialog.Builder"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBuilder"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        支持链式调用的Builder模式:
+        new AlertDialog.Builder(context)
+          .setTitle("Title")
+          .setMessage("Message")
+          .setPositiveButton("Yes", listener)
+          .setNegativeButton("No", listener)
+          .show()
+      rationale: "Builder模式在ArkUI中需要封装实现"
+
+    - android_api: "androidx.appcompat.app.AlertDialog.Builder.setTitle"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBuilder.setTitle()"
+      bridge_agent: "16.4.3"
+      interface_requirement: "返回this支持链式调用"
+      rationale: "封装promptAction.showDialog的title参数"
+
+    - android_api: "androidx.appcompat.app.AlertDialog.Builder.setMessage"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBuilder.setMessage()"
+      bridge_agent: "16.4.3"
+      interface_requirement: "返回this支持链式调用"
+      rationale: "封装promptAction.showDialog的message参数"
+
+    - android_api: "androidx.appcompat.app.AlertDialog.Builder.setPositiveButton"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBuilder.setPositiveButton()"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        映射到promptAction.showDialog的buttons数组:
+        buttons: [
+          { text: 'Yes', color: '#007DFF', action: callback }
+        ]
+      rationale: "封装按钮配置和回调处理"
+
+    - android_api: "androidx.appcompat.app.AlertDialog.Builder.setNegativeButton"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBuilder.setNegativeButton()"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        映射到promptAction.showDialog的buttons数组:
+        buttons: [
+          { text: 'No', color: '#666666', action: callback }
+        ]
+      rationale: "封装按钮配置和回调处理"
+
+    - android_api: "androidx.appcompat.app.AlertDialog.Builder.show()"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "AlertDialogBuilder.show()"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        调用promptAction.showDialog({
+          title: this.title,
+          message: this.message,
+          buttons: this.buttons
+        })
+      rationale: "整合所有配置并显示对话框"
+
+  # Bridge 任务分配汇总
+  bridge_tasks:
+    "16.4.2":
+      task_count: 0
+      note: "所有API均可直接映射，无需Bridge开发"
+      
+    "16.4.3":
+      task_count: 2
+      apis:
+        - "ToastBridge (已存在)"
+        - "AlertDialogBridge.Builder (需实现)"
+      note: "ToastBridge已在16.4.3实现；AlertDialog.Builder模式需要新建Bridge"
+
+  # 新模块提案 (NMP)
+  new_module_proposals: []
+
+  # 实施建议
+  implementation_notes:
+    - "ToastBridge可直接使用现有实现"
+    - "AlertDialogBridge需要实现Builder模式，支持链式调用"
+    - "注意Dialog按钮回调在HarmonyOS中通过buttons数组配置"
+    - "Android的null listener在HarmonyOS中可以省略action"
+
+  # 验收标准对应
+  acceptance_mapping:
+    - criteria: "Toast功能"
+      test_method: "点击Show Toast按钮验证"
+      bridge_verification: "16.4.3 ToastBridge.makeText().show()"
+      
+    - criteria: "Dialog功能"
+      test_method: "点击Show Dialog按钮验证"
+      bridge_verification: "16.4.3 AlertDialogBridge.Builder.show()"
+      
+    - criteria: "Dialog交互 - Yes按钮"
+      test_method: "点击Yes按钮验证Toast显示"
+      bridge_verification: "16.4.3 setPositiveButton回调"
+      
+    - criteria: "Dialog交互 - No按钮"
+      test_method: "点击No按钮验证对话框关闭"
+      bridge_verification: "16.4.3 setNegativeButton回调或省略action"
+
+  estimated_effort: "1-2天"
+  risk_level: "LOW"
+  dependencies: []

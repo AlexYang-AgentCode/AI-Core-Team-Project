@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DEX to ABC Converter</string>
+    <string name="title_home">Converter</string>
+    <string name="title_api">API Demo</string>
+    <string name="select_dex">Select DEX File</string>
+    <string name="convert">Convert to ABC</string>
+    <string name="convert_batch">Batch Convert</string>
+    <string name="run_benchmark">Run Benchmark</string>
+    <string name="api_documentation">API Documentation</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_converting">Converting...</string>
+    <string name="status_complete">Conversion Complete</string>
+    <string name="status_error">Error</string>
+</resources>

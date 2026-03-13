@@ -1,0 +1,9 @@
+api_manifest:
+  case_id: "16.1.126"
+  case_name: "Handler-Looper"
+  android_apis:
+    - api: "android.os.Handler"
+      bridge_owner: "16.4.6"
+    - api: "android.os.Looper"
+      bridge_owner: "16.4.6"
+  complexity: "HIGH"

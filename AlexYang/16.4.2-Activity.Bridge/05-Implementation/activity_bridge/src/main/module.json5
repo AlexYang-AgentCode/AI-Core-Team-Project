@@ -1,0 +1,25 @@
+{
+  "module": {
+    "name": "activity_bridge",
+    "type": "shared",
+    "description": "Android Activity API Bridge for HarmonyOS",
+    "mainElement": "",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1"
+    ],
+    "deliveryWithInstall": true,
+    "installationFree": false,
+    "pages": "$profile:main_pages",
+    "abilities": [],
+    "extensionAbilities": [],
+    "requestPermissions": [],
+    "metadata": [
+      {
+        "name": "ActivityBridgeVersion",
+        "value": "1.0.0"
+      }
+    ]
+  }
+}

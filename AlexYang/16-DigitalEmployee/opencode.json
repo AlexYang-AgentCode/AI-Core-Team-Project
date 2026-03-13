@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "deepseek": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DeepSeek Coder",
+      "options": {
+        "baseURL": "https://api.deepseek.com/v1",
+        "apiKey": "{env:DEEPSEEK_API_KEY}"
+      },
+      "models": {
+        "deepseek-coder": {
+          "name": "DeepSeek Coder",
+          "contextWindow": 16000
+        }
+      }
+    },
+    "kimi": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kimi K2",
+      "options": {
+        "baseURL": "https://api.moonshot.cn/v1",
+        "apiKey": "{env:MOONSHOT_API_KEY}"
+      },
+      "models": {
+        "kimi-k2-0711-preview": {
+          "name": "Kimi K2",
+          "contextWindow": 128000
+        }
+      }
+    },
+    "glm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "GLM-4",
+      "options": {
+        "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+        "apiKey": "{env:GLM_API_KEY}"
+      },
+      "models": {
+        "glm-4": {
+          "name": "GLM-4",
+          "contextWindow": 128000
+        }
+      }
+    }
+  }
+}

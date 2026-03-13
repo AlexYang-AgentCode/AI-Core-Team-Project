@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+    "permission": {
+    "read": "allow",
+    "edit": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "bash": "allow",
+    "external_directory": "allow",
+    "lsp": "allow",
+    "skill": "allow",
+    "task": "allow",
+    "question": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "codesearch": "allow"
+  },
+  "provider": {
+    "kimi": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kimi K2.5",
+      "options": {
+        "baseURL": "https://api.moonshot.cn/v1",
+        "apiKey": "{env:MOONSHOT_API_KEY}"
+      },
+      "models": {
+        "kimi-k2.5": {
+          "name": "Kimi K2.5"
+        }
+      }
+    }
+  }
+}

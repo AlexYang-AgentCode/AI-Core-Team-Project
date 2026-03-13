@@ -1,0 +1,512 @@
+---
+title: "API #1 高层设计 - AppCompatActivity"
+tags: [api-001, design, appcompat-activity, architecture]
+date: 2026-03-09
+status: in-progress
+---
+
+# API #1 高层设计 - AppCompatActivity
+
+> **API 编号**: API-131-001
+> **API 名称**: AppCompatActivity
+> **设计版本**: 1.0
+> **设计日期**: 2026-03-09
+> **设计状态**: 进行中
+
+---
+
+## 🎯 **设计目标**
+
+1. ✅ 理解 Android AppCompatActivity 的架构
+2. ✅ 设计 HarmonyOS Page/Ability 的等价实现
+3. ✅ 定义 Android → HarmonyOS 的映射规则
+4. ✅ 建立适配器接口规范
+
+---
+
+## 📐 **架构设计**
+
+### 整体架构图
+
+```
+┌─────────────────────────────────────────────┐
+│           TextClock Application             │
+├─────────────────────────────────────────────┤
+│
+│  ┌──────────────────┐    ┌──────────────────┐
+│  │    Android       │    │   HarmonyOS      │
+│  │    Platform      │    │    Platform      │
+│  └──────────────────┘    └──────────────────┘
+│         │                        │
+│         ├─→ AppCompatActivity    ├─→ Page
+│         │   (Activity 容器)      │   (页面容器)
+│         │   - onCreate()          │   - onPageShow()
+│         │   - onResume()          │   - onPageHide()
+│         │   - setContentView()    │   - build()
+│         │   - findViewById()      │   - @State
+│         │                         │
+│         ├─→ UI Components        ├─→ UI Components
+│         │   - TextClock          │   - Text
+│         │   - Button             │   - Button
+│         │   - TextView           │   - Text
+│         │                         │
+│         └─→ Event Listeners      └─→ Event Handlers
+│             - OnClickListener      - onClick()
+│
+│  ┌─────────────────────────────────────────┐
+│  │   AppCompatActivityAdapter              │
+│  │   (映射层 - 统一接口)                   │
+│  └─────────────────────────────────────────┘
+```
+
+### 生命周期映射
+
+```
+Android Activity 生命周期          HarmonyOS Page 生命周期
+════════════════════════════════════════════════════════════
+
+onCreate(Bundle)                   onPageShow()
+   ├─ super.onCreate()              ├─ 初始化数据
+   ├─ setContentView()              ├─ 构建 UI
+   ├─ findViewById()                 └─ 启动定时器
+   └─ 初始化事件监听
+
+onStart()                          (无直接对应)
+   └─ 注册监听器
+
+onResume()                         onPageShow()
+   └─ 启动更新                      └─ 启动定时器
+
+onPause()                          onPageHide()
+   └─ 停止更新                      └─ 停止定时器
+
+onStop()                           (无直接对应)
+   └─ 注销监听器
+
+onDestroy()                        (页面销毁时)
+   └─ 清理资源
+```
+
+---
+
+## 🔧 **核心组件设计**
+
+### 1. AppCompatActivity (Android)
+
+**职责**:
+- 容器管理
+- 生命周期管理
+- UI 加载和初始化
+- 事件处理
+
+**关键方法**:
+```java
+public class MainActivity extends AppCompatActivity {
+    // 成员变量 (持有所有 UI 组件)
+    private TextClock textClock;
+    private Button refreshButton;
+    private TextView locationView;
+
+    // 生命周期方法
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);  // 加载布局
+        initializeViews();                        // 初始化组件
+        setupListeners();                         // 设置监听器
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        startUpdates();  // 启动更新
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopUpdates();   // 停止更新
+    }
+
+    // 初始化视图
+    private void initializeViews() {
+        textClock = findViewById(R.id.text_clock);
+        refreshButton = findViewById(R.id.refresh_button);
+        locationView = findViewById(R.id.location_text);
+    }
+
+    // 设置事件监听
+    private void setupListeners() {
+        refreshButton.setOnClickListener(v -> onRefreshClicked());
+    }
+
+    // 事件处理
+    private void onRefreshClicked() {
+        // 刷新逻辑
+    }
+
+    private void startUpdates() {
+        // 启动 TextClock 更新
+    }
+
+    private void stopUpdates() {
+        // 停止 TextClock 更新
+    }
+}
+```
+
+### 2. MainPage (HarmonyOS)
+
+**职责**:
+- 页面管理
+- 状态管理 (@State)
+- UI 构建 (build())
+- 事件处理
+
+**关键方法**:
+```typescript
+@Entry
+@Component
+struct MainPage {
+    @State textClockValue: string = '';
+    @State locationText: string = '';
+    @State isRunning: boolean = false;
+
+    // UI 构建
+    build() {
+        Column() {
+            Text(this.textClockValue)
+                .fontSize(48)
+                .margin(20)
+
+            Button('Refresh')
+                .onClick(() => this.onRefreshClicked())
+                .margin(20)
+
+            Text(this.locationText)
+                .fontSize(14)
+                .margin(20)
+        }
+        .padding(20)
+    }
+
+    // 页面生命周期
+    onPageShow() {
+        // 对应 Android onCreate + onResume
+        this.initializeData();
+        this.startUpdates();
+        this.isRunning = true;
+    }
+
+    onPageHide() {
+        // 对应 Android onPause
+        this.stopUpdates();
+        this.isRunning = false;
+    }
+
+    // 初始化数据
+    private initializeData() {
+        this.updateTime();
+        this.updateLocation();
+    }
+
+    // 事件处理
+    private onRefreshClicked() {
+        this.updateTime();
+        this.updateLocation();
+    }
+
+    // 定时更新
+    private startUpdates() {
+        // 启动定时器更新时间
+    }
+
+    private stopUpdates() {
+        // 停止定时器
+    }
+
+    private updateTime() {
+        // 更新时间显示
+        this.textClockValue = new Date().toLocaleTimeString();
+    }
+
+    private updateLocation() {
+        // 更新位置显示
+        this.locationText = '位置信息';
+    }
+}
+```
+
+### 3. AppCompatActivityAdapter (统一接口)
+
+**职责**:
+- 统一 Android 和 HarmonyOS 的接口
+- 屏蔽平台差异
+- 提供通用 API
+
+**接口设计**:
+```typescript
+interface IAppCompatActivity {
+    // 初始化
+    init(): void;
+
+    // 生命周期
+    onShow(): void;
+    onHide(): void;
+
+    // UI 操作
+    setContentView(layoutId: string): void;
+    findViewById(id: string): any;
+
+    // 事件监听
+    setOnClickListener(viewId: string, callback: Function): void;
+
+    // 数据管理
+    saveState(state: any): void;
+    restoreState(): any;
+
+    // 生命周期控制
+    start(): void;
+    stop(): void;
+    pause(): void;
+    resume(): void;
+}
+
+// 实现
+class AppCompatActivityAdapter implements IAppCompatActivity {
+    private activity: any;
+
+    constructor(activity: MainActivity | MainPage) {
+        this.activity = activity;
+    }
+
+    init(): void {
+        if (this.isAndroid()) {
+            this.activity.onCreate(null);
+        } else {
+            this.activity.onPageShow();
+        }
+    }
+
+    onShow(): void {
+        if (this.isAndroid()) {
+            this.activity.onResume();
+        } else {
+            this.activity.onPageShow();
+        }
+    }
+
+    onHide(): void {
+        if (this.isAndroid()) {
+            this.activity.onPause();
+        } else {
+            this.activity.onPageHide();
+        }
+    }
+
+    setContentView(layoutId: string): void {
+        if (this.isAndroid()) {
+            this.activity.setContentView(layoutId);
+        } else {
+            // HarmonyOS: 在 build() 中定义
+        }
+    }
+
+    // ... 其他方法
+}
+```
+
+---
+
+## 🔄 **数据流设计**
+
+### 用户交互流程
+
+```
+用户点击刷新按钮
+    ↓
+onRefreshClicked() 事件处理
+    ↓
+├─ Android: refreshButton.setOnClickListener()
+└─ HarmonyOS: Button.onClick()
+    ↓
+更新时间和位置
+    ├─ updateTime()
+    └─ updateLocation()
+    ↓
+UI 更新
+    ├─ Android: TextView.setText()
+    └─ HarmonyOS: @State 更新
+    ↓
+显示新数据
+```
+
+### 生命周期流程
+
+```
+应用启动
+    ↓
+onCreate() / onPageShow()
+    ├─ 初始化数据
+    ├─ 加载 UI 布局
+    ├─ 查找 UI 组件
+    └─ 设置事件监听
+    ↓
+onResume() / 显示
+    ├─ 启动定时器
+    └─ 开始更新 UI
+    ↓
+用户交互
+    ├─ 点击按钮
+    └─ 处理事件
+    ↓
+onPause() / 隐藏
+    ├─ 停止定时器
+    └─ 保存状态
+    ↓
+onDestroy() / 销毁
+    └─ 清理资源
+```
+
+---
+
+## 📊 **状态管理设计**
+
+### Android 状态 (Bundle)
+
+```java
+// 保存状态
+@Override
+protected void onSaveInstanceState(Bundle outState) {
+    super.onSaveInstanceState(outState);
+    outState.putString("time", textClock.getText().toString());
+    outState.putString("location", locationView.getText().toString());
+}
+
+// 恢复状态
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    if (savedInstanceState != null) {
+        String time = savedInstanceState.getString("time");
+        String location = savedInstanceState.getString("location");
+        // 恢复 UI
+    }
+}
+```
+
+### HarmonyOS 状态 (@State)
+
+```typescript
+@Component
+struct MainPage {
+    @State textClockValue: string = '';      // 自动持久化
+    @State locationText: string = '';        // 自动持久化
+    @State isRunning: boolean = false;       // 自动持久化
+
+    // @State 装饰器会自动处理状态管理
+    // 数据变化时自动重新渲染
+}
+```
+
+---
+
+## 🔌 **接口设计**
+
+### 公开接口
+
+```typescript
+// 初始化接口
+interface IActivityInitializer {
+    initialize(): void;
+    destroy(): void;
+}
+
+// 生命周期接口
+interface IActivityLifecycle {
+    onCreate(): void;
+    onStart(): void;
+    onResume(): void;
+    onPause(): void;
+    onStop(): void;
+    onDestroy(): void;
+}
+
+// UI 操作接口
+interface IUIOperation {
+    findViewById(id: string): View;
+    setContentView(layoutId: string): void;
+    setClickListener(viewId: string, listener: OnClickListener): void;
+}
+
+// 完整接口
+interface IAppCompatActivity extends IActivityInitializer, IActivityLifecycle, IUIOperation {
+    // 组合所有接口
+}
+```
+
+---
+
+## 🎓 **映射策略**
+
+### 直接映射 (1:1)
+
+| Android | HarmonyOS | 说明 |
+|---------|-----------|------|
+| onCreate | onPageShow | 初始化 |
+| onResume | onPageShow | 启动更新 |
+| onPause | onPageHide | 停止更新 |
+| setContentView | build() | UI 构建 |
+| findViewById | @State | 组件引用 |
+
+### 适配映射 (需转换)
+
+| Android | HarmonyOS | 转换策略 |
+|---------|-----------|---------|
+| Activity | Page | 结构完全不同，需要 Adapter |
+| Bundle | @State | 状态管理机制不同 |
+| setOnClickListener | onClick | 事件处理方式不同 |
+| TextView.setText() | @State 更新 | 状态驱动 UI |
+
+---
+
+## ✅ **设计检查清单**
+
+- [x] 架构图完成
+- [x] 生命周期映射完成
+- [x] 核心组件设计完成
+- [x] 数据流设计完成
+- [x] 状态管理设计完成
+- [x] 接口设计完成
+- [x] 映射策略定义完成
+- [ ] 详细设计文档 (下一步)
+- [ ] HarmonyOS 映射设计 (下一步)
+- [ ] 实现代码 (下一步)
+
+---
+
+## 📈 **设计评审意见** (待填写)
+
+- [ ] 架构是否合理？
+- [ ] 生命周期映射是否准确？
+- [ ] 接口是否完整？
+- [ ] 是否遗漏任何重要设计？
+- [ ] 是否需要调整？
+
+---
+
+## 🚀 **后续步骤**
+
+1. ✅ **完成本高层设计** (已完成)
+2. ⏳ **创建详细设计文档** (API-131-001-DETAILED-DESIGN.md)
+3. ⏳ **创建 HarmonyOS 映射设计** (API-131-001-HARMONYOS-MAPPING.md)
+4. ⏳ **编码实现** (Android + HarmonyOS + Adapter)
+5. ⏳ **测试和验证**
+
+---
+
+**设计版本**: 1.0 (高层设计完成)
+**设计者**: Claudian
+**创建时间**: 2026-03-09
+**状态**: ✅ 高层设计完成，待详细设计
+

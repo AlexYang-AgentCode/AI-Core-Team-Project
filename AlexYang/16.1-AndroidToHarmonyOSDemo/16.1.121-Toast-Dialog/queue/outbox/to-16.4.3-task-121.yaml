@@ -1,0 +1,122 @@
+# Bridge Agent Task - 16.4.3 View Bridge
+# Case: 16.1.121 Toast-Dialog
+# Generated: 2026-03-13
+
+task_info:
+  case_id: "16.1.121"
+  case_name: "Toast-Dialog"
+  bridge_agent: "16.4.3"
+  task_type: "BRIDGE_EXISTING"
+  priority: "NORMAL"
+  deadline: "2026-03-14"
+
+source_context:
+  android_class: "MainActivity"
+  
+  toast_usage: |
+    // Toast 使用
+    Toast.makeText(this, "Hello Toast!", Toast.LENGTH_SHORT).show()
+    
+    // Dialog中确认回调使用Toast
+    Toast.makeText(this, "Confirmed", Toast.LENGTH_SHORT).show()
+  
+  dialog_usage: |
+    // AlertDialog 使用
+    new AlertDialog.Builder(this)
+        .setTitle("Confirm")
+        .setMessage("Are you sure?")
+        .setPositiveButton("Yes", (d, w) -> { /* 显示Toast */ })
+        .setNegativeButton("No", null)
+        .show()
+
+requirements:
+  existing_bridge:
+    - name: "ToastBridge"
+      status: "EXISTS"
+      path: "16.4.3/05-Implementation/widgets/ToastBridge.ets"
+      note: "可直接使用现有实现"
+  
+  new_bridge:
+    - name: "AlertDialogBridge"
+      harmony_api: "基于 @kit.ArkUI.promptAction.showDialog()"
+      
+      interface_spec: |
+        import promptAction from '@ohos.promptAction';
+        
+        /**
+         * 类Android AlertDialog.Builder的Bridge
+         * 封装 promptAction.showDialog() 提供兼容接口
+         */
+        export class AlertDialogBridge {
+          static Builder(context?: Object): AlertDialogBuilder;
+        }
+        
+        export class AlertDialogBuilder {
+          private title: string = '';
+          private message: string = '';
+          private positiveButton?: { text: string; callback?: () => void };
+          private negativeButton?: { text: string; callback?: () => void };
+          
+          setTitle(title: string): AlertDialogBuilder;
+          setMessage(message: string): AlertDialogBuilder;
+          setPositiveButton(text: string, callback?: () => void): AlertDialogBuilder;
+          setNegativeButton(text: string, callback?: () => void): AlertDialogBuilder;
+          show(): void;
+        }
+      
+      implementation_notes: |
+        1. Builder模式，支持链式调用
+        2. setPositiveButton/setNegativeButton 存储配置
+        3. show() 方法整合所有配置调用 promptAction.showDialog()
+        4. buttons数组格式:
+           [
+             { text: 'Yes', color: '#007DFF', action: positiveCallback },
+             { text: 'No', color: '#666666', action: negativeCallback || (()=>{}) }
+           ]
+        5. 支持null listener（NegativeButton可能为null）
+
+deliverables:
+  - path: "16.4.3/05-Implementation/widgets/AlertDialogBridge.ets"
+    description: "AlertDialog Bridge实现"
+    min_lines: 80
+    must_contain: 
+      - "AlertDialogBridge"
+      - "AlertDialogBuilder"
+      - "setTitle"
+      - "setMessage"
+      - "setPositiveButton"
+      - "setNegativeButton"
+      - "show"
+  
+  - path: "16.4.3/06-Test/AlertDialogBridge.test.ets"
+    description: "单元测试"
+    min_lines: 30
+    must_contain: ["expect", "assert"]
+
+test_cases:
+  - name: "builder chain"
+    steps: 
+      - "AlertDialogBridge.Builder().setTitle('T').setMessage('M').show()"
+    expected: "promptAction.showDialog被调用，title='T', message='M'"
+    
+  - name: "positive button"
+    steps:
+      - "设置setPositiveButton('Yes', callback)"
+      - "调用show()"
+    expected: "buttons数组包含Yes按钮配置和callback"
+    
+  - name: "negative button"
+    steps:
+      - "设置setNegativeButton('No', null)"
+      - "调用show()"
+    expected: "buttons数组包含No按钮，callback为空函数"
+    
+  - name: "full dialog"
+    steps:
+      - "链式调用所有方法"
+    expected: "完整对话框正确显示"
+
+notes: |
+  - ToastBridge已存在，无需重新实现
+  - AlertDialogBuilder需要完整的Builder模式实现
+  - 注意处理null callback的情况

@@ -1,0 +1,265 @@
+design_report:
+  case_id: "16.1.120"
+  case_name: "SharedPreferences"
+  design_date: "2026-03-13"
+  designed_by: "16.3-Adapter.Requirement"
+
+  # API 映射决策表
+  api_mappings:
+    # ==================== 16.4.2 Activity/Context Bridge ====================
+    - android_api: "androidx.appcompat.app.AppCompatActivity"
+      decision: "DIRECT_MAP"
+      harmony_api: "@Entry @Component struct MainPage"
+      bridge_agent: null
+      rationale: "ArkUI的@Entry装饰器直接对应Android的Activity入口，无需Bridge"
+
+    - android_api: "android.app.Activity.setContentView(int)"
+      decision: "DIRECT_MAP"
+      harmony_api: "build() { Column() { ... } }"
+      bridge_agent: null
+      rationale: "ArkUI的build()方法直接构建UI，无需setContentView"
+
+    - android_api: "android.content.Context.getSharedPreferences(String, int)"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "preferences.getPreferences(context, name)"
+      bridge_agent: "16.4.7"
+      interface_requirement: |
+        需要封装 @ohos.data.preferences 模块，提供类Android的API接口：
+        - getPreferences(context: Context, name: string): Preferences
+        - 支持 MODE_PRIVATE 模式（HarmonyOS默认）
+      rationale: "HarmonyOS使用@ohos.data.preferences替代SharedPreferences，需要Bridge封装以保持一致API"
+
+    - android_api: "android.content.Context.MODE_PRIVATE"
+      decision: "DIRECT_MAP"
+      harmony_api: "不传递mode参数（默认PRIVATE）"
+      bridge_agent: null
+      rationale: "HarmonyOS preferences默认就是私有模式，无需显式指定"
+
+    - android_api: "android.app.Activity.getSystemService(String)"
+      decision: "DIRECT_MAP"
+      harmony_api: "不直接对应，使用特定API"
+      bridge_agent: null
+      rationale: "InputMethodManager在HarmonyOS中不需要，键盘隐藏通过focusControl实现"
+
+    - android_api: "android.view.inputmethod.InputMethodManager"
+      decision: "DIRECT_MAP"
+      harmony_api: "focusControl.clearFocus()"
+      bridge_agent: null
+      rationale: "HarmonyOS使用focusControl模块管理焦点，hideSoftInputFromWindow不需要"
+
+    - android_api: "android.view.inputmethod.InputMethodManager.hideSoftInputFromWindow"
+      decision: "DIRECT_MAP"
+      harmony_api: "focusControl.clearFocus() 或不需要"
+      bridge_agent: null
+      rationale: "HarmonyOS中输入框失焦自动隐藏键盘，无需显式调用"
+
+    # ==================== 16.4.3 View/Widget Bridge ====================
+    - android_api: "android.app.Activity.findViewById(int)"
+      decision: "DIRECT_MAP"
+      harmony_api: "@State变量直接绑定"
+      bridge_agent: null
+      rationale: "ArkUI使用声明式UI，通过@State变量绑定组件，无需findViewById"
+
+    - android_api: "android.widget.EditText"
+      decision: "DIRECT_MAP"
+      harmony_api: "TextInput({ text: $value })"
+      bridge_agent: null
+      rationale: "HarmonyOS TextInput组件直接对应EditText"
+
+    - android_api: "android.widget.EditText.getText()"
+      decision: "DIRECT_MAP"
+      harmony_api: "@State绑定的string变量"
+      bridge_agent: null
+      rationale: "ArkUI通过@State双向绑定，直接读取变量值"
+
+    - android_api: "android.widget.Button"
+      decision: "DIRECT_MAP"
+      harmony_api: "Button('label')"
+      bridge_agent: null
+      rationale: "HarmonyOS Button组件直接对应Android Button"
+
+    - android_api: "android.widget.TextView"
+      decision: "DIRECT_MAP"
+      harmony_api: "Text('content')"
+      bridge_agent: null
+      rationale: "HarmonyOS Text组件直接对应TextView"
+
+    - android_api: "android.widget.TextView.setText(String)"
+      decision: "DIRECT_MAP"
+      harmony_api: "Text(this.message)"
+      bridge_agent: null
+      rationale: "ArkUI通过@State变量自动更新UI"
+
+    - android_api: "android.widget.Toast"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "ToastUtils.show(message)"
+      bridge_agent: "16.4.3"
+      interface_requirement: |
+        需要封装 promptAction.showToast() 提供简化接口：
+        - show(message: string, duration?: number): void
+        - 默认duration为SHORT
+      rationale: "虽然HarmonyOS有promptAction.showToast()，但为保持代码简洁，建议封装工具类"
+
+    - android_api: "android.widget.Toast.makeText"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "ToastUtils.show(message)"
+      bridge_agent: "16.4.3"
+      interface_requirement: "同上"
+      rationale: "封装为同步调用，隐藏makeText和show的分离"
+
+    - android_api: "android.widget.Toast.LENGTH_SHORT"
+      decision: "DIRECT_MAP"
+      harmony_api: "2000（毫秒）"
+      bridge_agent: null
+      rationale: "HarmonyOS使用毫秒数，SHORT约2秒"
+
+    # ==================== 16.4.7 Data Storage Bridge ====================
+    - android_api: "android.content.SharedPreferences"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "@ohos.data.preferences.Preferences"
+      bridge_agent: "16.4.7"
+      interface_requirement: |
+        需要封装类Android的SharedPreferences接口：
+        interface SharedPreferencesBridge {
+          getString(key: string, defValue?: string): string;
+          putString(key: string, value: string): void;
+          remove(key: string): void;
+          contains(key: string): boolean;
+          apply(): Promise<void>;
+          commit(): boolean;
+        }
+      rationale: "虽然HarmonyOS有preferences模块，但API风格不同，需要Bridge提供类Android接口减少迁移成本"
+
+    - android_api: "android.content.SharedPreferences.edit()"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "bridge.edit()"
+      bridge_agent: "16.4.7"
+      interface_requirement: "返回Editor对象，支持链式调用"
+      rationale: "保持Android的edit() -> putXXX() -> apply()调用链习惯"
+
+    - android_api: "android.content.SharedPreferences.contains(String)"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "bridge.has(key)"
+      bridge_agent: "16.4.7"
+      interface_requirement: "提供contains/has方法检查键存在"
+      rationale: "HarmonyOS使用has()，Bridge提供contains()别名"
+
+    - android_api: "android.content.SharedPreferences.getString(String, String)"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "bridge.getString(key, defValue)"
+      bridge_agent: "16.4.7"
+      interface_requirement: "提供getString方法，支持默认值"
+      rationale: "HarmonyOS使用get()返回Promise，Bridge封装为同步API"
+
+    - android_api: "android.content.SharedPreferences.Editor"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "PreferencesEditorBridge"
+      bridge_agent: "16.4.7"
+      interface_requirement: |
+        interface PreferencesEditorBridge {
+          putString(key: string, value: string): this;
+          remove(key: string): this;
+          apply(): Promise<void>;
+          commit(): boolean;
+        }
+      rationale: "模拟Android的Editor模式，支持链式调用"
+
+    - android_api: "android.content.SharedPreferences.Editor.putString(String, String)"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "editor.putString(key, value)"
+      bridge_agent: "16.4.7"
+      interface_requirement: "返回this支持链式调用"
+      rationale: "封装HarmonyOS的put()为putString()"
+
+    - android_api: "android.content.SharedPreferences.Editor.remove(String)"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "editor.remove(key)"
+      bridge_agent: "16.4.7"
+      interface_requirement: "返回this支持链式调用"
+      rationale: "封装HarmonyOS的delete()为remove()"
+
+    - android_api: "android.content.SharedPreferences.Editor.apply()"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "await editor.apply()"
+      bridge_agent: "16.4.7"
+      interface_requirement: "异步提交，返回Promise"
+      rationale: "对应HarmonyOS的flush()，apply()为异步提交"
+
+    - android_api: "android.content.SharedPreferences.Editor.commit()"
+      decision: "BRIDGE_EXISTING"
+      harmony_api: "editor.commit()"
+      bridge_agent: "16.4.7"
+      interface_requirement: "同步提交，返回boolean"
+      rationale: "对应HarmonyOS的flush()，commit()为同步提交"
+
+    - android_api: "android.view.View.getWindowToken()"
+      decision: "DIRECT_MAP"
+      harmony_api: "不需要"
+      bridge_agent: null
+      rationale: "HarmonyOS中不需要WindowToken概念"
+
+    - android_api: "android.view.inputmethod.InputMethodManager.RESULT_UNCHANGED_SHOWN"
+      decision: "DIRECT_MAP"
+      harmony_api: "不需要"
+      bridge_agent: null
+      rationale: "不需要该常量"
+
+  # Bridge 任务分配汇总
+  bridge_tasks:
+    "16.4.2":
+      task_count: 0
+      note: "所有API均可直接映射，无需Bridge开发"
+      
+    "16.4.3":
+      task_count: 1
+      apis:
+        - "Toast封装工具类"
+      note: "可选：简化promptAction.showToast()调用"
+      
+    "16.4.7":
+      task_count: 11
+      apis:
+        - "SharedPreferencesBridge 主类"
+        - "PreferencesEditorBridge 编辑器类"
+        - "getSharedPreferences()"
+        - "getString()"
+        - "putString()"
+        - "remove()"
+        - "contains()"
+        - "apply()"
+        - "commit()"
+      note: "核心Bridge，封装@ohos.data.preferences为类Android API"
+
+  # 新模块提案 (NMP)
+  new_module_proposals: []
+    # 本案例无需要新建模块的API
+
+  # 实施建议
+  implementation_notes:
+    - "SharedPreferencesBridge是核心，需要完整实现get/put/remove/contains/apply/commit"
+    - "Editor模式需要支持链式调用：edit().putString().putString().apply()"
+    - "Toast封装为可选，可以直接使用promptAction.showToast()"
+    - "输入框失焦自动隐藏键盘，hideKeyboard()方法可以简化或移除"
+    - "建议使用异步apply()为主，commit()用于需要立即确认的场景"
+
+  # 验收标准对应
+  acceptance_mapping:
+    - criteria: "SharedPreferences存储功能"
+      test_method: "输入文本点击Save，验证数据持久化"
+      bridge_verification: "16.4.7 putString + apply/commit"
+      
+    - criteria: "SharedPreferences读取功能"
+      test_method: "点击Open，验证显示已存文本"
+      bridge_verification: "16.4.7 getString"
+      
+    - criteria: "SharedPreferences删除功能"
+      test_method: "点击Delete，验证数据清除"
+      bridge_verification: "16.4.7 remove + commit"
+      
+    - criteria: "UI交互和Toast"
+      test_method: "验证按钮响应和提示消息"
+      bridge_verification: "16.4.3 Toast封装"
+
+  estimated_effort: "2-3天"
+  risk_level: "LOW"
+  dependencies: []

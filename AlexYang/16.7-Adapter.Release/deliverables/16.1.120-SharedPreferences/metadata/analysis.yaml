@@ -1,0 +1,161 @@
+api_manifest:
+  case_id: "16.1.120"
+  case_name: "SharedPreferences"
+  source_files:
+    - "src/MainActivity.java"
+    - "src/activity_main.xml"
+
+  android_apis:
+    # Activity / Context (16.4.2)
+    - api: "androidx.appcompat.app.AppCompatActivity"
+      type: "class"
+      usage: "MainActivity继承基类"
+      bridge_owner: "16.4.2"
+      
+    - api: "android.app.Activity.setContentView(int)"
+      type: "method"
+      usage: "设置布局资源"
+      bridge_owner: "16.4.2"
+      
+    - api: "android.content.Context.getSharedPreferences(String, int)"
+      type: "method"
+      usage: "获取SharedPreferences实例"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.Context.MODE_PRIVATE"
+      type: "constant"
+      usage: "SharedPreferences访问模式"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.app.Activity.getSystemService(String)"
+      type: "method"
+      usage: "获取系统服务"
+      bridge_owner: "16.4.2"
+
+    # View / Widget (16.4.3)
+    - api: "android.app.Activity.findViewById(int)"
+      type: "method"
+      usage: "查找视图组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.EditText"
+      type: "class"
+      usage: "文本输入组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.EditText.getText()"
+      type: "method"
+      usage: "获取输入文本"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Button"
+      type: "class"
+      usage: "按钮组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.TextView"
+      type: "class"
+      usage: "文本显示组件"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.TextView.setText(String)"
+      type: "method"
+      usage: "设置显示文本"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast"
+      type: "class"
+      usage: "消息提示"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast.makeText(Context, String, int)"
+      type: "method"
+      usage: "创建Toast消息"
+      bridge_owner: "16.4.3"
+      
+    - api: "android.widget.Toast.LENGTH_SHORT"
+      type: "constant"
+      usage: "Toast显示时长"
+      bridge_owner: "16.4.3"
+
+    # Data Storage (16.4.7)
+    - api: "android.content.SharedPreferences"
+      type: "class"
+      usage: "轻量级数据存储"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.edit()"
+      type: "method"
+      usage: "获取编辑器"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.contains(String)"
+      type: "method"
+      usage: "检查键是否存在"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.getString(String, String)"
+      type: "method"
+      usage: "获取字符串值"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.Editor"
+      type: "class"
+      usage: "SharedPreferences编辑器"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.Editor.putString(String, String)"
+      type: "method"
+      usage: "存储字符串值"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.Editor.remove(String)"
+      type: "method"
+      usage: "删除键值对"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.Editor.apply()"
+      type: "method"
+      usage: "异步提交修改"
+      bridge_owner: "16.4.7"
+      
+    - api: "android.content.SharedPreferences.Editor.commit()"
+      type: "method"
+      usage: "同步提交修改"
+      bridge_owner: "16.4.7"
+
+    # Input Method (16.4.2)
+    - api: "android.view.inputmethod.InputMethodManager"
+      type: "class"
+      usage: "输入法管理器"
+      bridge_owner: "16.4.2"
+      
+    - api: "android.view.inputmethod.InputMethodManager.hideSoftInputFromWindow(android.os.IBinder, int)"
+      type: "method"
+      usage: "隐藏软键盘"
+      bridge_owner: "16.4.2"
+      
+    - api: "android.view.inputmethod.InputMethodManager.RESULT_UNCHANGED_SHOWN"
+      type: "constant"
+      usage: "隐藏键盘结果标志"
+      bridge_owner: "16.4.2"
+      
+    - api: "android.view.View.getWindowToken()"
+      type: "method"
+      usage: "获取窗口Token"
+      bridge_owner: "16.4.2"
+
+  bridge_summary:
+    "16.4.2": 6  # Activity/Context/InputMethod
+    "16.4.3": 10 # View/Widget/Toast
+    "16.4.7": 11 # SharedPreferences/DataStorage
+
+  acceptance_criteria:
+    - "SharedPreferences存储功能：输入文本后点击Save，数据应持久化存储"
+    - "SharedPreferences读取功能：点击Open，应显示已存储的文本"
+    - "SharedPreferences删除功能：点击Delete，应清除存储的数据并显示空提示"
+    - "UI交互：保存后应隐藏软键盘，并显示Toast确认消息"
+    - "边界处理：空文本保存时应提示用户输入内容"
+
+  complexity: "LOW"
+  notes: "标准SharedPreferences使用场景，主要涉及16.4.7数据存储Bridge"

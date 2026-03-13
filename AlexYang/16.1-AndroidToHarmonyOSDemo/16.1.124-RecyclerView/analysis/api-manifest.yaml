@@ -1,0 +1,12 @@
+api_manifest:
+  case_id: "16.1.124"
+  case_name: "RecyclerView"
+  android_apis:
+    - api: "androidx.recyclerview.widget.RecyclerView"
+      bridge_owner: "16.4.3"
+    - api: "androidx.recyclerview.widget.LinearLayoutManager"
+      bridge_owner: "16.4.3"
+    - api: "androidx.recyclerview.widget.RecyclerView.Adapter"
+      bridge_owner: "16.4.3"
+  complexity: "MEDIUM"
+  notes: "RecyclerView需要List Bridge支持"

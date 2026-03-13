@@ -1,0 +1,10 @@
+test_suite:
+  case_id: "16.1.139"
+  case_name: "MediaPlayer"
+  test_cases:
+    - id: TC001
+      name: "基本功能测试"
+      expected: "功能正常运行"
+    - id: TC002
+      name: "边界条件测试"
+      expected: "边界条件正确处理"

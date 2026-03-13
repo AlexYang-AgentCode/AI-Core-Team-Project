@@ -1,0 +1,35 @@
+{
+  "name": "system-bridge-tests",
+  "version": "1.0.0",
+  "description": "System Bridge单元测试",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:decimal": "jest DecimalBridge",
+    "test:expression": "jest ExpressionEvaluator",
+    "test:colors": "jest SystemColors"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/__tests__"],
+    "testMatch": ["**/*.test.ts"],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/../05-Implementation/$1"
+    },
+    "collectCoverageFrom": [
+      "../05-Implementation/**/*.ts",
+      "!../05-Implementation/**/*.d.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"]
+  }
+}

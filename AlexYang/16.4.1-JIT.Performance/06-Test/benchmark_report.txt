@@ -1,0 +1,28 @@
+JIT Performance Benchmark Report
+======================================================================
+
+Single Instruction (add-int)
+  Avg: 0.0038 ms
+  Throughput: 265,535 ops/sec
+  Status: PASS
+
+Instruction Map (5 insns)
+  Avg: 0.0114 ms
+  Throughput: 87,879 ops/sec
+  Status: PASS
+
+Complex Method (29 insns)
+  Avg: 0.0472 ms
+  Throughput: 21,189 ops/sec
+  Status: PASS
+
+Throughput (1000 insns/batch)
+  Avg: 1.6015 ms
+  Throughput: 624,423 ops/sec
+  Status: PASS
+
+DEX Parse (simple class)
+  Avg: 0.0163 ms
+  Throughput: 61,522 ops/sec
+  Status: PASS
+

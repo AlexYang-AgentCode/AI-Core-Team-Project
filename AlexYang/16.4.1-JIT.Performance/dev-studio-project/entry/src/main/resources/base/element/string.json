@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "JIT Integration Test"
+    },
+    {
+      "name": "module_desc",
+      "value": "16.4.x Integration Test Module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Main Entry Ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "JIT Tester"
+    }
+  ]
+}

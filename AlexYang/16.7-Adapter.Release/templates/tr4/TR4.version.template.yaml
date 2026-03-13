@@ -1,0 +1,206 @@
+tr4_version:
+  schema_version: "1.0.0"
+  schema_name: "16.7-TR4-version"
+  
+  # 案例标识
+  case_id: "{{CASE_ID}}"
+  case_name: "{{CASE_NAME}}"
+  
+  # 版本信息
+  version: "{{VERSION}}"
+  build_number: "{{BUILD_NUMBER}}"
+  build_date: "{{BUILD_DATE}}"
+  
+  # 测试状态
+  test_status: "{{TEST_STATUS}}"
+  test_date: "{{TEST_DATE}}"
+  test_timestamp: "{{TEST_TIMESTAMP}}"
+  test_environment: "emulator"
+  
+  # 执行信息
+  executed_by: "16.6-Adapter.Test Agent"
+  orchestrator: "16.2-AgenticWorkFlow"
+  
+  # 平台测试结果
+  platforms:
+    android:
+      status: "{{ANDROID_STATUS}}"
+      device: "{{ANDROID_DEVICE}}"
+      device_type: "emulator"
+      os_version: "{{ANDROID_OS_VERSION}}"
+      api_level: {{ANDROID_API_LEVEL}}
+      test_count: {{ANDROID_TEST_COUNT}}
+      pass_count: {{ANDROID_PASS_COUNT}}
+      fail_count: {{ANDROID_FAIL_COUNT}}
+      skip_count: 0
+      pass_rate: {{ANDROID_PASS_RATE}}
+      
+    harmony:
+      status: "{{HARMONY_STATUS}}"
+      device: "{{HARMONY_DEVICE}}"
+      device_type: "simulator"
+      os_version: "{{HARMONY_OS_VERSION}}"
+      api_version: {{HARMONY_API_VERSION}}
+      test_count: {{HARMONY_TEST_COUNT}}
+      pass_count: {{HARMONY_PASS_COUNT}}
+      fail_count: {{HARMONY_FAIL_COUNT}}
+      skip_count: 0
+      pass_rate: {{HARMONY_PASS_RATE}}
+  
+  # 代码版本
+  code_versions:
+    android:
+      type: "apk"
+      filename: "{{ANDROID_FILENAME}}"
+      md5: "{{ANDROID_MD5}}"
+      sha256: "{{ANDROID_SHA256}}"
+      size: "{{ANDROID_SIZE}}"
+      package: "{{ANDROID_PACKAGE}}"
+      min_sdk: {{ANDROID_MIN_SDK}}
+      target_sdk: {{ANDROID_TARGET_SDK}}
+      
+    harmony:
+      type: "hap"
+      filename: "entry-default-signed.hap"
+      md5: "{{HARMONY_MD5}}"
+      sha256: "{{HARMONY_SHA256}}"
+      size: "{{HARMONY_SIZE}}"
+      bundle: "{{HARMONY_BUNDLE}}"
+      api_version: {{HARMONY_API_VERSION}}
+      
+  # 源码引用（只读引用，不存储）
+  source_reference:
+    project_root: "/mnt/e/10.Project"
+    android_source: "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/src/"
+    harmony_source: "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/harmony/"
+    analysis: "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/analysis/"
+    mapping: "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/mapping/"
+    e2e: "/mnt/e/10.Project/16.1-AndroidToHarmonyOSDemo/{{CASE_ID}}-{{CASE_NAME}}/e2e/"
+    
+  # Bridge依赖
+  bridge_dependencies:
+    # 根据实际使用情况填充
+    # - bridge_id: "16.4.3"
+    #   bridge_name: "View.Bridge"
+    #   version: "1.0.0"
+    #   apis_used: ["ToastBridge"]
+    
+  # 交付物清单
+  deliverables:
+    location: "/mnt/e/10.Project/16.7-Adapter.Release/deliverables/{{CASE_ID}}-{{CASE_NAME}}/"
+    files:
+      - type: "version_file"
+        description: "版本追踪文件"
+        path: "./TR4.version"
+        required: true
+        present: true
+        
+      - type: "manifest"
+        description: "交付物清单"
+        path: "./manifest.json"
+        required: true
+        present: true
+        
+      - type: "report"
+        description: "E2E测试报告"
+        path: "./e2e/report.html"
+        required: true
+        present: true
+        
+      - type: "evidence_android"
+        description: "Android测试证据"
+        path: "./e2e/evidence/android/"
+        required: true
+        present: true
+        count: {{ANDROID_SCREENSHOT_COUNT}}
+        
+      - type: "evidence_harmony"
+        description: "HarmonyOS测试证据"
+        path: "./e2e/evidence/harmony/"
+        required: true
+        present: true
+        count: {{HARMONY_SCREENSHOT_COUNT}}
+        
+      - type: "artifact_apk"
+        description: "Android APK"
+        path: "./artifacts/android/{{ANDROID_FILENAME}}"
+        required: true
+        present: true
+        checksum: "{{ANDROID_MD5}}"
+        
+      - type: "artifact_hap"
+        description: "HarmonyOS HAP"
+        path: "./artifacts/harmony/signed-hap/entry-default-signed.hap"
+        required: true
+        present: true
+        checksum: "{{HARMONY_MD5}}"
+        
+      - type: "artifact_source"
+        description: "HarmonyOS源码快照"
+        path: "./artifacts/harmony/source/"
+        required: true
+        present: true
+        
+      - type: "metadata"
+        description: "元数据"
+        path: "./metadata/"
+        required: true
+        present: true
+  
+  # 质量门禁
+  quality_gates:
+    - gate: "test_pass_rate"
+      threshold: "≥90%"
+      actual: "{{OVERALL_PASS_RATE}}"
+      status: "{{PASS_RATE_STATUS}}"
+      
+    - gate: "screenshot_evidence"
+      threshold: "≥2 per platform"
+      actual: "{{TOTAL_SCREENSHOT_COUNT}}"
+      status: "{{SCREENSHOT_STATUS}}"
+      
+    - gate: "artifacts_present"
+      threshold: "All required"
+      actual: "{{ARTIFACT_COUNT}}/{{REQUIRED_ARTIFACT_COUNT}}"
+      status: "{{ARTIFACT_STATUS}}"
+      
+    - gate: "checksum_valid"
+      threshold: "All match"
+      actual: "{{CHECKSUM_VALID_COUNT}}/{{CHECKSUM_TOTAL_COUNT}}"
+      status: "{{CHECKSUM_STATUS}}"
+  
+  # 验证信息
+  verification:
+    verified_by: "Orchestrator Agent (16.2)"
+    verification_timestamp: "{{VERIFICATION_TIMESTAMP}}"
+    signature: "{{SIGNATURE}}"
+    evidence_integrity: "verified"
+    
+  # 审计追踪
+  audit_trail:
+    - event: "deliverable_created"
+      timestamp: "{{TEST_TIMESTAMP}}"
+      actor: "16.6-Adapter.Test"
+      action: "E2E测试执行完成"
+      details: "Android: {{ANDROID_PASS_COUNT}}/{{ANDROID_TEST_COUNT}}, Harmony: {{HARMONY_PASS_COUNT}}/{{HARMONY_TEST_COUNT}}"
+      
+    - event: "deliverable_validated"
+      timestamp: "{{VERIFICATION_TIMESTAMP}}"
+      actor: "16.2-AgenticWorkFlow"
+      action: "交付物验证完成"
+      details: "所有质量门禁通过"
+      
+    - event: "deliverable_registered"
+      timestamp: "{{REGISTRATION_TIMESTAMP}}"
+      actor: "16.7-Adapter.Release"
+      action: "交付物入库"
+      details: "Registered in 16.7 deliverables"
+  
+  # 备注
+  notes: |
+    此交付物由16.6-Adapter.Test Agent自动生成。
+    所有测试在仿真器环境中执行。
+    交付物存储位置: /mnt/e/10.Project/16.7-Adapter.Release/deliverables/{{CASE_ID}}-{{CASE_NAME}}/
+    
+  # 下次评审日期
+  next_review_date: "{{NEXT_REVIEW_DATE}}"

@@ -1,0 +1,279 @@
+{
+  "total_apis": 6728,
+  "generated": "2026-03-11",
+  "modules": {
+    "M01": {
+      "name": "android.app & android.os",
+      "api_count": 649,
+      "package_count": 13,
+      "class_count": 63,
+      "packages": [
+        "android.app",
+        "android.app.assist",
+        "android.app.backup",
+        "android.app.blob",
+        "android.app.job",
+        "android.app.people",
+        "android.app.slice",
+        "android.app.usage",
+        "android.appwidget",
+        "android.os",
+        "android.os.health",
+        "android.os.storage",
+        "android.os.strictmode"
+      ]
+    },
+    "M02": {
+      "name": "android.content",
+      "api_count": 227,
+      "package_count": 6,
+      "class_count": 26,
+      "packages": [
+        "android.content",
+        "android.content.om",
+        "android.content.pm",
+        "android.content.pm.verify.domain",
+        "android.content.res",
+        "android.content.res.loader"
+      ]
+    },
+    "M03": {
+      "name": "android.view & android.graphics",
+      "api_count": 661,
+      "package_count": 17,
+      "class_count": 58,
+      "packages": [
+        "android.graphics",
+        "android.graphics.drawable",
+        "android.graphics.drawable.shapes",
+        "android.graphics.fonts",
+        "android.graphics.pdf",
+        "android.graphics.text",
+        "android.view",
+        "android.view.accessibility",
+        "android.view.animation",
+        "android.view.autofill",
+        "android.view.contentcapture",
+        "android.view.displayhash",
+        "android.view.inputmethod",
+        "android.view.inspector",
+        "android.view.textclassifier",
+        "android.view.textservice",
+        "android.view.translation"
+      ]
+    },
+    "M04": {
+      "name": "android.widget",
+      "api_count": 172,
+      "package_count": 3,
+      "class_count": 26,
+      "packages": [
+        "android.app",
+        "android.widget",
+        "android.widget.inline"
+      ]
+    },
+    "M05": {
+      "name": "android.net & android.webkit",
+      "api_count": 111,
+      "package_count": 7,
+      "class_count": 19,
+      "packages": [
+        "android.net",
+        "android.net.http",
+        "android.net.netstats",
+        "android.net.vcn",
+        "android.net.wifi",
+        "android.webkit",
+        "java.net"
+      ]
+    },
+    "M06": {
+      "name": "android.media & android.hardware.camera2",
+      "api_count": 482,
+      "package_count": 13,
+      "class_count": 53,
+      "packages": [
+        "android.hardware",
+        "android.hardware.camera2",
+        "android.hardware.camera2.params",
+        "android.media",
+        "android.media.audiofx",
+        "android.media.browse",
+        "android.media.effect",
+        "android.media.metrics",
+        "android.media.midi",
+        "android.media.projection",
+        "android.media.session",
+        "android.media.tv",
+        "android.media.tv.interactive"
+      ]
+    },
+    "M07": {
+      "name": "android.database & android.provider",
+      "api_count": 226,
+      "package_count": 4,
+      "class_count": 20,
+      "packages": [
+        "android.content",
+        "android.database",
+        "android.database.sqlite",
+        "android.provider"
+      ]
+    },
+    "M08": {
+      "name": "android.location & android.hardware (sensors)",
+      "api_count": 324,
+      "package_count": 9,
+      "class_count": 24,
+      "packages": [
+        "android.hardware",
+        "android.hardware.biometrics",
+        "android.hardware.display",
+        "android.hardware.input",
+        "android.hardware.lights",
+        "android.hardware.usb",
+        "android.location",
+        "android.location.altitude",
+        "android.location.provider"
+      ]
+    },
+    "M09": {
+      "name": "android.bluetooth & android.nfc",
+      "api_count": 236,
+      "package_count": 4,
+      "class_count": 24,
+      "packages": [
+        "android.bluetooth",
+        "android.nfc",
+        "android.nfc.cardemulation",
+        "android.nfc.tech"
+      ]
+    },
+    "M10": {
+      "name": "android.telephony",
+      "api_count": 134,
+      "package_count": 7,
+      "class_count": 15,
+      "packages": [
+        "android.telephony",
+        "android.telephony.data",
+        "android.telephony.emergency",
+        "android.telephony.euicc",
+        "android.telephony.ims",
+        "android.telephony.ims.stub",
+        "android.telephony.mbms"
+      ]
+    },
+    "M11": {
+      "name": "android.security & android.app.admin",
+      "api_count": 611,
+      "package_count": 3,
+      "class_count": 12,
+      "packages": [
+        "android.app.admin",
+        "android.security",
+        "android.security.keystore"
+      ]
+    },
+    "M12": {
+      "name": "android.animation & android.util",
+      "api_count": 253,
+      "package_count": 4,
+      "class_count": 27,
+      "packages": [
+        "android.animation",
+        "android.util",
+        "android.util.proto",
+        "android.view.animation"
+      ]
+    },
+    "M13": {
+      "name": "java.* & dalvik.* (ART/libcore)",
+      "api_count": 868,
+      "package_count": 7,
+      "class_count": 34,
+      "packages": [
+        "java.io",
+        "java.lang",
+        "java.net",
+        "java.util",
+        "java.util.concurrent",
+        "javax.microedition.khronos.egl",
+        "javax.microedition.khronos.opengles"
+      ]
+    },
+    "M99": {
+      "name": "Other",
+      "api_count": 1774,
+      "package_count": 42,
+      "class_count": 143,
+      "packages": [
+        "android",
+        "android.accessibilityservice",
+        "android.accounts",
+        "android.companion",
+        "android.companion.virtual",
+        "android.credentials",
+        "android.gesture",
+        "android.inputmethodservice",
+        "android.mtp",
+        "android.opengl",
+        "android.print",
+        "android.print.pdf",
+        "android.printservice",
+        "android.sax",
+        "android.se.omapi",
+        "android.service.assist.classification",
+        "android.service.autofill",
+        "android.service.carrier",
+        "android.service.chooser",
+        "android.service.controls",
+        "android.service.controls.actions",
+        "android.service.controls.templates",
+        "android.service.credentials",
+        "android.service.dreams",
+        "android.service.media",
+        "android.service.notification",
+        "android.service.quickaccesswallet",
+        "android.service.quicksettings",
+        "android.service.restrictions",
+        "android.service.textservice",
+        "android.service.voice",
+        "android.service.vr",
+        "android.service.wallpaper",
+        "android.speech",
+        "android.speech.tts",
+        "android.telecom",
+        "android.text.format",
+        "android.text.method",
+        "android.text.style",
+        "android.text.util",
+        "android.transition",
+        "android.window"
+      ]
+    }
+  },
+  "priorities": {
+    "P0": {
+      "name": "运行时核心",
+      "api_count": 1658
+    },
+    "P1": {
+      "name": "UI & 渲染",
+      "api_count": 833
+    },
+    "P2": {
+      "name": "应用框架",
+      "api_count": 1158
+    },
+    "P3": {
+      "name": "系统服务",
+      "api_count": 1305
+    },
+    "P4": {
+      "name": "完整覆盖",
+      "api_count": 1774
+    }
+  }
+}

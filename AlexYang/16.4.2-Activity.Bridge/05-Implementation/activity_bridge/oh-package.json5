@@ -1,0 +1,12 @@
+{
+  "name": "activity_bridge",
+  "version": "1.0.0",
+  "description": "Android Activity API Bridge for HarmonyOS - Provides Activity lifecycle compatibility",
+  "main": "index.ets",
+  "author": "16.4.2-Activity.Bridge Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@16.4.3/view-bridge": "file:../../16.4.3-View.Bridge/05-Implementation/view_bridge",
+    "@16.4.4/system-bridge": "file:../../16.4.4-System.Bridge/05-Implementation/system_bridge"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  // OpenCode 优化配置
+  "terminal.integrated.scrollback": 100000,
+  "terminal.integrated.fontSize": 14,
+  "terminal.integrated.fontFamily": "Consolas, 'Courier New', monospace",
+  "terminal.integrated.copyOnSelection": true,
+  "terminal.integrated.mouseWheelScrollSensitivity": 1.5,
+  "terminal.integrated.cursorStyle": "line",
+  "terminal.integrated.cursorBlinking": true,
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.defaultProfile.windows": "WSL",
+  
+  // OpenCode 快捷启动配置
+  "terminal.integrated.profiles.windows": {
+    "OpenCode": {
+      "path": "C:\\Windows\\System32\\wsl.exe",
+      "args": [
+        "-d", "Ubuntu",
+        "-e", "bash", "-c",
+        "cd /mnt/d/ObsidianVault/10-Projects/16-DigitalEmployee && opencode 2>&1 | tee -a ~/opencode-logs/$(date +%Y%m%d-%H%M%S).log; exec bash"
+      ],
+      "icon": "server-process"
+    },
+    "OpenCode (Simple)": {
+      "path": "C:\\Windows\\System32\\wsl.exe",
+      "args": [
+        "-d", "Ubuntu",
+        "-e", "bash", "-c",
+        "cd /mnt/d/ObsidianVault/10-Projects/16-DigitalEmployee && opencode; exec bash"
+      ],
+      "icon": "terminal"
+    }
+  }
+}

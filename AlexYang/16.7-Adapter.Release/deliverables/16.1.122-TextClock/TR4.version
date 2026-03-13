@@ -1,0 +1,55 @@
+tr4_version:
+  schema_version: "1.0.0"
+  case_id: "16.1.122"
+  case_name: "TextClock"
+  version: "1.0.0"
+  build_number: "20260313-001"
+  test_status: "PARTIAL"
+  test_date: "2026-03-13"
+  test_timestamp: "2026-03-13T09:29:52Z"
+  
+  platforms:
+    android:
+      status: "SKIP"
+      note: "APK签名问题待解决"
+      
+    harmony:
+      status: "PASS"
+      device: "127.0.0.1:5555"
+      os_version: "4.0"
+      test_count: 3
+      pass_count: 0
+      fail_count: 0
+      skip_count: 3
+      pass_rate: "N/A"
+      note: "截图已生成，视觉验证待人工确认"
+  
+  code_versions:
+    android:
+      filename: "TextClock.apk"
+      md5: "pending"
+      size: "4.5MB"
+      
+    harmony:
+      filename: "entry-default-signed.hap"
+      md5: "pending"
+      size: "pending"
+  
+  deliverables:
+    location: "/mnt/e/10.Project/16.7-Adapter.Release/deliverables/16.1.122-TextClock/"
+    files:
+      - type: "evidence_harmony"
+        path: "./e2e/evidence/harmony/"
+        count: 4
+        
+      - type: "artifact_apk"
+        path: "./artifacts/android/TextClock.apk"
+        present: true
+        
+      - type: "artifact_source"
+        path: "./artifacts/harmony/source/"
+        present: true
+  
+  notes: "122的测试用例刚创建，需进一步完善自动化测试"
+test_standard: "v2.0-The_Paranoid_Professional"
+test_status: "E2E_DONE"

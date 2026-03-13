@@ -1,0 +1,13 @@
+api_name,android_class,harmonyos_equivalent,complexity,priority,line_number,usage_count,notes
+AppCompatActivity,androidx.appcompat.app.AppCompatActivity,Page/Ability,1,medium,12,1,基础Activity类
+Bundle,android.os.Bundle,wantParams,1,low,20,1,状态保存
+onCreate,android.app.Activity.onCreate,onPageShow,1,low,20,1,生命周期
+setContentView,android.app.Activity.setContentView,build,1,low,22,1,设置布局
+findViewById,android.app.Activity.findViewById,@State装饰器,1,low,25,2,查找View
+Button,android.widget.Button,Button,1,high,XML,1,按钮组件
+TextView,android.widget.Text,Text,1,high,XML,1,文本显示
+TextClock,android.widget.TextClock,自定义实现,2,critical,XML,1,实时时钟-最复杂
+ConstraintLayout,androidx.constraintlayout.widget.ConstraintLayout,Stack/Row/Column,2,high,XML,1,约束布局
+setOnClickListener,android.view.View.setOnClickListener,onClick事件,1,medium,31,1,点击监听
+OnClickListener,android.view.View.OnClickListener,回调函数,1,low,31,1,监听接口
+TimeZone,java.util.TimeZone,Intl.DateTimeFormat,2,high,36,1,时区处理

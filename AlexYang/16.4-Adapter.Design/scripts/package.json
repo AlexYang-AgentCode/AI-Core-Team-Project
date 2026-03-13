@@ -1,0 +1,12 @@
+{
+  "name": "16.1-pipeline",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-AI pipeline for AndroidToHarmonyOS adapter generation",
+  "scripts": {
+    "start": "node pipeline.mjs",
+    "once": "node pipeline.mjs --once"
+  },
+  "dependencies": {
+  }
+}

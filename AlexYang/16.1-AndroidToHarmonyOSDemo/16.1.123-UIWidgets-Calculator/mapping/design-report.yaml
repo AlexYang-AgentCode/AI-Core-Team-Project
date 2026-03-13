@@ -1,0 +1,20 @@
+design_report:
+  case_id: "16.1.123"
+  case_name: "UIWidgets-Calculator"
+  api_mappings:
+    - android_api: "androidx.appcompat.app.AppCompatActivity"
+      decision: "DIRECT_MAP"
+      harmony_api: "@Entry @Component"
+    - android_api: "android.widget.Button"
+      decision: "DIRECT_MAP"
+      harmony_api: "Button"
+    - android_api: "android.widget.TextView"
+      decision: "DIRECT_MAP"
+      harmony_api: "Text"
+    - android_api: "android.view.View.OnClickListener"
+      decision: "DIRECT_MAP"
+      harmony_api: ".onClick"
+  bridge_tasks:
+    "16.4.2": 0
+    "16.4.3": 0
+  estimated_effort: "1天"

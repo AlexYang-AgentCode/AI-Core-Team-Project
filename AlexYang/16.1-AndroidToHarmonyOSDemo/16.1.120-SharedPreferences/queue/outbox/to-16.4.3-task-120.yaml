@@ -1,0 +1,80 @@
+# Bridge Agent Task - 16.4.3 View Bridge
+# Case: 16.1.120 SharedPreferences
+# Generated: 2026-03-13
+
+task_info:
+  case_id: "16.1.120"
+  case_name: "SharedPreferences"
+  bridge_agent: "16.4.3"
+  task_type: "BRIDGE_EXISTING"
+  priority: "NORMAL"
+  deadline: "2026-03-14"
+
+source_context:
+  android_class: "MainActivity"
+  android_apis:
+    - "android.widget.Toast"
+    - "android.widget.Toast.makeText"
+    - "android.widget.Toast.LENGTH_SHORT"
+  
+  usage_scenario: |
+    在MainActivity中，msg()方法使用Toast显示操作反馈：
+    - 保存成功时显示 "Saved\nPress OPEN"
+    - 数据为空时显示 "SharedPreferences is null"
+    - 删除成功时显示 "SharedPreferences delete"
+
+requirements:
+  bridge_name: "ToastUtils"
+  harmony_api: "基于 @kit.ArkUI.promptAction.showToast()"
+  
+  interface_spec: |
+    export class ToastUtils {
+      /**
+       * 显示Toast消息
+       * @param message 显示文本
+       * @param duration 显示时长，默认SHORT(2000ms)
+       */
+      static show(message: string, duration?: number): void;
+      
+      /**
+       * 快捷显示SHORT时长Toast
+       */
+      static showShort(message: string): void;
+      
+      /**
+       * 快捷显示LONG时长Toast
+       */
+      static showLong(message: string): void;
+    }
+  
+  constants: |
+    const DURATION_SHORT = 2000;  // 毫秒
+    const DURATION_LONG = 3500;   // 毫秒
+
+deliverables:
+  - path: "16.4.3/05-Implementation/ToastUtils.ets"
+    description: "Toast工具类实现"
+    min_lines: 30
+  
+  - path: "16.4.3/06-Test/ToastUtils.test.ets"
+    description: "单元测试"
+    min_lines: 20
+    must_contain: ["expect", "assert"]
+
+test_cases:
+  - name: "show basic message"
+    input: { message: "Hello", duration: 2000 }
+    expected: "promptAction.showToast被调用，duration=2000"
+    
+  - name: "showShort uses default duration"
+    input: { message: "Short" }
+    expected: "duration自动设为2000"
+    
+  - name: "showLong uses long duration"
+    input: { message: "Long" }
+    expected: "duration自动设为3500"
+
+notes: |
+  - promptAction.showToast() 是 HarmonyOS 原生API
+  - 封装目的是为了保持代码简洁，隐藏makeText/show的分离
+  - 如需更复杂样式，可考虑使用promptAction.showDialog()
