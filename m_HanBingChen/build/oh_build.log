@@ -1,0 +1,738 @@
+
+[32m	*********Welcome to OpenHarmony!*********[0m
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+[33m Your system shell isn't bash, we recommend you to use bash, because some commands may not be supported in other shells, such as pushd and shopt are not supported in dash. 
+ You can follow these tips to modify the system shell to bash on Ubuntu: [0m
+[33m [1]:Open the Terminal tool and execute the following command: sudo dpkg-reconfigure dash 
+ [2]:Enter the password and select <no>  [0m
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+[32mCurrent time: 2026-03-20 18:14:51[0m
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+[32mBuild args: --product-name dayu210 --ccache --gn-args allow_sanitize_debug=true --build-target abilityms --build-target libappms --build-target libwms --build-target libbms[0m
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+[OHOS INFO] Current Node.js version is v14.21.1
+[32m[OHOS INFO] Node.js version check passed![0m
+[OHOS INFO] Ohpm initialization started...
+[OHOS INFO] Current ohpm version is 5.0.8
+ohpm [33mWARN: [39m[33mYour "NodeJs" version is less than the recommended version "18.x.x", please upgrade it as soon as possible.[39m
+ohpm [90mDEBUG: [39m[90mconfig set registry https://repo.harmonyos.com/ohpm/[39m
+ohpm [90mDEBUG: [39m[90mstart to write trace data[39m
+ohpm [90mDEBUG: [39m[90mstart to get key[39m
+ohpm [90mDEBUG: [39m[90mstart to get root key[39m
+ohpm [90mDEBUG: [39m[90mstart to get trace log dir[39m
+ohpm [90mDEBUG: [39m[90mAudit failed, detail: the trace log file path is not exist! trace path: /root/Library/Caches/Huawei/DevEcoStudio5.0/TraceLogData[39m
+ohpm [33mWARN: [39m[33mYour "NodeJs" version is less than the recommended version "18.x.x", please upgrade it as soon as possible.[39m
+ohpm [90mDEBUG: [39m[90mconfig set strict_ssl false[39m
+ohpm [90mDEBUG: [39m[90mstart to write trace data[39m
+ohpm [90mDEBUG: [39m[90mstart to get key[39m
+ohpm [90mDEBUG: [39m[90mstart to get root key[39m
+ohpm [90mDEBUG: [39m[90mstart to get trace log dir[39m
+ohpm [90mDEBUG: [39m[90mAudit failed, detail: the trace log file path is not exist! trace path: /root/Library/Caches/Huawei/DevEcoStudio5.0/TraceLogData[39m
+ohpm [33mWARN: [39m[33mYour "NodeJs" version is less than the recommended version "18.x.x", please upgrade it as soon as possible.[39m
+ohpm [90mDEBUG: [39m[90mconfig set log_level debug[39m
+ohpm [90mDEBUG: [39m[90mstart to write trace data[39m
+ohpm [90mDEBUG: [39m[90mstart to get key[39m
+ohpm [90mDEBUG: [39m[90mstart to get root key[39m
+ohpm [90mDEBUG: [39m[90mstart to get trace log dir[39m
+ohpm [90mDEBUG: [39m[90mAudit failed, detail: the trace log file path is not exist! trace path: /root/Library/Caches/Huawei/DevEcoStudio5.0/TraceLogData[39m
+[OHOS INFO] installing pnpm...
+[OHOS INFO] installing hypium...
+[32m[OHOS INFO] ohpm initialization successful![0m
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+[32m[OHOS INFO] Start building...[0m
+
+[33m libtinfo5 is not installed. please install it.[0m
+[33m u-boot-tools is not installed. please install it.[0m
+[33m gcc-arm-none-eabi is not installed. please install it.[0m
+[31m Missing dependencies, please check![0m
+[OHOS INFO]  Set cache size limit to 100.0 GB
+[OHOS INFO] [PRELOAD] generated build prop info to /root/oh/out/preloader/dayu210/build.prop
+[OHOS INFO] [PRELOAD] generated build config info to /root/oh/out/preloader/dayu210/build_config.json
+[OHOS INFO] [PRELOAD] generated product parts info to /root/oh/out/preloader/dayu210/parts.json
+[OHOS INFO] [PRELOAD] generated parts config info to /root/oh/out/preloader/dayu210/parts_config.json
+[OHOS INFO] [PRELOAD] generated build gnargs prop info to /root/oh/out/preloader/dayu210/build_gnargs.prop
+[OHOS INFO] [PRELOAD] generated features info to /root/oh/out/preloader/dayu210/features.json
+[OHOS INFO] [PRELOAD] generated syscap info to /root/oh/out/preloader/dayu210/syscap.json
+[OHOS INFO] [PRELOAD] generated exclusion modules info to /root/oh/out/preloader/dayu210/exclusion_modules.json
+[OHOS INFO] [PRELOAD] generated platforms build info to /root/oh/out/preloader/dayu210/platforms.build
+[OHOS INFO] [PRELOAD] generated subsystem config info to /root/oh/out/preloader/dayu210/subsystem_config.json
+[OHOS INFO] [PRELOAD] generated system capability info to /root/oh/out/preloader/dayu210/systemcapability.json
+[OHOS INFO] [PRELOAD] generated compile_standard_whitelist info to /root/oh/out/preloader/dayu210/compile_standard_whitelist.json
+[OHOS INFO] [PRELOAD] generated compile_env_allowlist info to /root/oh/out/preloader/dayu210/compile_env_allowlist.json
+[OHOS INFO] [PRELOAD] generated hvigor_compile_whitelist info to /root/oh/out/preloader/dayu210/hvigor_compile_hap_whitelist.json
+[OHOS INFO]  The run time for _prebuild_and_preload is 0.0 s
+[OHOS INFO] [LOAD] Checking all build args...
+[OHOS INFO] [LOAD] The thread num for subsytem config scan is 32
+[OHOS INFO] [LOAD] subsytem config scan completed
+[OHOS INFO] [LOAD] all parts scan completed
+[OHOS INFO] [LOAD] Loading configuration file...
+
+[OHOS INFO] [LOAD] loader args:['platforms_config_file="/root/oh/out/preloader/dayu210/platforms.build"', 'subsystem_config_file="/root/oh/out/preloader/dayu210/subsystem_config.json"', 'example_subsystem_file=""', 'exclusion_modules_config_file="/root/oh/out/preloader/dayu210/exclusion_modules.json"', 'source_root_dir="/root/oh/"', 'gn_root_out_dir="out/rk3588"', 'build_platform_name=phone', 'build_xts=False', 'load_test_config=True', 'target_os=ohos', 'target_cpu=arm64', 'os_level=standard', "ignore_api_check=['xts', 'common', 'testfwk']", 'scalable_build=False', 'skip_partlist_check=False']
+[OHOS INFO] [LOAD] Checking parts config...
+[OHOS INFO] [LOAD] generated subsystem build config to '/root/oh/out/rk3588/build_configs/subsystem_info/subsystem_build_config.json'
+[OHOS INFO] [LOAD] generated src subsystem info to '/root/oh/out/rk3588/build_configs/subsystem_info/src_subsystem_info.json'
+[OHOS INFO] [LOAD] generated no src subsystem info to '/root/oh/out/rk3588/build_configs/subsystem_info/no_src_subsystem_info.json'
+[OHOS INFO] [LOAD] generate target platform parts to '/root/oh/out/rk3588/build_configs/target_platforms_parts.json'
+[OHOS INFO] [LOAD] generated system capabilities to '/root/oh/out/rk3588/build_configs/phone_system_capabilities.json'
+[OHOS INFO] [LOAD] generated platforms parts by src to '/root/oh/out/rk3588/build_configs/platforms_parts_by_src.json'
+[OHOS INFO] [LOAD] generate required parts targets to '/root/oh/out/rk3588/build_configs/required_parts_targets.json'
+[OHOS INFO] [LOAD] generate build targets list file to '/root/oh/out/rk3588/build_configs/required_parts_targets_list.json'
+[OHOS INFO] [LOAD] generated parts src flag to '/root/oh/out/rk3588/build_configs/subsystem_info/parts_src_flag.json'
+[OHOS INFO] [LOAD] generate auto install part to '/root/oh/out/rk3588/build_configs/auto_install_parts.json'
+[OHOS INFO] [LOAD] generate platforms list to '/root/oh/out/rk3588/build_configs/platforms_list.gni'
+[OHOS INFO] [LOAD] generate part different info to '/root/oh/out/rk3588/build_configs/parts_different_info.json'
+[OHOS INFO] [LOAD] generate infos for testfwk to '/root/oh/out/rk3588/build_configs/infos_for_testfwk.json'
+[OHOS INFO] [LOAD] Checking all product features...
+[OHOS INFO] [LOAD] generate syscap info file to '/root/oh/out/preloader/dayu210/system/etc/SystemCapability.json'
+[OHOS INFO] [LOAD] generate syscap info with part name list to '/root/oh/out/preloader/dayu210/system/etc/syscap.json'
+[OHOS INFO] [LOAD] generate target syscap for init list to '/root/oh/out/preloader/dayu210/system/etc/param/syscap.para'
+
+[OHOS INFO] [GN] Excuting gn command: /root/oh/prebuilts/build-tools/linux-x86/bin/gn gen --args="product_name=\"dayu210\" product_path=\"/root/oh/vendor/hihope/dayu210\" product_config_path=\"/root/oh/vendor/hihope/dayu210\" device_name=\"rk3588\" device_path=\"/root/oh/device/board/HiHope/rk3588\" device_company=\"HiHope\" device_config_path=\"/root/oh/device/board/HiHope/rk3588\" target_cpu=\"arm64\" precise_branch=\"\" is_standard_system=true ohos_build_compiler_specified=\"\" ohos_build_time=1773972895426 ohos_build_datetime=\"2026-03-20 18:14:55\" ace_engine_feature_enable_accessibility=true ace_engine_feature_enable_web=true ace_engine_feature_enable_upgrade_skia=true os_account_multiple_active_accounts=false datamgr_service_udmf=true code_signature_support_oh_code_sign=false code_signature_support_oh_release_app=true code_signature_support_app_allow_list=false init_feature_ab_partition=true hiview_feature_bbox_userspace=true hiview_enable_leak_detector=true hiview_enable_performance_monitor=true t2stack_feature_vtp=true t2stack_feature_coap=true t2stack_feature_dfile=true dsoftbus_feature_coap=true dsoftbus_feature_vtp=true dsoftbus_feature_dfile=true dsoftbus_feature_disc_ble=true dsoftbus_feature_disc_coap=true dsoftbus_feature_disc_lnn_coap=true dsoftbus_feature_conn_pv1=true dsoftbus_feature_conn_br=true dsoftbus_feature_conn_ble=true dsoftbus_feature_conn_tcp_proxy=true dsoftbus_feature_conn_tcp_comm=true dsoftbus_feature_trans_udp_stream=true dsoftbus_feature_trans_udp_file=true dsoftbus_feature_trans_udp=true dsoftbus_feature_trans_proxy_file=true dsoftbus_feature_trans_qos=true dsoftbus_feature_trans_br_proxy=true dsoftbus_feature_lnn_ble=true dsoftbus_feature_lnn_wifi=true dsoftbus_feature_lnn_cloud_sync=true dsoftbus_feature_lnn_channel_rating=true dsoftbus_feature_lnn_lane_mgr=true dsoftbus_feature_lnn_lane_qos=true dsoftbus_feature_lnn_frame=true wifi_feature_non_seperate_p2p=true wifi_feature_non_hdf_driver=true wifi_feature_p2p_random_mac_addr=true fusion_connectivity_partner_agent_feature=true updater_feature_use_ptable=false updater_feature_updater_gen_executable=true updater_feature_sign_on_server=false sys_installer_feature_ohos_cfg=true graphic_2d_feature_rs_enable_eglimage=true graphic_2d_feature_use_texgine=true graphic_2d_feature_upgrade_skia=true audio_framework_feature_dtmf_tone=true audio_framework_feature_opensl_es=true audio_framework_feature_support_os_account=false image_framework_feature_upgrade_skia=true input_feature_combination_key=true input_feature_pointer_drawing=true input_feature_interceptor=true input_feature_monitor=true input_feature_keyboard=true input_feature_mouse=true input_feature_touchscreen=true input_feature_input_device=true battery_manager_feature_enable_charger=true memmgr_purgeable_memory=true memmgr_hyperhold_memory=true usb_manager_feature_pop_up_func_switch_model=false usb_manager_feature_host=true usb_manager_feature_device=true usb_manager_feature_port=true device_status_interaction_coordination=false wpa_supplicant_driver_nl80211=true skia_feature_upgrade=true libuv_use_ffrt=true qrcodegen_feature_ace_engine_qrcode_able=true hdf_core_platform_test_support=true hdf_core_default_peripheral_config=false drivers_interface_display_community=true drivers_interface_display_vdi_default=true drivers_peripheral_input_feature_model=true drivers_peripheral_input_feature_support_ddk=true drivers_peripheral_display_community=true drivers_peripheral_display_vdi_default=true drivers_peripheral_wlan_feature_enable_HDF_NL80211=true drivers_peripheral_wlan_feature_enable_HDF_UT=false drivers_peripheral_wlan_feature_vendor=\"default\" drivers_peripheral_wlan_p2p_name=\"p2p-dev-wlan0\" drivers_peripheral_sensor_feature_model=true drivers_peripheral_audio_feature_full_test_suite=true drivers_peripheral_audio_feature_alsa_lib=false drivers_peripheral_audio_feature_effect=true drivers_peripheral_light_feature_model=true drivers_peripheral_vibrator_feature_model=true drivers_peripheral_codec_feature_support_omx_extend_test=true drivers_peripheral_codec_feature_support_hdi_v1=true drivers_interface_audio_community=true ohos_build_enable_ccache=true ohos_build_type=\"debug\" device_type=\"default\" build_variant=\"root\" allow_sanitize_debug=true root_perf_main=\"main\" runtime_mode=\"release\"" --args=product_name="dayu210" product_path="/root/oh/vendor/hihope/dayu210" product_config_path="/root/oh/vendor/hihope/dayu210" device_name="rk3588" device_path="/root/oh/device/board/HiHope/rk3588" device_company="HiHope" device_config_path="/root/oh/device/board/HiHope/rk3588" target_cpu="arm64" precise_branch="" is_standard_system=true ohos_build_compiler_specified="" ohos_build_time=1773972895426 ohos_build_datetime="2026-03-20 18:14:55" ace_engine_feature_enable_accessibility=true ace_engine_feature_enable_web=true ace_engine_feature_enable_upgrade_skia=true os_account_multiple_active_accounts=false datamgr_service_udmf=true code_signature_support_oh_code_sign=false code_signature_support_oh_release_app=true code_signature_support_app_allow_list=false init_feature_ab_partition=true hiview_feature_bbox_userspace=true hiview_enable_leak_detector=true hiview_enable_performance_monitor=true t2stack_feature_vtp=true t2stack_feature_coap=true t2stack_feature_dfile=true dsoftbus_feature_coap=true dsoftbus_feature_vtp=true dsoftbus_feature_dfile=true dsoftbus_feature_disc_ble=true dsoftbus_feature_disc_coap=true dsoftbus_feature_disc_lnn_coap=true dsoftbus_feature_conn_pv1=true dsoftbus_feature_conn_br=true dsoftbus_feature_conn_ble=true dsoftbus_feature_conn_tcp_proxy=true dsoftbus_feature_conn_tcp_comm=true dsoftbus_feature_trans_udp_stream=true dsoftbus_feature_trans_udp_file=true dsoftbus_feature_trans_udp=true dsoftbus_feature_trans_proxy_file=true dsoftbus_feature_trans_qos=true dsoftbus_feature_trans_br_proxy=true dsoftbus_feature_lnn_ble=true dsoftbus_feature_lnn_wifi=true dsoftbus_feature_lnn_cloud_sync=true dsoftbus_feature_lnn_channel_rating=true dsoftbus_feature_lnn_lane_mgr=true dsoftbus_feature_lnn_lane_qos=true dsoftbus_feature_lnn_frame=true wifi_feature_non_seperate_p2p=true wifi_feature_non_hdf_driver=true wifi_feature_p2p_random_mac_addr=true fusion_connectivity_partner_agent_feature=true updater_feature_use_ptable=false updater_feature_updater_gen_executable=true updater_feature_sign_on_server=false sys_installer_feature_ohos_cfg=true graphic_2d_feature_rs_enable_eglimage=true graphic_2d_feature_use_texgine=true graphic_2d_feature_upgrade_skia=true audio_framework_feature_dtmf_tone=true audio_framework_feature_opensl_es=true audio_framework_feature_support_os_account=false image_framework_feature_upgrade_skia=true input_feature_combination_key=true input_feature_pointer_drawing=true input_feature_interceptor=true input_feature_monitor=true input_feature_keyboard=true input_feature_mouse=true input_feature_touchscreen=true input_feature_input_device=true battery_manager_feature_enable_charger=true memmgr_purgeable_memory=true memmgr_hyperhold_memory=true usb_manager_feature_pop_up_func_switch_model=false usb_manager_feature_host=true usb_manager_feature_device=true usb_manager_feature_port=true device_status_interaction_coordination=false wpa_supplicant_driver_nl80211=true skia_feature_upgrade=true libuv_use_ffrt=true qrcodegen_feature_ace_engine_qrcode_able=true hdf_core_platform_test_support=true hdf_core_default_peripheral_config=false drivers_interface_display_community=true drivers_interface_display_vdi_default=true drivers_peripheral_input_feature_model=true drivers_peripheral_input_feature_support_ddk=true drivers_peripheral_display_community=true drivers_peripheral_display_vdi_default=true drivers_peripheral_wlan_feature_enable_HDF_NL80211=true drivers_peripheral_wlan_feature_enable_HDF_UT=false drivers_peripheral_wlan_feature_vendor="default" drivers_peripheral_wlan_p2p_name="p2p-dev-wlan0" drivers_peripheral_sensor_feature_model=true drivers_peripheral_audio_feature_full_test_suite=true drivers_peripheral_audio_feature_alsa_lib=false drivers_peripheral_audio_feature_effect=true drivers_peripheral_light_feature_model=true drivers_peripheral_vibrator_feature_model=true drivers_peripheral_codec_feature_support_omx_extend_test=true drivers_peripheral_codec_feature_support_hdi_v1=true drivers_interface_audio_community=true ohos_build_enable_ccache=true ohos_build_type="debug" device_type="default" build_variant="root" allow_sanitize_debug=true root_perf_main="main" runtime_mode="release" /root/oh/out/rk3588
+[OHOS INFO] [GN] root_out_dir=//out/rk3588
+[OHOS INFO] [GN] root_build_dir=//out/rk3588
+[OHOS INFO] [GN] root_gen_dir=//out/rk3588/gen
+[OHOS INFO] [GN] current_toolchain=//build/toolchain/ohos:ohos_clang_arm64
+[OHOS INFO] [GN] host_toolchain=//build/toolchain/linux:clang_x64
+[OHOS INFO] [GN] power_interface_service
+[OHOS INFO] [GN] power_interface_service
+[OHOS INFO] [GN] power_interface_service
+[OHOS INFO] [GN] libunwind_action is exec
+[OHOS INFO] [GN] partitionslot_interface_service
+[OHOS INFO] [GN] location_agnss
+[OHOS INFO] [GN] Build curl is_cares_on: true
+[OHOS INFO] [GN] Build curl support_gmssl: true
+[OHOS INFO] [GN] bluetooth_hci
+[OHOS INFO] [GN] bluetooth_a2dp
+[OHOS INFO] [GN] bluetooth_lp_ble
+[OHOS INFO] [GN] E2FSPROGS_DIR is /root/oh/out/rk3588/gen/third_party/e2fsprogs/e2fsprogs
+[OHOS INFO] [GN] input_service
+[OHOS INFO] [GN] hid_ddk
+[OHOS INFO] [GN] hid_ddk
+[OHOS INFO] [GN] wpa_supplicant_vendor_ext = false
+[OHOS INFO] [GN] wpa_supplicant_wapi = false
+[OHOS INFO] [GN] drivers_peripheral_face_auth
+[OHOS INFO] [GN] sensor_service
+[OHOS INFO] [GN] sensor_service
+[OHOS INFO] [GN] sensor_convert_service
+[OHOS INFO] [GN] av_codec_support_fcodec = true
+[OHOS INFO] [GN] av_codec_support_avc_encoder = true
+[OHOS INFO] [GN] av_codec_support_hevc_decoder = true
+[OHOS INFO] [GN] av_codec_support_hcodec = true
+[OHOS INFO] [GN] av_codec_support_vp8_decoder = false
+[OHOS INFO] [GN] av_codec_support_vp9_decoder = false
+[OHOS INFO] [GN] av_codec_support_av1_decoder = false
+[OHOS INFO] [GN] av_codec_enable_start_stop_on_demand = false
+[OHOS INFO] [GN] default_toolchain =  //build/toolchain/ohos:ohos_clang_arm64
+[OHOS INFO] [GN] current_toolchain =  //build/toolchain/ohos:ohos_clang_arm64
+[OHOS INFO] [GN] host_toolchain =  //build/toolchain/linux:clang_x64
+[OHOS INFO] [GN] root_out_dir =  //out/rk3588
+[OHOS INFO] [GN] root_output_dir_proto =  out/rk3588/clang_x64
+[OHOS INFO] [GN] wlan_service
+[OHOS INFO] [GN] wlan_service
+[OHOS INFO] [GN] wlan_service
+[OHOS INFO] [GN] wpa_service
+[OHOS INFO] [GN] hostapd_service
+[OHOS INFO] [GN] chip
+[OHOS INFO] [GN] window_manager_use_sceneboard = false
+[OHOS INFO] [GN] window_manager_feature_subscribe_motion = false
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] window_scene_common imf_enable:  true
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] window manager fold ability is enabled.
+[OHOS INFO] [GN] window manager active mode ability is enabled.
+[OHOS INFO] [GN] window manager screen color gamut ability is enabled.
+[OHOS INFO] [GN] window manager screen hdr format ability is enabled.
+[OHOS INFO] [GN] window manager screen color space ability is enabled.
+[OHOS INFO] [GN] window manager screen multi screen ability is enabled.
+[OHOS INFO] [GN] window manager screen multi screen frame ctl ability is enabled.
+[OHOS INFO] [GN] window manager screen camera mode ability is enabled.
+[OHOS INFO] [GN] window manager screen multi usr ability is enabled.
+[OHOS INFO] [GN] window manager screen lock manager ability is enabled.
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] Debug info gen_utils_abc file path:  //out/rk3588/obj/commonlibrary/ets_utils/js_concurrent_module/utils/utils.abc
+[OHOS INFO] [GN] vibrator_service
+[OHOS INFO] [GN] ************libhilog_base use_musl ***************
+[OHOS INFO] [GN] Support dsoftbus.
+[OHOS INFO] [GN] support hearing aid
+[OHOS INFO] [GN] dayu210_group in
+[OHOS INFO] [GN] drivers_peripheral_user_auth
+[OHOS INFO] [GN] drivers_peripheral_user_auth
+[OHOS INFO] [GN] hisysevent_usage = false
+[OHOS INFO] [GN] ans_hitrace_usage = true
+[OHOS INFO] [GN] location_gnss
+[OHOS INFO] [GN] distributed_camera_provider_service
+[OHOS INFO] [GN] current_cpu = arm64
+[OHOS INFO] [GN] current_os = ohos
+[OHOS INFO] [GN] host_os = linux
+[OHOS INFO] [GN] openhitls selected linux-armv8
+[OHOS INFO] [GN] openhitls detecting os done, openhitls_selected_platform = linux-armv8
+[OHOS INFO] [GN] drivers_peripheral_huks
+[OHOS INFO] [GN] input_feature_combination_key = true
+[OHOS INFO] [GN] input_feature_pointer_drawing = true
+[OHOS INFO] [GN] input_feature_monitor = true
+[OHOS INFO] [GN] input_feature_interceptor = true
+[OHOS INFO] [GN] input_feature_keyboard = true
+[OHOS INFO] [GN] input_feature_switch = true
+[OHOS INFO] [GN] input_feature_mouse = true
+[OHOS INFO] [GN] input_feature_joystick = true
+[OHOS INFO] [GN] input_feature_touchscreen = true
+[OHOS INFO] [GN] input_feature_input_device = true
+[OHOS INFO] [GN] input_feature_short_key = true
+[OHOS INFO] [GN] input_ext_feature_keyboard_ext_flag = false
+[OHOS INFO] [GN] input_feature_one_hand_mode_enable = false
+[OHOS INFO] [GN] input_feature_move_event_filters = false
+[OHOS INFO] [GN] input_feature_external_screen = true
+[OHOS INFO] [GN] input_feature_touchpad = true
+[OHOS INFO] [GN] input_feature_pen = true
+[OHOS INFO] [GN] input_feature_touch_gesture = true
+[OHOS INFO] [GN] usbd
+[OHOS INFO] [GN] usbd
+[OHOS INFO] [GN] usbd
+[OHOS INFO] [GN] usbd
+[OHOS INFO] [GN] serial
+[OHOS INFO] [GN] usbfn_mtp
+[OHOS INFO] [GN] usb_ddk
+[OHOS INFO] [GN] usb_ddk
+[OHOS INFO] [GN] usb_serial_ddk
+[OHOS INFO] [GN] scsi_ddk
+[OHOS INFO] [GN] ethernet_service
+[OHOS INFO] [GN] time_system_ability_static output_values: ["//out/rk3588/gen/base/time/time_service/services/itime_service.h", "//out/rk3588/gen/base/time/time_service/services/time_service_proxy.cpp", "//out/rk3588/gen/base/time/time_service/services/time_service_stub.cpp", "//out/rk3588/gen/base/time/time_service/services/time_service_proxy.h", "//out/rk3588/gen/base/time/time_service/services/time_service_stub.h", "//out/rk3588/gen/base/time/time_service/services/itimer_callback.h", "//out/rk3588/gen/base/time/time_service/services/timer_callback_proxy.cpp", "//out/rk3588/gen/base/time/time_service/services/timer_callback_stub.cpp", "//out/rk3588/gen/base/time/time_service/services/timer_callback_proxy.h", "//out/rk3588/gen/base/time/time_service/services/timer_callback_stub.h"]
+[OHOS INFO] [GN] ["--haptobin", "../../developtools/packing_tool/adapter/ohos", "--haptobinOutput", "obj/developtools/packing_tool/jar/haptobin_tool.jar", "--unpackOutput", "obj/developtools/packing_tool/jar/app_unpacking_tool.jar", "--packOutput", "obj/developtools/packing_tool/jar/app_packing_tool.jar", "--outpath", "obj/developtools/packing_tool/jar", "--checkOutput", "obj/developtools/packing_tool/jar/app_check_tool.jar", "--toolchain", "//build/toolchain/ohos:ohos_clang_arm64", "--compileTarget", "image"]
+[OHOS INFO] [GN] nnrt
+[OHOS INFO] [GN] nnrt
+[OHOS INFO] [GN] nnrt
+[OHOS INFO] [GN] Msdp motion ability is disabled.
+[OHOS INFO] [GN] drm_interface_service
+[OHOS INFO] [GN] drm_interface_service
+[OHOS INFO] [GN] bundle_framework_power_mgr_enable = true
+[OHOS INFO] [GN] bundle_framework_graphics = true
+[OHOS INFO] [GN] bundle_framework_free_install = true
+[OHOS INFO] [GN] bundle_framework_default_app = true
+[OHOS INFO] [GN] bundle_framework_launcher = true
+[OHOS INFO] [GN] bundle_framework_sandbox_app = true
+[OHOS INFO] [GN] bundle_framework_quick_fix = true
+[OHOS INFO] [GN] bundle_framework_app_control = true
+[OHOS INFO] [GN] distributed_bundle_framework = true
+[OHOS INFO] [GN] ability_runtime_enable = true
+[OHOS INFO] [GN] account_enable = true
+[OHOS INFO] [GN] configpolicy_enable = true
+[OHOS INFO] [GN] global_resmgr_enable = true
+[OHOS INFO] [GN] hicollie_enable = true
+[OHOS INFO] [GN] support_jsapi = true
+[OHOS INFO] [GN] hisysevent_enable = true
+[OHOS INFO] [GN] bundle_framework_overlay_install = true
+[OHOS INFO] [GN] bundle_framework_bundle_resource = true
+[OHOS INFO] [GN] verify_abc_enabled = true
+[OHOS INFO] [GN] user_auth_framework_impl_enabled = true
+[OHOS INFO] [GN] location_geofence
+[OHOS INFO] [GN] ########## ets_runtime disable cmc-gc ##############
+[OHOS INFO] [GN] has_hisysevent_part = true
+[OHOS INFO] [GN] event ces_hitrace_usage = true
+[OHOS INFO] [GN] daudio
+[OHOS INFO] [GN] daudioext
+[OHOS INFO] [GN] daudioext
+[OHOS INFO] [GN] daudioext
+[OHOS INFO] [GN] drivers_peripheral_fingerprint_auth
+[OHOS INFO] [GN] //out/rk3588/obj/foundation/arkui/advanced_ui_component/customappbar/atomicservicemenubar/atomicservicemenubar.abc
+[OHOS INFO] [GN] memory_tracker_interface_service
+[OHOS INFO] [GN] light_service
+[OHOS INFO] [GN] Cares install
+[OHOS INFO] [GN] motion_service
+[OHOS INFO] [GN] motion_service
+[OHOS INFO] [GN] miscdevice_feature_vibrator_custom = true
+[OHOS INFO] [GN] accessibility_feature_display_manager = true
+[OHOS INFO] [GN] accessibility_feature_power_manager = true
+[OHOS INFO] [GN] accessibility_use_rosen_drawing = true
+[OHOS INFO] [GN] accessibility_feature_data_share = true
+[OHOS INFO] [GN] accessibility_feature_hiviewdfx_hitrace = true
+[OHOS INFO] [GN] accessibility_feature_hiviewdfx_hisysevent = true
+[OHOS INFO] [GN] cups_action is exec
+[OHOS INFO] [GN] display_buffer
+[OHOS INFO] [GN] display_buffer
+[OHOS INFO] [GN] display_composer
+[OHOS INFO] [GN] display_composer
+[OHOS INFO] [GN] display_composer
+[OHOS INFO] [GN] display_composer
+[OHOS INFO] [GN] display_composer
+[OHOS INFO] [GN] display_commontype
+[OHOS INFO] [GN] display_commontype
+[OHOS INFO] [GN] display_buffer
+[OHOS INFO] [GN] display_buffer
+[OHOS INFO] [GN] display_buffer
+[OHOS INFO] [GN] display_commontype
+[OHOS INFO] [GN] display_commontype
+[OHOS INFO] [GN] display_commontype
+[OHOS INFO] [GN] display_commontype
+[OHOS INFO] [GN] current_cpu = arm64
+[OHOS INFO] [GN] current_os = ohos
+[OHOS INFO] [GN] host_os = linux
+[OHOS INFO] [GN] is_mingw = false
+[OHOS INFO] [GN] ffmpeg selected aarch64
+[OHOS INFO] [GN] third_party:ffmpeg # external_deps //third_party/musl:soft_libc_musl_static
+[OHOS INFO] [GN] battery_interface_service
+[OHOS INFO] [GN] drivers_peripheral_pin_auth
+[OHOS INFO] [GN] ril_service
+[OHOS INFO] [GN] ril_service
+[OHOS INFO] [GN] ril_service
+[OHOS INFO] [GN] ril_service
+[OHOS INFO] [GN] ril_service
+[OHOS INFO] [GN] Reading plugin sources: ets (//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [GN] effect_host
+[OHOS INFO] [GN] audio_service
+[OHOS INFO] [GN] distributed_bundle_framework_graphics = true
+[OHOS INFO] [GN] ability_runtime_enable_dbms = true
+[OHOS INFO] [GN] account_enable_dbms = true
+[OHOS INFO] [GN] distributed_bundle_framework_enable = true
+[OHOS INFO] [GN] hisysevent_enable_dbms = true
+[OHOS INFO] [GN] distributed_bundle_image_framework_enable = true
+[OHOS INFO] [GN] output_values: ["//out/rk3588/gen/domains/game/game_controller_framework/frameworks/native/igame_controller_server_interface.h", "//out/rk3588/gen/domains/game/game_controller_framework/frameworks/native/game_controller_server_interface_proxy.cpp", "//out/rk3588/gen/domains/game/game_controller_framework/frameworks/native/game_controller_server_interface_stub.cpp", "//out/rk3588/gen/domains/game/game_controller_framework/frameworks/native/game_controller_server_interface_proxy.h", "//out/rk3588/gen/domains/game/game_controller_framework/frameworks/native/game_controller_server_interface_stub.h"]
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] camera_service
+[OHOS INFO] [GN] codec_service
+[OHOS INFO] [GN] codec_service
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] ["OS_ACCOUNT_EDM_ENABLE"]
+[OHOS INFO] [GN] openssl detecting os now...
+[OHOS INFO] [GN] current_cpu = arm64
+[OHOS INFO] [GN] current_os = ohos
+[OHOS INFO] [GN] host_os = linux
+[OHOS INFO] [GN] is_mingw = false
+[OHOS INFO] [GN] openssl selected linux-aarch64
+[OHOS INFO] [GN] openssl detecting os done. openssl_selected_platform = linux-aarch64
+[OHOS INFO] [GN] intell_voice_engine_service
+[OHOS INFO] [GN] intell_voice_engine_service
+[OHOS INFO] [GN] intell_voice_trigger_service
+[OHOS INFO] [GN] intell_voice_trigger_service
+[OHOS INFO] [GN] intell_voice_trigger_service
+[OHOS INFO] [GN] intell_voice_engine_service
+[OHOS INFO] [GN] midi
+[OHOS INFO] [GN] backends_action is exec
+[OHOS INFO] [GN] thermal_interface_service
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/distributeddatamgr/data_share/test/unittest/native/resource/datashare_ext_bundle:datashare_ext(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/distributeddatamgr/data_share/test/unittest/native/resource/errorcode_ext_bundle:errorcode_ext(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/distributeddatamgr/data_share/test/unittest/native/resource/datashare_proxy_bundle:proxydatas_with_permission(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] imf_enable:  true
+[OHOS INFO] [GN] account_enable_bm = true
+[OHOS INFO] [GN] overlay_install_bm = true
+[OHOS INFO] [GN] quick_fix_bm = true
+[OHOS INFO] [GN] distributed_bundle_framework_bm = true
+[OHOS INFO] [GN] histreamer plugin: ffmpeg_adapter = true
+[OHOS INFO] [GN] histreamer plugin: wav_demuxer = false
+[OHOS INFO] [GN] histreamer plugin: hdi_adapter = false
+[OHOS INFO] [GN] histreamer plugin: file_source = false
+[OHOS INFO] [GN] histreamer plugin: file_fd_source = false
+[OHOS INFO] [GN] histreamer plugin: std_stream_source = false
+[OHOS INFO] [GN] histreamer plugin: http_source = false
+[OHOS INFO] [GN] histreamer plugin: stream_source = false
+[OHOS INFO] [GN] histreamer plugin: audio_server_sink = false
+[OHOS INFO] [GN] histreamer plugin: lite_aac_decoder = false
+[OHOS INFO] [GN] histreamer plugin: std_video_surface_sink = false
+[OHOS INFO] [GN] histreamer plugin: std_video_capture = false
+[OHOS INFO] [GN] histreamer plugin: file_fd_sink = false
+[OHOS INFO] [GN] histreamer plugin: codec_adapter = true
+[OHOS INFO] [GN] ########## ets_runtime disable cmc-gc ##############
+[OHOS INFO] [GN] target_out_dir //out/rk3588/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] target_dir /root/oh/out/rk3588/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] test_abc_dir /root/oh/out/rk3588/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] target_out_dir //out/rk3588/clang_x64/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] target_dir /root/oh/out/rk3588/clang_x64/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] test_abc_dir /root/oh/out/rk3588/clang_x64/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] include_dirs= ["//out/rk3588/gen/foundation/multimedia/audio_framework/services/audio_service/idl", "//foundation/multimedia/audio_framework/services/audio_service/idl/"]
+[OHOS INFO] [GN] target_gen_dir= //out/rk3588/gen/foundation/multimedia/audio_framework/services/audio_service/idl
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] defines _ARM64_
+[OHOS INFO] [GN] E2FSPROGS_DIR is /root/oh/out/rk3588/clang_x64/gen/third_party/e2fsprogs/e2fsprogs
+[OHOS INFO] [GN] ************libhilog_base use_musl ***************
+[OHOS INFO] [GN] Reading plugin sources: ets (//build/toolchain/linux:clang_x64)
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_tool/test/sceneProject/tools/bm/test_app_one:test_app_one(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/resourceManagerTest:resourceManagerTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] ########## ets_runtime disable cmc-gc ##############
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/tools/test/resource/aa/pageAbilityBundleForDump:pageAbilityBundleForDump(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/tools/test/resource/aa/pageAbilityBundleForStart:pageAbilityBundleForStart(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/tools/test/resource/aa/dataAbilityBundleForDump:dataAbilityBundleForDump(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/tools/test/resource/aa/serviceAbilityBundleForStop:serviceAbilityBundleForStop(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/tools/test/resource/aa/serviceAbilityBundleForStart:serviceAbilityBundleForStart(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/test/moduletest/ui_extension_ability_test/ui_extension_provider_bundle:ui_extension_provider_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/ability/ability_runtime/test/moduletest/ui_extension_ability_test/ui_extension_user_bundle:ui_extension_user_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] openssl detecting os now...
+[OHOS INFO] [GN] current_cpu = x64
+[OHOS INFO] [GN] current_os = linux
+[OHOS INFO] [GN] host_os = linux
+[OHOS INFO] [GN] is_mingw = false
+[OHOS INFO] [GN] openssl selected linux-x86_64
+[OHOS INFO] [GN] openssl detecting os done. openssl_selected_platform = linux-x86_64
+[OHOS INFO] [GN] Reading plugin sources: ets (//build/toolchain/mingw:mingw_x86_64)
+[OHOS INFO] [GN] target_out_dir //out/rk3588/mingw_x86_64/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] target_dir /root/oh/out/rk3588/mingw_x86_64/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] test_abc_dir /root/oh/out/rk3588/mingw_x86_64/obj/arkcompiler/runtime_core/libark_defect_scan_aux/tests/unittest
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/moduletest/other_bundle/bmsThirdBundle1:mstbmsThirdBundle1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/moduletest/other_bundle/bmsThirdBundle14:mstbmsThirdBundle14(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/moduletest/other_bundle/bmsThirdBundle2:mstbmsThirdBundle2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_share_library/libA_v10000:libA_v10000(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/bmsAccessTokentest1:bmsAccessTokentest1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/bmsAccessTokentest2:bmsAccessTokentest2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/bmsThirdBundle1:bmsThirdBundle1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/defaultAppTest:defaultAppTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/bmsThirdBundle2:bmsThirdBundle2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/thumbnailTest:thumbnailTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/bmsAccessTokentest3:bmsAccessTokentest3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/fifth_right:fifth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/first_right:first_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/fourth_right:fourth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/rightTest:rightTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/rightTest1:rightTest1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/second_right:second_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/seventh_right:seventh_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/third_right:third_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionTest1:versionTest1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionTest2:versionTest2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionTest3:versionTest3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/wrong_bundle_name:wrong_bundle_name(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionNormalHapTest1:versionNormalHapTest1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionNormalHapTest2:versionNormalHapTest2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/signatureTest:signatureTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/moduleJsonTest:moduleJsonTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/backupTest:backupTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/system_module:system_module(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_hsp/hsp_A:hsp_A(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_hsp/hsp_B:hsp_B(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_hsp/hsp_C:hsp_C(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_hsp/hsp_C2:hsp_C2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_share_library/libA_normal_hap:libA_normal_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_share_library/libA_v10001:libA_v10001(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_share_library/libA_v10002:libA_v10002(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_share_library/libB_v10001:libB_v10001(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_share_library/libA_without_provision:libA_without_provision(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/parse_bundle/new:new(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/sandboxTest:sandboxTest(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/thumbnailTest2:thumbnailTest2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_so/compressNativeLibsFalse:compressNativeLibsFalse01(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_so/compressNativeLibsTrue:compressNativeLibsTrue01(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/permission_bundle/bmsGrantPermission1:bmsGrantPermission1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/permission_bundle/bmsGrantPermission3:bmsGrantPermission3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/permission_bundle/bmsGrantPermission6:bmsGrantPermission6(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/permission_bundle/bmsGrantPermission4:bmsGrantPermission4(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/permission_bundle/bmsGrantPermission7:bmsGrantPermission7(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_app_service/app_service_version1_library1:appService_v1_library1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_dependencies/dependencies_entry_B:dependencies_entry_B(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_dependencies/dependencies_entry_C:dependencies_entry_C(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/install_daemon/right:right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_dependencies/dependencies_entry_A:dependencies_entry_A(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/benchmark/benchmarktesthap:benchmarktesthap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_app_service/app_service_version2_library1:appService_v2_library1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_app_service/app_service_version2_library2:appService_v2_library2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/bundle_app_service/app_service_version1_library2:appService_v1_library2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionUpdateTest2:versionUpdateTest2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionUpdateTest3:versionUpdateTest3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionUpdateTest1:versionUpdateTest1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/versionUpdateTest4:versionUpdateTest4(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestAppField:otaUpdateTestAppField(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestBasis:otaUpdateTestBasis(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestBasis/feature1:otaUpdateTestBasisFeature1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestBasis/feature2:otaUpdateTestBasisFeature2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestBasis2:otaUpdateTestBasis2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestSignaIcon:otaUpdateTestSignaIcon(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestAplDown:otaUpdateTestAplDown(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestAplUp:otaUpdateTestAplUp(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestAppField2:otaUpdateTestAppField2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestSoChanged:otaUpdateTestSoChanged(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestModuleField:otaUpdateTestModuleField(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestSoChanged/feature1:otaUpdateTestSoChangedFeature1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/otaUpdateTestSoChanged/feature2:otaUpdateTestSoChangedFeature2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/second_backup_right:second_backup_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/eleventh_right:eleventh_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/first_diff_minCompCode:first_diff_minCompCode(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/first_right_with_diff_moduleType:first_right_with_diff_moduleType(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/sixteenth_right:sixteenth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/ninth_right:ninth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/tenth_right:tenth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/eighth_right:eighth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/thirteenth_right:thirteenth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/twelfth_right:twelfth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/first_diff_release_type:first_diff_release_type(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/fifteenth_right:fifteenth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/first_right_compCode:first_right_compCode(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/fourteenth_right:fourteenth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/test_bundle/sixth_right:sixth_right(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/driver_test/lower_version_driver_feature14:lower_version_driver_feature14_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/driver_test/high_version_non_driver_feature11:high_version_non_driver_feature11_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/unittest/driver_test/lower_version_non_driver_feature12:lower_version_non_driver_feature12_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/CodeSignature/CodeSignatureWithoutLibs2:CodeSignatureWithoutLibs2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/CodeSignature/CodeSignatureWithoutLibs:CodeSignatureWithoutLibs(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/CodeSignature/CodeSigntureWithLibs:CodeSigntureWithLibs(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundle6:bmsThirdBundle6(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundleDataAbility:bmsThirdBundleDataAbility(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundle1:bmsThirdBundle1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundle3:bmsThirdBundle3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundle2:bmsThirdBundle2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundle4:bmsThirdBundle4(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/stMatchShareBundle/matchShareBundle1:matchShareBundle1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/stMatchShareBundle/matchShareBundle3:matchShareBundle3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/jsBundle/jsThirdBundle/bmsThirdBundle5:bmsThirdBundle5(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/stMatchShareBundle/matchShareBundle2:matchShareBundle2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/BundleClient/bundleClient1:bundleClient1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/permissionBundle/permissionGrantBundle2:permissionGrantBundle2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/permissionBundle/permissionGrantBundle4:permissionGrantBundle4(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/permissionBundle/permissionGrantBundle3:permissionGrantBundle3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/permissionBundle/permissionGrantBundle5:permissionGrantBundle5(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testOverlay/target_module_entry:entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testOverlay/target_module_entry_higher_version:higher_version_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testOverlay/target_module_feature1:feature1_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/stVendorBundle/bmsVendorBundle1:bmsVendorBundle1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/stThirdBundle/bmsThirdBundle3:stbmsThirdBundle3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature3:hspASystemtestFeature3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso2/feature5:hapSectionContainsoFeature5(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] ########## ets_runtime disable cmc-gc ##############
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso5/feature3:hapIncludeso5Feature3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso7:hapIncludeso7(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso2:hapSectionContainso2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature1:hspASystemtestFeature1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso1:hapSectionContainso1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso2/feature4:hapSectionContainsoFeature4(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso3:hapIncludeso3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso1/feature3:hapSectionContainsoFeature3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A:hsp_A(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapNotIncludeso2:hapNotIncludeso2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso5/feature1:hapIncludeso5Feature1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso1/feature2:hapSectionContainsoFeature2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapNotIncludeso1:hapNotIncludeso1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature4:hspASystemtestFeature4(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso2/feature6:hapSectionContainsoFeature6(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso6/feature2:hapIncludeso6Feature2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso7/feature1:hapIncludeso7Feature1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapNoSo/hapSectionContainso1/feature1:hapSectionContainsoFeature1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature2:hspASystemtestFeature2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/testHapSo/hapIncludeso7/hapnoso3:hapnoso3(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature6:hspASystemtestFeature6(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature5:hspASystemtestFeature5(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature7:hspASystemtestFeature7(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/bundle_hsp/hsp_A/feature8:hspASystemtestFeature8(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/oneExtensionDir/version2/feature:version2_oneExtension_feature_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/twoExtensionDir/version1/entry:version1_twoExtension_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/twoExtensionDir/version1/feature:version1_twoExtension_feature_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/twoExtensionDir/version2/entry:version2_twoExtension_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/twoExtensionDir/version2/feature:version2_twoExtension_feature_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/withoutExtensionDir/version1/entry:version1_withoutExtension_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/withoutExtensionDir/version1/feature:version1_withoutExtension_feature_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/withoutExtensionDir/version1_form/entry:version1_withoutExtension_entry_form_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/withoutExtensionDir/version2/entry:version2_withoutExtension_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/withoutExtensionDir/version2/feature:version2_withoutExtension_feature_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/withoutExtensionDir/version2_form/entry:version2_withoutExtension_entry_form_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/oneExtensionDir/version1/entry:version1_oneExtension_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/oneExtensionDir/version1/entry_ex2:version1_oneExtension2_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/oneExtensionDir/version1/feature:version1_oneExtension_feature_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/oneExtensionDir/version2/entry:version2_oneExtension_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/extensionDirTest/oneExtensionDir/version2/entry_ex2:version2_oneExtension2_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/distributed_bundle_framework/services/dbms/test/sceneProject/unittest/system_module:distributed_system_module(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] ########## ets_runtime disable cmc-gc ##############
+[OHOS INFO] [GN] ************libhilog_base use_musl ***************
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/driverBundle/driverBundle1:driverBundle1(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/driverBundle/driverBundle2:driverBundle2(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/multiUser/lower_versionCode_entry:lower_versionCode_entry_hap(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] Set module_install_dir or relative_install_dir field in the //foundation/bundlemanager/bundle_framework/test/sceneProject/systemtest/multiUser/lower_versionCode_entry/feature:lower_versionCode_entry_hapB(//build/toolchain/ohos:ohos_clang_arm64). Do not install the module to app.
+[OHOS INFO] [GN] ########## ets_runtime disable cmc-gc ##############
+[OHOS INFO] [GN] WARNING at the command-line "--args":1:209: Build argument has no effect.
+[OHOS INFO] [GN] product_name="dayu210" product_path="/root/oh/vendor/hihope/dayu210" product_config_path="/root/oh/vendor/hihope/dayu210" device_name="rk3588" device_path="/root/oh/device/board/HiHope/rk3588" device_company="HiHope" device_config_path="/root/oh/device/board/HiHope/rk3588" target_cpu="arm64" precise_branch="" is_standard_system=true ohos_build_compiler_specified="" ohos_build_time=1773972895426 ohos_build_datetime="2026-03-20 18:14:55" ace_engine_feature_enable_accessibility=true ace_engine_feature_enable_web=true ace_engine_feature_enable_upgrade_skia=true os_account_multiple_active_accounts=false datamgr_service_udmf=true code_signature_support_oh_code_sign=false code_signature_support_oh_release_app=true code_signature_support_app_allow_list=false init_feature_ab_partition=true hiview_feature_bbox_userspace=true hiview_enable_leak_detector=true hiview_enable_performance_monitor=true t2stack_feature_vtp=true t2stack_feature_coap=true t2stack_feature_dfile=true dsoftbus_feature_coap=true dsoftbus_feature_vtp=true dsoftbus_feature_dfile=true dsoftbus_feature_disc_ble=true dsoftbus_feature_disc_coap=true dsoftbus_feature_disc_lnn_coap=true dsoftbus_feature_conn_pv1=true dsoftbus_feature_conn_br=true dsoftbus_feature_conn_ble=true dsoftbus_feature_conn_tcp_proxy=true dsoftbus_feature_conn_tcp_comm=true dsoftbus_feature_trans_udp_stream=true dsoftbus_feature_trans_udp_file=true dsoftbus_feature_trans_udp=true dsoftbus_feature_trans_proxy_file=true dsoftbus_feature_trans_qos=true dsoftbus_feature_trans_br_proxy=true dsoftbus_feature_lnn_ble=true dsoftbus_feature_lnn_wifi=true dsoftbus_feature_lnn_cloud_sync=true dsoftbus_feature_lnn_channel_rating=true dsoftbus_feature_lnn_lane_mgr=true dsoftbus_feature_lnn_lane_qos=true dsoftbus_feature_lnn_frame=true wifi_feature_non_seperate_p2p=true wifi_feature_non_hdf_driver=true wifi_feature_p2p_random_mac_addr=true fusion_connectivity_partner_agent_feature=true updater_feature_use_ptable=false updater_feature_updater_gen_executable=true updater_feature_sign_on_server=false sys_installer_feature_ohos_cfg=true graphic_2d_feature_rs_enable_eglimage=true graphic_2d_feature_use_texgine=true graphic_2d_feature_upgrade_skia=true audio_framework_feature_dtmf_tone=true audio_framework_feature_opensl_es=true audio_framework_feature_support_os_account=false image_framework_feature_upgrade_skia=true input_feature_combination_key=true input_feature_pointer_drawing=true input_feature_interceptor=true input_feature_monitor=true input_feature_keyboard=true input_feature_mouse=true input_feature_touchscreen=true input_feature_input_device=true battery_manager_feature_enable_charger=true memmgr_purgeable_memory=true memmgr_hyperhold_memory=true usb_manager_feature_pop_up_func_switch_model=false usb_manager_feature_host=true usb_manager_feature_device=true usb_manager_feature_port=true device_status_interaction_coordination=false wpa_supplicant_driver_nl80211=true skia_feature_upgrade=true libuv_use_ffrt=true qrcodegen_feature_ace_engine_qrcode_able=true hdf_core_platform_test_support=true hdf_core_default_peripheral_config=false drivers_interface_display_community=true drivers_interface_display_vdi_default=true drivers_peripheral_input_feature_model=true drivers_peripheral_input_feature_support_ddk=true drivers_peripheral_display_community=true drivers_peripheral_display_vdi_default=true drivers_peripheral_wlan_feature_enable_HDF_NL80211=true drivers_peripheral_wlan_feature_enable_HDF_UT=false drivers_peripheral_wlan_feature_vendor="default" drivers_peripheral_wlan_p2p_name="p2p-dev-wlan0" drivers_peripheral_sensor_feature_model=true drivers_peripheral_audio_feature_full_test_suite=true drivers_peripheral_audio_feature_alsa_lib=false drivers_peripheral_audio_feature_effect=true drivers_peripheral_light_feature_model=true drivers_peripheral_vibrator_feature_model=true drivers_peripheral_codec_feature_support_omx_extend_test=true drivers_peripheral_codec_feature_support_hdi_v1=true drivers_interface_audio_community=true ohos_build_enable_ccache=true ohos_build_type="debug" device_type="default" build_variant="root" allow_sanitize_debug=true root_perf_main="main" runtime_mode="release"
+[OHOS INFO] [GN]                                                                                                                                                                                                                 ^-------
+[OHOS INFO] [GN] The variable "device_company" was set as a build argument
+[OHOS INFO] [GN] but never appeared in a declare_args() block in any buildfile.
+[OHOS INFO] [GN] 
+[OHOS INFO] [GN] To view all possible args, run "gn args --list <out_dir>"
+[OHOS INFO] [GN] 
+[OHOS INFO] [GN] The build continued as if that argument was unspecified.
+[OHOS INFO] [GN] 
+[OHOS INFO] [GN] Done. Made 129947 targets from 16685 files in 14856ms
+[OHOS INFO]  The run time for _gn is 14.99 s
+
+[OHOS INFO] [NINJA] Excuting ninja command: /root/oh/prebuilts/build-tools/linux-x86/bin/ninja -w dupbuild=warn -C /root/oh/out/rk3588 libappms libwms abilityms libbms
+[OHOS INFO] [NINJA] [0/1] Regenerating ninja files
+[OHOS INFO] [NINJA] [1/440] ACTION //arkcompiler/runtime_core/static_core/compiler:libarktscompiler__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [2/439] ACTION //arkcompiler/runtime_core/static_core/etc/para:code_coverage.para.dac__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [3/438] ACTION //arkcompiler/runtime_core/static_core/libarkfile:libarktsfile__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [4/437] ACTION //arkcompiler/runtime_core/static_core/compiler/aot:libarkaotmanager__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [5/436] ACTION //arkcompiler/runtime_core/static_core/assembler:libarktsassembler__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [6/435] ACTION //arkcompiler/runtime_core/static_core/assembler:libarktsassembler_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [7/434] ACTION //arkcompiler/runtime_core/static_core/libarkbase:libarktsbase__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [8/433] ACTION //arkcompiler/runtime_core/static_core/dprof:libdprof_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [9/432] ACTION //arkcompiler/runtime_core/static_core/etc/para:code_coverage.para__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [10/431] ACTION //arkcompiler/runtime_core/static_core/libziparchive:libarktsziparchive__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [11/430] ACTION //arkcompiler/runtime_core/static_core/compiler/optimizer/code_generator:libarkencoder__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [12/429] ACTION //arkcompiler/runtime_core/static_core/libarkbase:libarktsbase_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [13/425] ACTION //arkcompiler/runtime_core/static_core/dprof:libdprof__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [14/424] ACTION //arkcompiler/runtime_core/static_core/libarkfile:libarktsfile_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [15/423] ACTION //arkcompiler/runtime_core/static_core/libziparchive:libarktsziparchive_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [16/417] ACTION //arkcompiler/runtime_core/static_core/runtime/asm_defines:asm_defines__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [17/416] ACTION //base/security/access_token/frameworks/common:permission_definition_check(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [18/200] ACTION //arkcompiler/runtime_core/static_core/plugins/ets/runtime/libani_helpers:ani_helpers__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [19/199] ACTION //arkcompiler/runtime_core/static_core/plugins/ets/runtime/ani:ani__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [20/197] ACTION //arkcompiler/runtime_core/static_core/platforms/target_defaults:arktarget_options__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [21/196] ACTION //arkcompiler/runtime_core/static_core/platforms/target_defaults:arktarget_options_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [22/194] ACTION //arkcompiler/runtime_core/static_core/plugins/ets/runtime/libani_helpers:ani_helpers_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [23/193] ACTION //arkcompiler/runtime_core/static_core/runtime:arkruntime_interpreter_impl__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [24/192] ACTION //arkcompiler/runtime_core/static_core/plugins/ets/runtime/libani_helpers/interop_js:hybridgref_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [25/191] ACTION //arkcompiler/runtime_core/static_core/runtime:arkruntime_pcre2__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [26/187] ACTION //arkcompiler/runtime_core/static_core/runtime:libarkruntime__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [27/186] ACTION //arkcompiler/runtime_core/static_core/runtime:libarkruntime_set_static__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [28/179] ACTION //arkcompiler/runtime_core/static_core/runtime:runtime.para.dac__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [29/178] ACTION //arkcompiler/runtime_core/static_core/runtime:runtime.para__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [30/177] ACTION //arkcompiler/runtime_core/static_core/runtime/para:Runtime.para__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [31/176] ACTION //arkcompiler/runtime_core/static_core/runtime/para:Runtime.para.dac__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [32/175] ACTION //third_party/skia/m133:ohos_font_file_map.json__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [33/174] ACTION //third_party/skia/m133:ohos_fontconfig.json__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [34/173] ACTION //arkcompiler/runtime_core/static_core/libarkbase:libarktsbase_static__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [35/171] ACTION //third_party/skia/m133:ohos_fontconfig_old.json__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [36/170] ACTION //third_party/skia/m133/modules/skparagraph:skia_paragraph_ohos_new__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [37/169] ACTION //arkcompiler/runtime_core/static_core/compiler/optimizer/code_generator:libarkencoder__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [38/168] ACTION //third_party/skia/m133/modules/svg:svg__notice(//build/toolchain/ohos:ohos_clang_arm64)
+[OHOS INFO] [NINJA] [39/60] ACTION //arkcompiler/runtime_core/static_core/compiler:libarktscompiler__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [40/59] ACTION //arkcompiler/runtime_core/static_core/libarkbase:libarktsbase__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [41/57] ACTION //arkcompiler/runtime_core/static_core/libarkfile:libarktsfile__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [42/56] ACTION //arkcompiler/runtime_core/static_core/libarkfile:libarktsfile_static__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [43/55] ACTION //arkcompiler/runtime_core/static_core/irtoc:irtoc__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [44/54] ACTION //arkcompiler/runtime_core/static_core/runtime/asm_defines:asm_defines__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [45/53] ACTION //arkcompiler/runtime_core/static_core/libziparchive:libarktsziparchive_static__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO] [NINJA] [46/51] ACTION //arkcompiler/runtime_core/static_core/libziparchive:libarktsziparchive__notice(//build/toolchain/linux:clang_x64)
+[OHOS INFO]  The run time for _ninja is 40.86 s
+[OHOS INFO] [POSTBUILD] ccache_dir = /root/.ccache, ccache_exec = /usr/bin/ccache
+[OHOS INFO] [POSTBUILD] --------------------------------------------
+[OHOS INFO] [POSTBUILD] ccache summary:
+[OHOS INFO] [POSTBUILD] ccache version: 3.7.7
+[OHOS INFO] [POSTBUILD] cache hit (direct): 0
+[OHOS INFO] [POSTBUILD] cache hit (preprocessed): 0
+[OHOS INFO] [POSTBUILD] cache miss: 0
+[OHOS INFO] [POSTBUILD] hit rate: 0.00% 
+[OHOS INFO] [POSTBUILD] miss rate: 0.00% 
+[OHOS INFO] [POSTBUILD] Cache size (GB): 
+[OHOS INFO] [POSTBUILD] ---------------------------------------------
+[OHOS INFO] [POSTBUILD] unrecognized ninja log format, we need # ninja log v5
+[OHOS INFO] [POSTBUILD] 
+[OHOS INFO] [POSTBUILD] c targets overlap rate statistics
+[OHOS INFO] [POSTBUILD] subsystem       	files NO.	percentage	builds NO.	percentage	overlap rate
+[OHOS INFO] [POSTBUILD] arkcompiler     	    1670	10.3%	    1861	11.1%	1.11
+[OHOS INFO] [POSTBUILD] thirdparty      	    5817	35.7%	    6056	36.3%	1.04
+[OHOS INFO] [POSTBUILD] ability         	     830	5.1%	     830	5.0%	1.00
+[OHOS INFO] [POSTBUILD] accesscontrol   	       8	0.0%	       8	0.0%	1.00
+[OHOS INFO] [POSTBUILD] account         	      55	0.3%	      55	0.3%	1.00
+[OHOS INFO] [POSTBUILD] arkui           	      50	0.3%	      50	0.3%	1.00
+[OHOS INFO] [POSTBUILD] barrierfree     	      38	0.2%	      38	0.2%	1.00
+[OHOS INFO] [POSTBUILD] bundlemanager   	     361	2.2%	     361	2.2%	1.00
+[OHOS INFO] [POSTBUILD] commonlibrary   	      56	0.3%	      56	0.3%	1.00
+[OHOS INFO] [POSTBUILD] communication   	     319	2.0%	     319	1.9%	1.00
+[OHOS INFO] [POSTBUILD] customization   	       1	0.0%	       1	0.0%	1.00
+[OHOS INFO] [POSTBUILD] developtools    	       5	0.0%	       5	0.0%	1.00
+[OHOS INFO] [POSTBUILD] deviceprofile   	      39	0.2%	      39	0.2%	1.00
+[OHOS INFO] [POSTBUILD] distributeddatamgr	     526	3.2%	     526	3.1%	1.00
+[OHOS INFO] [POSTBUILD] distributedhardware	      19	0.1%	      19	0.1%	1.00
+[OHOS INFO] [POSTBUILD] filemanagement  	      56	0.3%	      56	0.3%	1.00
+[OHOS INFO] [POSTBUILD] global          	      93	0.6%	      93	0.6%	1.00
+[OHOS INFO] [POSTBUILD] graphic         	     798	4.9%	     798	4.8%	1.00
+[OHOS INFO] [POSTBUILD] hdf             	     103	0.6%	     103	0.6%	1.00
+[OHOS INFO] [POSTBUILD] hiviewdfx       	     166	1.0%	     166	1.0%	1.00
+[OHOS INFO] [POSTBUILD] inputmethod     	      43	0.3%	      43	0.3%	1.00
+[OHOS INFO] [POSTBUILD] msdp            	      59	0.4%	      59	0.4%	1.00
+[OHOS INFO] [POSTBUILD] multimedia      	     135	0.8%	     135	0.8%	1.00
+[OHOS INFO] [POSTBUILD] multimodalinput 	      58	0.4%	      58	0.3%	1.00
+[OHOS INFO] [POSTBUILD] notification    	      36	0.2%	      36	0.2%	1.00
+[OHOS INFO] [POSTBUILD] powermgr        	      45	0.3%	      45	0.3%	1.00
+[OHOS INFO] [POSTBUILD] resourceschedule	     159	1.0%	     159	1.0%	1.00
+[OHOS INFO] [POSTBUILD] security        	     180	1.1%	     180	1.1%	1.00
+[OHOS INFO] [POSTBUILD] sensors         	      27	0.2%	      27	0.2%	1.00
+[OHOS INFO] [POSTBUILD] startup         	      72	0.4%	      72	0.4%	1.00
+[OHOS INFO] [POSTBUILD] systemabilitymgr	      19	0.1%	      19	0.1%	1.00
+[OHOS INFO] [POSTBUILD] theme           	       6	0.0%	       6	0.0%	1.00
+[OHOS INFO] [POSTBUILD] time            	       5	0.0%	       5	0.0%	1.00
+[OHOS INFO] [POSTBUILD] useriam         	      41	0.3%	      41	0.2%	1.00
+[OHOS INFO] [POSTBUILD] web             	       5	0.0%	       5	0.0%	1.00
+[OHOS INFO] [POSTBUILD] window          	     250	1.5%	     250	1.5%	1.00
+[OHOS INFO] [POSTBUILD] 
+[OHOS INFO] [POSTBUILD] c overall build overlap rate: 1.03
+[OHOS INFO] [POSTBUILD] 
+[OHOS INFO] [POSTBUILD] 
+Scanning 0 ELF files now ...
+Build dependence tree for 0 ELF files now ...
+    Got 1 dependencies
+Load compile information now ...
+file info not found.
+/root/oh/out/rk3588/packages/phone/vendor/etc/hdfconfig/hdf_default.hcb or /root/oh/out/rk3588/obj/drivers/hdf_core/framework/tools/hc-gen/hc-gen not exist
+Do NO-Depends-On-NAPI rule checking now:
+Do NO-Depends-On-SA rule checking now:
+Do NO-Depends-On-HDI rule checking now:
+****add chipsetsdk_rules_path path:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/ChipsetSDK/chipsetsdk_info.json****
+Do ChipsetSDK rule checking now:
+****add chipsetsdk_rules_path path:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/ChipsetSDK/chipsetsdk_info.json****
+****add chipsetsdk_rules_path path:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/ChipsetSDK/chipsetsdk_indirect.json****
+****chipsetsdk dep whitelist file is /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/chipsetsdk_dep_whitelist.json****
+****chipsetsdk dep whitelist file is /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/chipsetsdk_dep_whitelist.json****
+****check_depends_on_chipsetsdk result:True****
+****check_if_deps_correctly result:True****
+****check_if_deps_correctly indirect result:True****
+****check_tagged_correctly result:True****
+Do BaseInnerApi rule checking now:
+****chipsetsdk dep whitelist file is /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/chipsetsdk_dep_whitelist.json****
+****add chipsetsdk_sp_rules_path path:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/ChipsetsdkSP/chipsetsdk_sp_info.json****
+Do ChipsetsdkSP rule checking now:
+****add chipsetsdk_sp_rules_path path:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/ChipsetsdkSP/chipsetsdk_sp_info.json****
+****add chipsetsdk_sp_rules_path path:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/ChipsetsdkSP/chipsetsdk_sp_indirect.json****
+****chipsetsdk dep whitelist file is /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/chipsetsdk_dep_whitelist.json****
+****check_depends_on_chipsetsdk_sp result:True****
+****check_if_deps_correctly result:True****
+****check_if_deps_correctly indirect result:True****
+****check_tagged_correctly result:True****
+****add more llndk info in dir:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/LLndk/llndk_info.json****
+Do LLndk rule checking now:
+****chipsetsdk dep whitelist file is /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/chipsetsdk_dep_whitelist.json****
+****add more llndk info in dir:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/LLndk/llndk_info.json****
+****check_if_tagged_correctly result:True****
+****check_if_deps_correctly result:True****
+****add more passthrough info in dir:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/Passthrough/passthrough_info.json****
+Do Passthrough rule checking now:
+****add more passthrough info in dir:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/Passthrough/passthrough_info.json****
+****add more passthrough info in dir:/root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules****
+****Parsing rules file in /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/Passthrough/passthrough_indirect.json****
+****chipsetsdk dep whitelist file is /root/oh/developtools/integration_verification/tools/deps_guard/rules_checker/../rules/chipsetsdk_dep_whitelist.json****
+****check_depends_on_passthrough result:True****
+****check_if_deps_correctly result:True****
+****check_if_deps_correctly indirect result:True****
+****check_tagged_correctly result:True****
+All rules passed
+Warning, invalid config file /root/oh/out/rk3588/packages/phone/system/etc/init.cfg
+Error, invalid selinux config path /root/oh/out/rk3588/packages/phone/system/etc/selinux/config
+Warning, invalid parameter file  /root/oh/out/rk3588/packages/phone/system/etc/selinux/targeted/contexts/parameter_contexts
+Do NO-Config-Cmds-In-Init rule checking now:
+[35m[WARNING][0m: selinux status is 
+Do NO-Config-SystemParameter-In-INIT rule checking now:
+Do NO-User-Group_In-Init rule checking now:
+  Please refer to: [91mhttps://gitee.com/openharmony/developtools_integration_verification/tree/master/tools/startup_guard/rules/NO-User-Group_In-Init/README.md[0m
+Do NO-Plug-In_Module-Init rule checking now:
+Do NO-Illegal-SA-Directory-Creation rule checking now:
+Please modify according to README.md
+[OHOS INFO]  dayu210 build success
+[OHOS INFO]  Cost Time:  0:01:07
+[32m=====build  successful=====[0m
+2026-03-20 18:16:02
+++++++++++++++++++++++++++++++++++++++++

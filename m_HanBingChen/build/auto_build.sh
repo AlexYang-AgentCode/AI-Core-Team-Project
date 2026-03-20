@@ -1,5 +1,9 @@
 #!/bin/bash
-cd /root/aosp
+# Auto-build AOSP with iterative missing-dependency resolution
+# Usage: auto_build.sh [--aosp-root=PATH]
+AOSP_DIR="${AOSP_ROOT:-/root/aosp}"
+for arg in "$@"; do case "$arg" in --aosp-root=*) AOSP_DIR="${arg#*=}";; esac; done
+cd "$AOSP_DIR"
 MAX_ITER=30
 for i in $(seq 1 $MAX_ITER); do
     echo "=== Build attempt $i ==="

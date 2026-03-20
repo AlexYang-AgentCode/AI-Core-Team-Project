@@ -1,0 +1,12 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 0f33f1f2..e22caf32 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -231,6 +231,7 @@ if (defined(ohos_lite)) {
+ } else {
+   ohos_static_library("turbojpeg_static") {
+     visibility = [
++      "//device/board/hihope/dayu210/camera/vdi_impl/v4l2/pipeline_core:camera_pipeline_core",
+       ":*",
+       "//vendor/huawei/foundation/multimedia/algorithm_camera/refine_engine/algo_plugin/ipp/ITOF:libcamera_ips_ipp_itof",
+       "//ide/tools/previewer/test/unittest/jsapp_lite:jsapp_lite_test",

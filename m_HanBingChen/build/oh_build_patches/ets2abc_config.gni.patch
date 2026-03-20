@@ -1,0 +1,70 @@
+diff --git a/config/components/ets_frontend/ets2abc_config.gni b/config/components/ets_frontend/ets2abc_config.gni
+index 52926c13..91385b71 100644
+--- a/config/components/ets_frontend/ets2abc_config.gni
++++ b/config/components/ets_frontend/ets2abc_config.gni
+@@ -87,9 +87,9 @@ ohos_ets_etsstdlib_deps = "runtime_core:ohos_ets_etsstdlib_abc"
+ ohos_ets_etsstdlib_path =
+     "$build_sdk_path/build-tools/ets2panda/lib/etsstdlib.abc"
+ 
+-ohos_ets_kits_deps = "sdk:ohos_ets_kits"
+-ohos_ets_api_deps = "sdk:ohos_ets_api"
+-ohos_ets_arkts_deps = "sdk:ohos_ets_arkts"
++ohos_ets_kits_deps = ""
++ohos_ets_api_deps = ""
++ohos_ets_arkts_deps = ""
+ ohos_ets_stdlib_deps = "runtime_core:ohos_ets_stdlib"
+ ohos_ets_es2panda_deps =
+     "//build/config/components/ets_frontend:ohos_ets_es2panda"
+@@ -99,7 +99,7 @@ ohos_ets_libes2panda_public_deps =
+     "//build/config/components/ets_frontend:ohos_ets_libes2panda_public"
+ ohos_ets_build_system_deps = "ets_frontend:ohos_ets_build_system"
+ ohos_ets_dependency_analyzer_deps = "ets_frontend:ohos_ets_dependency_analyzer"
+-ohos_ets_ui_plugins_deps = "ace_ets2bundle:ohos_ets_ui_plugins"
++ohos_ets_ui_plugins_deps = ""
+ 
+ ohos_ets_api_tmp_path = "$root_build_dir/ohos_ets_tmp/api"
+ ohos_ets_api_arkui_tmp_path = "$root_build_dir/ohos_ets_tmp/api/arkui/component"
+@@ -183,8 +183,8 @@ template("generate_static_abc") {
+     ]
+     external_deps = external_dependencies
+     external_deps += [
+-      ohos_ets_etsstdlib_deps,
+-      ohos_ets_stdlib_deps,
++      # ohos_ets_etsstdlib_deps  # patched,
++      # ohos_ets_stdlib_deps  # patched,
+     ]
+ 
+     args = [
+@@ -215,14 +215,14 @@ template("generate_static_abc") {
+     if (ui_enable == "True") {
+       assert(defined(invoker.files), "files is required!")
+       assert(defined(invoker.base_url), "base_url is required!")
+-      deps += [ ohos_ets_libes2panda_public_deps ]
++      # deps += [ ohos_ets_libes2panda_public_deps ]  # patched
+       external_deps += [
+-        ohos_ets_api_deps,
+-        ohos_ets_arkts_deps,
+-        ohos_ets_build_system_deps,
+-        ohos_ets_kits_deps,
+-        ohos_ets_koala_wrapper_deps,
+-        ohos_ets_ui_plugins_deps,
++        # ohos_ets_api_deps  # patched out,
++        # ohos_ets_arkts_deps  # patched out,
++        # ohos_ets_build_system_deps  # patched,
++        # ohos_ets_kits_deps  # patched out,
++        # ohos_ets_koala_wrapper_deps  # patched,
++        # ohos_ets_ui_plugins_deps  # patched out,
+       ]
+       args += [
+         "--base-url",
+@@ -290,8 +290,8 @@ template("generate_static_abc") {
+       }
+     } else if (defined(invoker.base_url)) {
+       external_deps += [
+-        ohos_ets_api_deps,
+-        ohos_ets_arkts_deps,
++        # ohos_ets_api_deps  # patched out,
++        # ohos_ets_arkts_deps  # patched out,
+       ]
+       args += [
+         "--base-url",

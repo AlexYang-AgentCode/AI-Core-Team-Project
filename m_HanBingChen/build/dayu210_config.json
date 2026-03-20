@@ -1,0 +1,598 @@
+{
+  "product_name": "dayu210",
+  "device_company": "HiHope",
+  "device_build_path": "device/board/hihope/dayu210",
+  "target_cpu": "arm64",
+  "type": "standard",
+  "version": "3.0",
+  "board": "rk3588",
+  "api_version": 8,
+  "enable_ramdisk": true,
+  "enable_absystem": false,
+  "build_selinux": false,
+  "build_seccomp": false,
+  "inherit": [
+    "productdefine/common/inherit/rich.json",
+    "productdefine/common/inherit/chipset_common.json"
+  ],
+  "subsystems": [
+    {
+      "subsystem": "security",
+      "components": [
+        {
+          "component": "selinux_adapter",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "device_rk3588",
+      "components": [
+        {
+          "component": "device_rk3588",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "arkui",
+      "components": [
+        {
+          "component": "ace_engine",
+          "features": [
+            "ace_engine_feature_enable_accessibility = true",
+            "ace_engine_feature_enable_web = true",
+            "ace_engine_feature_enable_upgrade_skia = true"
+          ]
+        },
+        {
+          "component": "ui_appearance",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "hdf",
+      "components": [
+        {
+          "component": "drivers_interface_ril",
+          "features": []
+        },
+        {
+          "component": "drivers_peripheral_ril",
+          "features": []
+        },
+        {
+          "component": "drivers_interface_bluetooth",
+          "features": []
+        },
+        {
+          "component": "drivers_interface_audio",
+          "features": [
+            "drivers_interface_audio_community = true"
+          ]
+        },
+        {
+          "component": "drivers_peripheral_audio",
+          "features": [
+            "drivers_peripheral_audio_feature_full_test_suite = true",
+            "drivers_peripheral_audio_feature_alsa_lib = false",
+            "drivers_peripheral_audio_feature_effect = true"
+          ]
+        },
+        {
+          "component": "drivers_peripheral_codec",
+          "features": [
+            "drivers_peripheral_codec_feature_support_omx_extend_test = true",
+            "drivers_peripheral_codec_feature_support_hdi_v1 = true"
+          ]
+        },
+        {
+          "component": "drivers_peripheral_display",
+          "features": [
+            "drivers_peripheral_display_community = true",
+            "drivers_peripheral_display_vdi_default = true"
+          ]
+        },
+        {
+          "component": "drivers_peripheral_wlan",
+          "features": [
+            "drivers_peripheral_wlan_feature_enable_HDF_NL80211 = true",
+            "drivers_peripheral_wlan_feature_enable_HDF_UT = false",
+            "drivers_peripheral_wlan_feature_vendor = default",
+            "drivers_peripheral_wlan_p2p_name = p2p-dev-wlan0"
+          ]
+        },
+        {
+          "component": "hdf_core",
+          "features": [
+            "hdf_core_platform_test_support = true",
+            "hdf_core_default_peripheral_config = false"
+          ]
+        },
+        {
+          "component": "drivers_tools",
+          "features": []
+        },
+        {
+          "component": "drivers_adapter",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "startup",
+      "components": [
+        {
+          "component": "init",
+          "features": [
+            "init_feature_ab_partition = true"
+          ]
+        }
+      ]
+    },
+    {
+      "subsystem": "ai",
+      "components": [
+        {
+          "component": "mindspore",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "msdp",
+      "components": [
+        {
+          "component": "device_status",
+          "features": [
+            "device_status_interaction_coordination = false"
+          ]
+        }
+      ]
+    },
+    {
+      "subsystem": "communication",
+      "components": [
+        {
+          "component": "netmanager_ext",
+          "features": []
+        },
+        {
+          "component": "bluetooth_service",
+          "features": []
+        },
+        {
+          "component": "wifi",
+          "features": [
+            "wifi_feature_non_seperate_p2p = true",
+            "wifi_feature_non_hdf_driver = true",
+            "wifi_feature_p2p_random_mac_addr = true"
+          ]
+        }
+      ]
+    },
+    {
+      "subsystem": "multimedia",
+      "components": [
+        {
+          "component": "audio_framework",
+          "features": [
+            "audio_framework_feature_dtmf_tone = true",
+            "audio_framework_feature_opensl_es = true",
+            "audio_framework_feature_support_os_account = false"
+          ]
+        },
+        {
+          "component": "video_processing_engine",
+          "features": []
+        },
+        {
+          "component": "image_framework",
+          "features": [
+            "image_framework_feature_upgrade_skia = true"
+          ]
+        }
+      ]
+    },
+    {
+      "subsystem": "castplus",
+      "components": [
+        {
+          "component": "sharing_framework",
+          "features": []
+        },
+        {
+          "component": "cast_engine",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "thirdparty",
+      "components": [
+        {
+          "component": "libuv",
+          "features": [
+            "libuv_use_ffrt = true"
+          ]
+        },
+        {
+          "component": "wpa_supplicant",
+          "features": [
+            "wpa_supplicant_driver_nl80211 = true"
+          ]
+        },
+        {
+          "component": "noto-cjk",
+          "features": []
+        },
+        {
+          "component": "notofonts",
+          "features": []
+        },
+        {
+          "component": "tex-hyphen",
+          "features": []
+        },
+        {
+          "component": "qrcodegen",
+          "features": [
+            "qrcodegen_feature_ace_engine_qrcode_able = true"
+          ]
+        },
+        {
+          "component": "skia",
+          "features": [
+            "skia_feature_upgrade = true"
+          ]
+        },
+        {
+          "component": "rust_peeking_take_while",
+          "features": []
+        },
+        {
+          "component": "rust_foreign_types",
+          "features": []
+        },
+        {
+          "component": "rust_syn",
+          "features": []
+        },
+        {
+          "component": "rust_libc",
+          "features": []
+        },
+        {
+          "component": "rust_rust-openssl",
+          "features": []
+        },
+        {
+          "component": "rust_unicode_width",
+          "features": []
+        },
+        {
+          "component": "rust_nom",
+          "features": []
+        },
+        {
+          "component": "rust_clap",
+          "features": []
+        },
+        {
+          "component": "rust_once_cell",
+          "features": []
+        },
+        {
+          "component": "rust_cfg_if",
+          "features": []
+        },
+        {
+          "component": "rust_is_terminal",
+          "features": []
+        },
+        {
+          "component": "rust_either",
+          "features": []
+        },
+        {
+          "component": "rust_codespan",
+          "features": []
+        },
+        {
+          "component": "rust_regex",
+          "features": []
+        },
+        {
+          "component": "rust_minimal_lexical",
+          "features": []
+        },
+        {
+          "component": "rust_proc_macro_error",
+          "features": []
+        },
+        {
+          "component": "rust_heck",
+          "features": []
+        },
+        {
+          "component": "rust_linux_raw_sys",
+          "features": []
+        },
+        {
+          "component": "rust_io_lifetimes",
+          "features": []
+        },
+        {
+          "component": "rust_cxx",
+          "features": []
+        },
+        {
+          "component": "rust_strsim_rs",
+          "features": []
+        },
+        {
+          "component": "rust_lazy_static",
+          "features": []
+        },
+        {
+          "component": "rust_termcolor",
+          "features": []
+        },
+        {
+          "component": "rust_which_rs",
+          "features": []
+        },
+        {
+          "component": "rust_rust_cexpr",
+          "features": []
+        },
+        {
+          "component": "rust_autocfg",
+          "features": []
+        },
+        {
+          "component": "rust_lazycell",
+          "features": []
+        },
+        {
+          "component": "rust_quote",
+          "features": []
+        },
+        {
+          "component": "rust_atty",
+          "features": []
+        },
+        {
+          "component": "rust_humantime",
+          "features": []
+        },
+        {
+          "component": "rust_os_str_bytes",
+          "features": []
+        },
+        {
+          "component": "rust_pin_utils",
+          "features": []
+        },
+        {
+          "component": "rust_memoffset",
+          "features": []
+        },
+        {
+          "component": "rust_nix",
+          "features": []
+        },
+        {
+          "component": "rust_link_cplusplus",
+          "features": []
+        },
+        {
+          "component": "rust_aho_corasick",
+          "features": []
+        },
+        {
+          "component": "rust_version_check",
+          "features": []
+        },
+        {
+          "component": "rust_unicode-ident",
+          "features": []
+        },
+        {
+          "component": "rust_rustix",
+          "features": []
+        },
+        {
+          "component": "rust_memchr",
+          "features": []
+        },
+        {
+          "component": "rust_env_logger",
+          "features": []
+        },
+        {
+          "component": "rust_bitflags",
+          "features": []
+        },
+        {
+          "component": "rust_clang_sys",
+          "features": []
+        },
+        {
+          "component": "rust_bindgen",
+          "features": []
+        },
+        {
+          "component": "rust_glob",
+          "features": []
+        },
+        {
+          "component": "rust_rustc_hash",
+          "features": []
+        },
+        {
+          "component": "rust_log",
+          "features": []
+        },
+        {
+          "component": "rust_libloading",
+          "features": []
+        },
+        {
+          "component": "rust_serde",
+          "features": []
+        },
+        {
+          "component": "rust_proc-macro2",
+          "features": []
+        },
+        {
+          "component": "rust_shlex",
+          "features": []
+        },
+        {
+          "component": "rust_static_assertions_rs",
+          "features": []
+        },
+        {
+          "component": "libusb",
+          "features": []
+        },
+        {
+          "component": "alsa-lib",
+          "features": []
+        },
+        {
+          "component": "typescript",
+          "features": []
+        },
+        {
+          "component": "pcre2",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "tee",
+      "components": [
+        {
+          "component": "tee_client",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "usb",
+      "components": [
+        {
+          "component": "usb_manager",
+          "features": [
+            "usb_manager_feature_pop_up_func_switch_model = false",
+            "usb_manager_feature_host = true",
+            "usb_manager_feature_device = true",
+            "usb_manager_feature_port = true"
+          ]
+        }
+      ]
+    },
+    {
+      "subsystem": "graphic",
+      "components": [
+        {
+          "component": "graphic_2d",
+          "features": [
+            "graphic_2d_feature_rs_enable_eglimage = true",
+            "graphic_2d_feature_use_texgine = true",
+            "graphic_2d_feature_upgrade_skia = true"
+          ]
+        },
+        {
+          "component": "graphics_effect",
+          "features": []
+        },
+        {
+          "component": "graphic_surface",
+          "features": []
+        },
+        {
+          "component": "graphic_3d",
+          "features": []
+        },
+        {
+          "component": "vulkan-loader",
+          "features": []
+        },
+        {
+          "component": "vulkan-headers",
+          "features": []
+        },
+        {
+          "component": "graphic_utils_lite",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "hiviewdfx",
+      "components": [
+        {
+          "component": "hiview",
+          "features": [
+            "hiview_feature_bbox_userspace = true",
+            "hiview_enable_leak_detector = true",
+            "hiview_enable_performance_monitor = true"
+          ]
+        }
+      ]
+    },
+    {
+      "subsystem": "ability",
+      "components": [
+        {
+          "component": "idl_tool",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "commonlibrary",
+      "components": [
+        {
+          "component": "ylong_json",
+          "features": []
+        },
+        {
+          "component": "ylong_http",
+          "features": []
+        },
+        {
+          "component": "ylong_runtime",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "developtools",
+      "components": [
+        {
+          "component": "packing_tool",
+          "features": []
+        },
+        {
+          "component": "ace_ets2bundle",
+          "features": []
+        }
+      ]
+    },
+    {
+      "subsystem": "sdk",
+      "components": [
+        {
+          "component": "sdk",
+          "features": []
+        }
+      ]
+    }
+  ]
+}
