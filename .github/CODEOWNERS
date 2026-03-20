@@ -1,0 +1,8 @@
+# CODEOWNERS - AI-Core-Team-Project
+# Each member owns their m_ directory
+
+# HanBingChen owns m_HanBingChen/
+/m_HanBingChen/ @Iceberg-Chen
+
+# Default: AlexYang reviews everything else
+* @AlexYang-AgentCode
