@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android-OpenHarmony 适配可行性分析报告 — 接口映射、技术挑战与实施路径</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; padding: 12px 16px; margin: 30px 0 20px; background: linear-gradient(135deg, #e3f2fd, #bbdefb); border-radius: 6px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; padding: 8px 14px; background: linear-gradient(90deg, #e8eaf6, #f5f5f5); border-left: 4px solid var(--primary); border-radius: 0 6px 6px 0; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #1565c0, #00695c); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; background: none; border: none; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-green { background-color: #d4edda; color: #155724; padding: 2px 8px; border-radius: 3px; }
+  .tag-yellow { background-color: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 3px; }
+  .tag-red { background-color: #f8d7da; color: #721c24; padding: 2px 8px; border-radius: 3px; }
+  .mappable { color: #27ae60; font-weight: bold; }
+  .need-oh { color: #e74c3c; font-weight: bold; }
+  .ignorable { color: #95a5a6; font-weight: bold; }
+  .difficulty { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; }
+  .diff-low { background: #d5f5e3; color: #1e8449; }
+  .diff-medium { background: #fef9e7; color: #b7950b; }
+  .diff-high { background: #fadbd8; color: #c0392b; }
+  .diff-very-high { background: #f5b7b1; color: #922b21; }
+  .workload { font-weight: bold; }
+  .progress-bar { background: #ecf0f1; border-radius: 10px; overflow: hidden; height: 24px; margin: 5px 0; display: flex; }
+  .progress-fill { height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .toc .sub2 { padding-left: 48px; }
+  .summary-box { background: #eaf2f8; border: 2px solid #3498db; border-radius: 8px; padding: 20px; margin: 20px 0; }
+  .warning-box { background: #fdf2e9; border: 2px solid #e67e22; border-radius: 8px; padding: 20px; margin: 20px 0; }
+  .success-box { background: #eafaf1; border: 2px solid #27ae60; border-radius: 8px; padding: 20px; margin: 20px 0; }
+  .danger-box { background: #fdedec; border: 2px solid #e74c3c; border-radius: 8px; padding: 20px; margin: 20px 0; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Android-OpenHarmony 适配可行性分析报告</h1>
+  <p>接口映射、技术挑战与实施路径</p>
+  <p>合并版 v2.0 | 2026年3月 | 基于 AOSP 14 + OpenHarmony 5.0/6.1 源代码分析</p>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 项目背景与目标</a></li>
+    <li><a href="#ch2">2. 接口通信方向与语义映射</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 接口通信方向对照</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 核心接口语义映射</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 生命周期状态机差异</a></li>
+    <li><a href="#ch3">3. Android 侧核心接口详析</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 IApplicationThread</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 IActivityManager</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 IActivityTaskManager</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 IWindow</a></li>
+    <li class="sub"><a href="#ch3-5">3.5 IWindowManager</a></li>
+    <li class="sub"><a href="#ch3-6">3.6 IWindowSession</a></li>
+    <li><a href="#ch4">4. OpenHarmony 侧核心接口详析</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 IAppScheduler</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 IAbilityManager</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 IAbilityScheduler</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 IAppMgr</a></li>
+    <li class="sub"><a href="#ch4-5">4.5 ISceneSessionManager / IWindowManager(OH)</a></li>
+    <li class="sub"><a href="#ch4-6">4.6 ISessionStage</a></li>
+    <li class="sub"><a href="#ch4-7">4.7 IWindowManagerAgent</a></li>
+    <li><a href="#ch5">5. 正向接口适配分析（530 方法）</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 IActivityManager（249 方法）</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 IActivityTaskManager（95 方法）</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 IWindowManager（144 方法）</a></li>
+    <li class="sub"><a href="#ch5-4">5.4 IWindowSession（42 方法）</a></li>
+    <li class="sub"><a href="#ch5-5">5.5 正向适配总结</a></li>
+    <li><a href="#ch6">6. 反向回调适配分析（210 方法）</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 IAppScheduler（34 方法）</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 IAbilityScheduler（35 方法）</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 IAbilityConnection（2 方法）</a></li>
+    <li class="sub"><a href="#ch6-4">6.4 IWindow-OH（28 方法）</a></li>
+    <li class="sub"><a href="#ch6-5">6.5 ISessionStage（63+ 方法）</a></li>
+    <li class="sub"><a href="#ch6-6">6.6 IWindowManagerAgent（19 方法）</a></li>
+    <li class="sub"><a href="#ch6-7">6.7 反向适配总结</a></li>
+    <li><a href="#ch7">7. Android 回调接口缺失分析</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 IApplicationThread 未覆盖方法</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 IWindow-Android 未覆盖方法</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 IServiceConnection 覆盖情况</a></li>
+    <li class="sub"><a href="#ch7-4">7.4 OH 系统服务增强优先级（P0-P3 矩阵）</a></li>
+    <li class="sub"><a href="#ch7-5">7.5 缺失分析总结</a></li>
+    <li><a href="#ch8">8. 核心技术挑战</a></li>
+    <li><a href="#ch9">9. 架构设计方案</a></li>
+    <li class="sub"><a href="#ch9-1">9.1 系统架构图</a></li>
+    <li class="sub"><a href="#ch9-2">9.2 适配层核心模块设计</a></li>
+    <li><a href="#ch10">10. 可行性评估与工作量估算</a></li>
+    <li class="sub"><a href="#ch10-1">10.1 整体可行性评估</a></li>
+    <li class="sub"><a href="#ch10-2">10.2 工作量估算总表</a></li>
+    <li class="sub"><a href="#ch10-3">10.3 风险评估</a></li>
+    <li><a href="#ch11">11. 实施路径建议</a></li>
+    <li><a href="#ch12">12. 结论</a></li>
+  </ul>
+</div>
+
+
+<!-- ========== 第1章 ========== -->
+<h1 id="ch1">1. 项目背景与目标</h1>
+
+<p>本报告旨在评估将 Android Framework 与 OpenHarmony 系统服务进行对接的技术可行性。核心构想是在 Android Framework 中增加一个适配层（Adaptation Layer），实现以下两个目标：</p>
+
+<ol>
+  <li><strong>App &rarr; 系统服务方向：</strong>将 Android App 作为 Client 调用系统服务的接口，转换为调用 OpenHarmony 系统服务的接口；</li>
+  <li><strong>系统服务 &rarr; App 方向：</strong>将 OpenHarmony 系统服务调用 App 的接口，转换为 Android App 能够理解的接口。</li>
+</ol>
+
+<p>两个系统均采用 Binder 机制进行跨进程 IPC 通信，但其接口定义、数据结构和底层实现存在显著差异。</p>
+
+<div class="summary-box">
+<h4>分析范围</h4>
+<p>本报告对 Android 应用调用系统服务的 <strong>4 个正向接口</strong>（共 530 个方法）和 OH 系统回调 Android 应用的 <strong>6 个反向接口</strong>（共 181+ 个方法）进行了逐方法级别的可行性分析，同时从 Android 回调接口视角分析了 47 个方法的覆盖缺口。采用三级分类：</p>
+<ul>
+<li><span class="mappable">可映射</span> &mdash; 存在 OH 对应接口，可通过直接映射或逻辑转换完成适配</li>
+<li><span class="need-oh">需OH增强</span> &mdash; 无 OH 对应接口，需 OH 系统服务新增能力</li>
+<li><span class="ignorable">可忽略</span> &mdash; 可安全忽略（返回默认值/空操作），不影响 App 正常运行</li>
+</ul>
+
+<table>
+<tr>
+<th>方向</th><th>接口数</th><th>总方法数</th><th>可映射</th><th>需OH增强</th><th>可忽略</th>
+</tr>
+<tr>
+<td><strong>正向</strong>（App &rarr; OH服务）</td><td>4</td><td>530</td>
+<td class="mappable">206 (39%)</td><td class="need-oh">89 (17%)</td><td class="ignorable">235 (44%)</td>
+</tr>
+<tr>
+<td><strong>反向</strong>（OH服务 &rarr; App）</td><td>6</td><td>181</td>
+<td class="mappable">100 (55%)</td><td class="need-oh">13 (7%)</td><td class="ignorable">68 (38%)</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td>10</td><td>711</td>
+<td class="mappable">306 (43%)</td><td class="need-oh">102 (14%)</td><td class="ignorable">303 (43%)</td>
+</tr>
+</table>
+
+<div class="progress-bar">
+<div class="progress-fill" style="width:43%; background:#27ae60;">可映射 43%</div>
+<div class="progress-fill" style="width:14%; background:#e74c3c;">需OH增强 14%</div>
+<div class="progress-fill" style="width:43%; background:#95a5a6;">可忽略 43%</div>
+</div>
+
+<p><strong>关键结论：</strong>711 个方法中，43% 可直接映射或逻辑转换完成适配，43% 可安全忽略，<strong>仅 14%（102 个）需要 OH 系统服务增强能力</strong>。实际需要适配的 408 个方法（可映射+需OH增强）中，75% 可映射。<strong>项目整体技术可行性为"可行"</strong>。</p>
+</div>
+
+
+<!-- ========== 第2章 ========== -->
+<h1 id="ch2">2. 接口通信方向与语义映射</h1>
+
+<h2 id="ch2-1">2.1 接口通信方向对照</h2>
+
+<table>
+  <tr><th>方向</th><th>Android 接口</th><th>OpenHarmony 接口</th></tr>
+  <tr><td rowspan="5"><strong>App &rarr; 系统服务</strong></td><td><code>IActivityManager</code></td><td><code>IAbilityManager</code></td></tr>
+  <tr><td><code>IActivityTaskManager</code></td><td><code>IMissionManager</code>, <code>IExtensionManager</code></td></tr>
+  <tr><td><code>IWindowManager</code></td><td><code>ISceneSessionManager</code>（SA 4607，继承自 IWindowManager(OH)）</td></tr>
+  <tr><td><code>IWindowSession</code></td><td><code>ISession</code>（每窗口代理，由 ISceneSessionManager 创建返回）</td></tr>
+  <tr><td>AttachApplication (via IAM)</td><td><code>IAppMgr</code></td></tr>
+  <tr><td rowspan="5"><strong>系统服务 &rarr; App</strong></td><td><code>IApplicationThread</code></td><td><code>IAppScheduler</code></td></tr>
+  <tr><td>Activity lifecycle (via IAT)</td><td><code>IAbilityScheduler</code></td></tr>
+  <tr><td><code>IWindow</code></td><td><code>ISessionStage</code></td></tr>
+  <tr><td>（无直接对应）</td><td><code>IWindowManagerAgent</code></td></tr>
+  <tr><td>（无直接对应）</td><td><code>IAbilityConnection</code>, <code>IForegroundAppConnection</code></td></tr>
+</table>
+
+
+<h2 id="ch2-2">2.2 核心接口语义映射</h2>
+
+<h3>2.2.1 应用生命周期管理</h3>
+
+<table>
+  <tr><th>功能</th><th>Android</th><th>OpenHarmony</th><th>映射难度</th></tr>
+  <tr><td>应用附着</td><td><code>IActivityManager.attachApplication()</code></td><td><code>IAppMgr.AttachApplication()</code></td><td><span class="tag-yellow">中</span> 参数结构不同但语义相近</td></tr>
+  <tr><td>启动Activity/Ability</td><td><code>IActivityTaskManager.startActivity(Intent)</code></td><td><code>IAbilityManager.StartAbility(Want)</code></td><td><span class="tag-red">高</span> Intent与Want模型差异大</td></tr>
+  <tr><td>前台/后台切换通知</td><td><code>IApplicationThread.scheduleTransaction()</code></td><td><code>IAppScheduler.ScheduleForegroundApplication()</code></td><td><span class="tag-yellow">中</span> Android用ClientTransaction封装</td></tr>
+  <tr><td>生命周期回调</td><td><code>scheduleTransaction(LaunchActivityItem...)</code></td><td><code>IAbilityScheduler.ScheduleAbilityTransaction()</code></td><td><span class="tag-red">高</span> 生命周期状态机不同</td></tr>
+  <tr><td>Service绑定</td><td><code>IActivityManager.bindService()</code></td><td><code>IAbilityManager.ConnectAbility()</code></td><td><span class="tag-yellow">中</span> 语义类似，连接回调机制不同</td></tr>
+  <tr><td>内存通知</td><td><code>IApplicationThread.scheduleTrimMemory()</code></td><td><code>IAppScheduler.ScheduleMemoryLevel()</code></td><td><span class="tag-green">低</span> 可直接映射</td></tr>
+</table>
+
+<h3>2.2.2 窗口管理</h3>
+
+<table>
+  <tr><th>功能</th><th>Android</th><th>OpenHarmony</th><th>映射难度</th></tr>
+  <tr><td>创建窗口</td><td><code>IWindowSession.addToDisplay()</code></td><td><code>ISceneSessionManager.CreateAndConnectSpecificSession()</code>（SA 4607，返回 ISession 每窗口代理）</td><td><span class="tag-red">极高</span> Surface/图形系统完全不同</td></tr>
+  <tr><td>窗口布局</td><td><code>IWindowSession.relayout()</code></td><td><code>ISession.UpdateSessionRect()</code>（每窗口代理方法）</td><td><span class="tag-red">高</span> 布局参数、Insets模型不同</td></tr>
+  <tr><td>焦点管理</td><td>Android <code>IWindowManager</code> 内部</td><td><code>IWindowManagerAgent.UpdateFocusChangeInfo()</code></td><td><span class="tag-yellow">中</span></td></tr>
+  <tr><td>输入事件分发</td><td>通过 InputChannel</td><td>通过 Session 机制</td><td><span class="tag-red">极高</span> 底层通道机制完全不同</td></tr>
+</table>
+
+
+<h2 id="ch2-3">2.3 生命周期状态机差异</h2>
+
+<pre>
+Android Activity:
+  onCreate &rarr; onStart &rarr; onResume &rarr; onPause &rarr; onStop &rarr; onDestroy
+
+OpenHarmony Ability (Stage模型):
+  onCreate &rarr; onWindowStageCreate &rarr; onForeground &rarr; onBackground &rarr; onWindowStageDestroy &rarr; onDestroy
+</pre>
+
+<p><strong>关键差异：</strong>OpenHarmony 的 Ability 生命周期与 WindowStage 紧耦合，而 Android 的 Activity 生命周期与 Window 相对松耦合。适配层需要在两种状态机之间建立正确的映射关系。</p>
+
+
+<!-- ========== 第3章 ========== -->
+<h1 id="ch3">3. Android 侧核心接口详析</h1>
+
+<h2 id="ch3-1">3.1 IApplicationThread（SystemServer &rarr; App）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/app/IApplicationThread.aidl</code></td></tr>
+  <tr><td>方向</td><td>SystemServer &rarr; App（one-way 异步回调）</td></tr>
+  <tr><td>实现类</td><td><code>ActivityThread.ApplicationThread extends IApplicationThread.Stub</code></td></tr>
+  <tr><td>机制</td><td>AIDL 生成</td></tr>
+</table>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li><code>scheduleTransaction(ClientTransaction)</code> &mdash; 现代统一事务API，封装多个生命周期事件</li>
+  <li><code>bindApplication()</code> &mdash; 应用初始化绑定</li>
+  <li><code>scheduleLowMemory()</code> / <code>scheduleTrimMemory()</code> &mdash; 内存压力通知</li>
+  <li><code>scheduleReceiver()</code> &mdash; 广播接收器投递</li>
+  <li><code>scheduleCreateService()</code> / <code>scheduleBindService()</code> &mdash; Service 生命周期</li>
+</ul>
+
+<h2 id="ch3-2">3.2 IActivityManager（App &rarr; SystemServer）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/app/IActivityManager.aidl</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; SystemServer（同步调用）</td></tr>
+  <tr><td>实现类</td><td><code>ActivityManagerService extends IActivityManager.Stub</code></td></tr>
+  <tr><td>机制</td><td>AIDL 生成，927行接口定义</td></tr>
+</table>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li><code>startActivity()</code> / <code>startService()</code> / <code>bindService()</code></li>
+  <li><code>registerReceiver()</code> / <code>broadcastIntent()</code></li>
+  <li><code>attachApplication()</code> &mdash; 进程附着</li>
+  <li><code>getConfiguration()</code> / <code>getTasks()</code></li>
+</ul>
+
+<h2 id="ch3-3">3.3 IActivityTaskManager（App &rarr; SystemServer）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/app/IActivityTaskManager.aidl</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; SystemServer（同步调用）</td></tr>
+  <tr><td>实现类</td><td><code>ActivityTaskManagerService extends IActivityTaskManager.Stub</code></td></tr>
+  <tr><td>说明</td><td>Android 9+ 从 IActivityManager 拆分，专注任务和 Activity 状态管理</td></tr>
+</table>
+
+<h2 id="ch3-4">3.4 IWindow（SystemServer &rarr; App）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/view/IWindow.aidl</code></td></tr>
+  <tr><td>方向</td><td>SystemServer &rarr; App（one-way 异步）</td></tr>
+  <tr><td>说明</td><td>WindowManagerService 向 App 窗口推送事件</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>resized()</code>、<code>insetsControlChanged()</code>、<code>dispatchAppVisibility()</code>、<code>dispatchDragEvent()</code></p>
+
+<h2 id="ch3-5">3.5 IWindowManager（App &rarr; SystemServer）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/view/IWindowManager.aidl</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; SystemServer（同步调用）</td></tr>
+  <tr><td>实现类</td><td><code>WindowManagerService extends IWindowManager.Stub</code></td></tr>
+  <tr><td>说明</td><td>1018行接口定义，全局窗口管理</td></tr>
+</table>
+
+<h2 id="ch3-6">3.6 IWindowSession（App &harr; SystemServer）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/view/IWindowSession.aidl</code></td></tr>
+  <tr><td>方向</td><td>双向（每个 App 进程独有一个 Session）</td></tr>
+  <tr><td>实现类</td><td><code>Session extends IWindowSession.Stub</code></td></tr>
+  <tr><td>获取方式</td><td>通过 <code>IWindowManager.openSession()</code></td></tr>
+</table>
+<p><strong>关键方法：</strong><code>addToDisplay()</code>、<code>relayout()</code>、<code>remove()</code>、<code>finishDrawing()</code>、<code>performDrag()</code></p>
+
+
+<!-- ========== 第4章 ========== -->
+<h1 id="ch4">4. OpenHarmony 侧核心接口详析</h1>
+
+<h2 id="ch4-1">4.1 IAppScheduler（系统服务 &rarr; App）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/app_manager/include/appmgr/app_scheduler_interface.h</code></td></tr>
+  <tr><td>方向</td><td>AppMgr Service &rarr; App（调度任务到 App 进程）</td></tr>
+  <tr><td>Proxy</td><td><code>AppSchedulerProxy : IRemoteProxy&lt;IAppScheduler&gt;</code></td></tr>
+  <tr><td>Stub</td><td><code>AppSchedulerHost : IRemoteStub&lt;IAppScheduler&gt;</code></td></tr>
+</table>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li><code>ScheduleForegroundApplication()</code> / <code>ScheduleBackgroundApplication()</code></li>
+  <li><code>ScheduleLaunchApplication()</code> / <code>ScheduleTerminateApplication()</code></li>
+  <li><code>ScheduleLaunchAbility()</code> / <code>ScheduleCleanAbility()</code></li>
+  <li><code>ScheduleMemoryLevel()</code> / <code>ScheduleConfigurationUpdated()</code></li>
+</ul>
+
+<h2 id="ch4-2">4.2 IAbilityManager（App &rarr; 系统服务）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/ability_manager/include/ability_manager_interface.h</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; AbilityManager Service</td></tr>
+  <tr><td>Proxy</td><td><code>AbilityManagerProxy : IRemoteProxy&lt;IAbilityManager&gt;</code></td></tr>
+  <tr><td>Stub</td><td><code>AbilityManagerStub : IRemoteStub&lt;IAbilityManager&gt;</code></td></tr>
+</table>
+<p><strong>关键方法：</strong><code>StartAbility(Want)</code>、<code>ConnectAbility()</code>、<code>DisconnectAbility()</code>、<code>StartSelfUIAbility()</code></p>
+
+<h2 id="ch4-3">4.3 IAbilityScheduler（系统服务 &rarr; App）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/ability_manager/include/ability_scheduler_interface.h</code></td></tr>
+  <tr><td>方向</td><td>AbilityManager &rarr; App（通知 Ability 生命周期和数据事件）</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>ScheduleAbilityTransaction()</code>、<code>ScheduleConnectAbility()</code>、<code>SendResult()</code>、数据能力操作（Insert/Update/Delete/Query）</p>
+
+<h2 id="ch4-4">4.4 IAppMgr（App &rarr; 系统服务）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/app_manager/include/appmgr/app_mgr_interface.h</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; AppMgr Service</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>AttachApplication()</code>、<code>ApplicationForegrounded()</code>、<code>ApplicationBackgrounded()</code>、<code>GetAllRunningProcesses()</code></p>
+
+<h2 id="ch4-5">4.5 ISceneSessionManager / IWindowManager(OH)（App &rarr; 窗口服务）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>IWindowManager(OH)</td><td><code>wms/wmserver/include/zidl/window_manager_interface.h</code>（SA 4606，31 个纯虚方法：CreateWindow、RequestFocus、GetSnapshot 等基础窗口操作）</td></tr>
+  <tr><td>ISceneSessionManager</td><td><code>wms/window_scene/session_manager/include/zidl/scene_session_manager_interface.h</code>（SA 4607，<strong>继承 IWindowManager 全部 31 个方法 + 新增 15 个会话管理方法</strong>）</td></tr>
+  <tr><td>ISession</td><td><code>wms/window_scene/session/host/include/zidl/session_interface.h</code>（<strong>每窗口代理</strong>，由 CreateAndConnectSpecificSession 返回，用于 UpdateSessionRect、DrawingCompleted、Foreground、Background、Disconnect 等每窗口操作）</td></tr>
+</table>
+<p><strong>继承关系：</strong><code>ISceneSessionManager : public IWindowManager</code>，是 IWindowManager 的<strong>超集</strong>。
+现代 OH 系统默认启用 SceneBoard，适配层只需连接 SA 4607（ISceneSessionManager），无需单独适配 SA 4606（IWindowManager）。</p>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li>ISceneSessionManager：<code>CreateAndConnectSpecificSession()</code>（创建会话，返回 ISession 代理）、<code>DestroyAndDisconnectSpecificSession()</code></li>
+  <li>ISession（每窗口）：<code>UpdateSessionRect()</code>、<code>DrawingCompleted()</code>、<code>Foreground()</code>、<code>Background()</code>、<code>Disconnect()</code></li>
+</ul>
+
+<h2 id="ch4-6">4.6 ISessionStage（窗口服务 &rarr; App）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>wms/window_scene/session/container/include/zidl/session_stage_interface.h</code></td></tr>
+  <tr><td>方向</td><td>WindowManager &harr; UIAbility/Extension</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>SetActive()</code>、<code>UpdateRect()</code>、<code>HandleBackEvent()</code>、<code>NotifyDestroy()</code>、<code>UpdateWindowMode()</code></p>
+
+<h2 id="ch4-7">4.7 IWindowManagerAgent（窗口服务 &rarr; App）</h2>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>wms/wm/include/zidl/window_manager_agent_interface.h</code></td></tr>
+  <tr><td>方向</td><td>WindowManager &rarr; App/SystemService（通知推送）</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>UpdateFocusChangeInfo()</code>、<code>UpdateWindowVisibilityInfo()</code>、<code>NotifyAccessibilityWindowInfo()</code></p>
+
+
+<!-- ========== 第5章 ========== -->
+<h1 id="ch5">5. 正向接口适配分析（530 方法）</h1>
+
+<p>Android App 通过 Binder IPC 调用系统服务的 4 个核心接口，适配层需要将这些调用路由到对应的 OH 系统服务接口。</p>
+
+<!-- IActivityManager -->
+<h2 id="ch5-1">5.1 IActivityManager（249 个方法）</h2>
+
+<p><strong>目标OH接口：</strong>IAbilityManager（能力生命周期）、IAppMgr（应用进程管理）、IMissionManager（任务/Mission管理）</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>Activity生命周期</strong></td>
+<td class="mappable">8</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>startActivity/finishActivity等 &rarr; IAbilityManager.StartAbility/CloseAbility，需IntentWantConverter转换</td>
+</tr>
+<tr>
+<td><strong>Service生命周期</strong></td>
+<td class="mappable">10</td><td class="need-oh">8</td><td class="ignorable">0</td>
+<td>startService/bindService等 &rarr; IAbilityManager.ConnectAbility；前台Service概念OH无对应</td>
+</tr>
+<tr>
+<td><strong>应用/进程管理</strong></td>
+<td class="mappable">28</td><td class="need-oh">15</td><td class="ignorable">15</td>
+<td>attachApplication/killBackgroundProcesses等 &rarr; IAppMgr；进程细粒度控制可忽略</td>
+</tr>
+<tr>
+<td><strong>任务/Mission管理</strong></td>
+<td class="mappable">10</td><td class="need-oh">10</td><td class="ignorable">0</td>
+<td>getTasks/moveTaskToFront等 &rarr; IMissionManager；部分Assist相关无映射</td>
+</tr>
+<tr>
+<td><strong>广播系统</strong></td>
+<td class="mappable">0</td><td class="need-oh">6</td><td class="ignorable">5</td>
+<td>Android BroadcastReceiver与OH CommonEventManager模型不同；系统级广播管理方法可忽略</td>
+</tr>
+<tr>
+<td><strong>ContentProvider</strong></td>
+<td class="mappable">0</td><td class="need-oh">10</td><td class="ignorable">0</td>
+<td>OH使用DataShareExtensionAbility，URI和CRUD契约不同</td>
+</tr>
+<tr>
+<td><strong>权限管理</strong></td>
+<td class="mappable">8</td><td class="need-oh">4</td><td class="ignorable">14</td>
+<td>URI权限可桥接；高级权限检查方法可忽略</td>
+</tr>
+<tr>
+<td><strong>用户/多用户管理</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">45</td>
+<td>OH多用户模型不同，普通App极少调用，全部可忽略</td>
+</tr>
+<tr>
+<td><strong>系统配置</strong></td>
+<td class="mappable">6</td><td class="need-oh">1</td><td class="ignorable">0</td>
+<td>getConfiguration等可映射</td>
+</tr>
+<tr>
+<td><strong>调试/Instrumentation</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">18</td>
+<td>测试框架专用，非App运行时必需，全部可忽略</td>
+</tr>
+<tr>
+<td><strong>其他</strong></td>
+<td class="mappable">12</td><td class="need-oh">3</td><td class="ignorable">13</td>
+<td>IntentSender/PendingIntent、StrictMode、已废弃功能等可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">82</td><td class="need-oh">57</td><td class="ignorable">110</td><td></td>
+</tr>
+</table>
+
+<div class="progress-bar">
+<div class="progress-fill" style="width:33%; background:#27ae60;">可映射 33%</div>
+<div class="progress-fill" style="width:23%; background:#e74c3c;">需OH增强 23%</div>
+<div class="progress-fill" style="width:44%; background:#95a5a6;">可忽略 44%</div>
+</div>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-medium">中等可行</span> &mdash; Activity/Service/进程管理核心方法可映射，广播/ContentProvider需重新设计</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-high">高</span> &mdash; 广播系统和ContentProvider差异是最大挑战，Intent&harr;Want转换需精确处理</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（82个可映射）：约6人周 | 完整适配（249个）：约16人周</td></tr>
+</table>
+
+
+<!-- IActivityTaskManager -->
+<h2 id="ch5-2">5.2 IActivityTaskManager（95 个方法）</h2>
+
+<p><strong>目标OH接口：</strong>IAbilityManager（Activity启动）、IMissionManager（任务管理）、ISceneSessionManager（窗口组织）</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>Activity启动</strong></td>
+<td class="mappable">12</td><td class="need-oh">1</td><td class="ignorable">0</td>
+<td>所有startActivity变体 &rarr; IAbilityManager.StartAbility(Want)，覆盖率极高</td>
+</tr>
+<tr>
+<td><strong>任务/RootTask管理</strong></td>
+<td class="mappable">19</td><td class="need-oh">5</td><td class="ignorable">0</td>
+<td>getTasks/removeTask/setFocusedRootTask等 &rarr; IMissionManager</td>
+</tr>
+<tr>
+<td><strong>任务快照</strong></td>
+<td class="mappable">3</td><td class="need-oh">1</td><td class="ignorable">0</td>
+<td>getTaskSnapshot等 &rarr; ISceneSessionManager.GetSessionSnapshot</td>
+</tr>
+<tr>
+<td><strong>LockTask模式</strong></td>
+<td class="mappable">2</td><td class="need-oh">4</td><td class="ignorable">0</td>
+<td>部分锁定任务管理可映射</td>
+</tr>
+<tr>
+<td><strong>画中画/Back导航</strong></td>
+<td class="mappable">7</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>PiP状态、Back导航等可桥接</td>
+</tr>
+<tr>
+<td><strong>Voice/VR/Assist</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">11</td>
+<td>语音交互、VR、Assist框架等OH无对应，全部可忽略</td>
+</tr>
+<tr>
+<td><strong>远程动画</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">4</td>
+<td>Launcher/SystemUI专用，可忽略</td>
+</tr>
+<tr>
+<td><strong>其他</strong></td>
+<td class="mappable">7</td><td class="need-oh">4</td><td class="ignorable">15</td>
+<td>屏幕兼容、App切换控制、SplashScreen等可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">50</td><td class="need-oh">15</td><td class="ignorable">30</td><td></td>
+</tr>
+</table>
+
+<div class="progress-bar">
+<div class="progress-fill" style="width:53%; background:#27ae60;">可映射 53%</div>
+<div class="progress-fill" style="width:16%; background:#e74c3c;">需OH增强 16%</div>
+<div class="progress-fill" style="width:31%; background:#95a5a6;">可忽略 31%</div>
+</div>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-low">高度可行</span> &mdash; 核心Activity启动和任务管理覆盖率超过50%</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-medium">中等</span> &mdash; 主要挑战在Intent&rarr;Want转换和任务快照格式</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（50个可映射）：约4人周 | 完整适配（95个）：约8人周</td></tr>
+</table>
+
+
+<!-- IWindowManager -->
+<h2 id="ch5-3">5.3 IWindowManager（144 个方法）</h2>
+
+<p><strong>目标OH接口：</strong>ISceneSessionManager（会话管理）、ISession（窗口操作）、DisplayManager（显示管理）</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>会话管理</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>openSession &rarr; ISceneSessionManager.CreateAndConnectSpecificSession</td>
+</tr>
+<tr>
+<td><strong>显示尺寸/密度</strong></td>
+<td class="mappable">7</td><td class="need-oh">5</td><td class="ignorable">0</td>
+<td>getInitialDisplaySize/Density等 &rarr; DisplayManager，覆盖率高</td>
+</tr>
+<tr>
+<td><strong>窗口令牌</strong></td>
+<td class="mappable">2</td><td class="need-oh">1</td><td class="ignorable">0</td>
+<td>addWindowToken/removeWindowToken &rarr; ISceneSessionManager</td>
+</tr>
+<tr>
+<td><strong>旋转控制</strong></td>
+<td class="mappable">10</td><td class="need-oh">4</td><td class="ignorable">0</td>
+<td>freezeRotation/thawRotation/watchRotation等 &rarr; DisplayManager + ISession</td>
+</tr>
+<tr>
+<td><strong>触摸模式</strong></td>
+<td class="mappable">2</td><td class="need-oh">1</td><td class="ignorable">0</td>
+<td>setInTouchMode &rarr; ISceneSessionManager</td>
+</tr>
+<tr>
+<td><strong>窗口Insets</strong></td>
+<td class="mappable">3</td><td class="need-oh">1</td><td class="ignorable">1</td>
+<td>getStableInsets/getWindowInsets &rarr; ISession.GetAvoidAreaByType</td>
+</tr>
+<tr>
+<td><strong>截图/快照</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">2</td>
+<td>captureDisplay &rarr; ISceneSessionManager.GetSnapshot</td>
+</tr>
+<tr>
+<td><strong>显示管理</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">3</td>
+<td>显示折叠/窗口监听等 &rarr; DisplayManager</td>
+</tr>
+<tr>
+<td><strong>Keyguard（锁屏）</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">9</td>
+<td>OH锁屏机制不同，大部分App不直接操作锁屏，可忽略</td>
+</tr>
+<tr>
+<td><strong>动画控制</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">7</td>
+<td>动画缩放等开发者选项功能，可忽略</td>
+</tr>
+<tr>
+<td><strong>壁纸</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">4</td>
+<td>OH壁纸系统不同，壁纸App专用，可忽略</td>
+</tr>
+<tr>
+<td><strong>Trace/Debug</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">11</td>
+<td>窗口追踪调试功能，全部可忽略</td>
+</tr>
+<tr>
+<td><strong>其他</strong></td>
+<td class="mappable">19</td><td class="need-oh">0</td><td class="ignorable">43</td>
+<td>ViewServer、StrictMode、Screen Freeze、手势导航、Layer追踪、Display Hash等可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">52</td><td class="need-oh">12</td><td class="ignorable">80</td><td></td>
+</tr>
+</table>
+
+<div class="progress-bar">
+<div class="progress-fill" style="width:36%; background:#27ae60;">可映射 36%</div>
+<div class="progress-fill" style="width:8%; background:#e74c3c;">需OH增强 8%</div>
+<div class="progress-fill" style="width:56%; background:#95a5a6;">可忽略 56%</div>
+</div>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-medium">中等可行</span> &mdash; 显示/旋转/Insets核心功能可映射，锁屏/壁纸/动画/调试等均可忽略</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-high">高</span> &mdash; OH窗口管理（SceneSession模式）与Android WMS架构差异大，Surface共享是核心难点</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（52个可映射）：约5人周 | 完整适配（144个）：约14人周</td></tr>
+</table>
+
+
+<!-- IWindowSession -->
+<h2 id="ch5-4">5.4 IWindowSession（42 个方法）</h2>
+
+<p><strong>目标OH接口：</strong>ISession（窗口操作）、ISessionStage（窗口状态）、ISceneSessionManager</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>窗口生命周期</strong></td>
+<td class="mappable">4</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>addToDisplay/remove &rarr; ISession.Connect/Disconnect</td>
+</tr>
+<tr>
+<td><strong>窗口布局</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>relayout/relayoutAsync &rarr; ISession.UpdateSessionRect + DrawingCompleted</td>
+</tr>
+<tr>
+<td><strong>Insets和绘制</strong></td>
+<td class="mappable">2</td><td class="need-oh">2</td><td class="ignorable">2</td>
+<td>setInsets/finishDrawing &rarr; ISession</td>
+</tr>
+<tr>
+<td><strong>拖放</strong></td>
+<td class="mappable">4</td><td class="need-oh">1</td><td class="ignorable">0</td>
+<td>performDrag/reportDropResult等 &rarr; ISession拖放支持</td>
+</tr>
+<tr>
+<td><strong>输入和指针</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>updatePointerIcon/grantInputChannel等 &rarr; ISession输入管理</td>
+</tr>
+<tr>
+<td><strong>壁纸</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">7</td>
+<td>壁纸偏移/命令等OH无对应，壁纸App专用，可忽略</td>
+</tr>
+<tr>
+<td><strong>Back导航</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>setOnBackInvokedCallbackInfo &rarr; ISession</td>
+</tr>
+<tr>
+<td><strong>其他</strong></td>
+<td class="mappable">3</td><td class="need-oh">2</td><td class="ignorable">6</td>
+<td>嵌入窗口焦点、任务移动、手势排除等可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">22</td><td class="need-oh">5</td><td class="ignorable">15</td><td></td>
+</tr>
+</table>
+
+<div class="progress-bar">
+<div class="progress-fill" style="width:52%; background:#27ae60;">可映射 52%</div>
+<div class="progress-fill" style="width:12%; background:#e74c3c;">需OH增强 12%</div>
+<div class="progress-fill" style="width:36%; background:#95a5a6;">可忽略 36%</div>
+</div>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-low">高度可行</span> &mdash; 窗口核心操作（创建/布局/绘制/输入）52%可映射</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-medium">中等</span> &mdash; relayout的参数映射和Surface管理需仔细处理</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（22个可映射）：约3人周 | 完整适配（42个）：约5人周</td></tr>
+</table>
+
+
+<!-- 正向总结 -->
+<h2 id="ch5-5">5.5 正向适配总结</h2>
+
+<table>
+<tr>
+<th>接口</th><th>总方法数</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>可映射率</th><th>技术难度</th><th>工作量（核心/完整）</th>
+</tr>
+<tr>
+<td>IActivityManager</td><td>249</td>
+<td class="mappable">82 (33%)</td><td class="need-oh">57 (23%)</td><td class="ignorable">110 (44%)</td>
+<td>33%</td><td><span class="difficulty diff-high">高</span></td><td>6 / 16人周</td>
+</tr>
+<tr>
+<td>IActivityTaskManager</td><td>95</td>
+<td class="mappable">50 (53%)</td><td class="need-oh">15 (16%)</td><td class="ignorable">30 (31%)</td>
+<td>53%</td><td><span class="difficulty diff-medium">中</span></td><td>4 / 8人周</td>
+</tr>
+<tr>
+<td>IWindowManager</td><td>144</td>
+<td class="mappable">52 (36%)</td><td class="need-oh">12 (8%)</td><td class="ignorable">80 (56%)</td>
+<td>36%</td><td><span class="difficulty diff-high">高</span></td><td>5 / 14人周</td>
+</tr>
+<tr>
+<td>IWindowSession</td><td>42</td>
+<td class="mappable">22 (52%)</td><td class="need-oh">5 (12%)</td><td class="ignorable">15 (36%)</td>
+<td>52%</td><td><span class="difficulty diff-medium">中</span></td><td>3 / 5人周</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td>530</td>
+<td class="mappable">206 (39%)</td><td class="need-oh">89 (17%)</td><td class="ignorable">235 (44%)</td>
+<td>39%</td><td></td><td><strong>18 / 43人周</strong></td>
+</tr>
+</table>
+
+<div class="summary-box">
+<h4>正向接口关键发现</h4>
+<ul>
+<li><strong>高映射率领域：</strong>Activity启动（12/13=92%）、Service绑定（10/18=56%）、窗口生命周期（4/4=100%）、旋转控制（10/14=71%）</li>
+<li><strong>大量可忽略：</strong>多用户管理（45个）、Instrumentation（18个）、Voice/VR/Assist（11个）、Keyguard（9个）、Trace/Debug（11个）等共235个方法可安全忽略</li>
+<li><strong>真正需OH增强：</strong>仅89个方法（17%），主要集中在广播系统（6个）、ContentProvider（10个）、Service高级功能（8个）、任务管理（10个）</li>
+<li><strong>最大技术挑战：</strong>广播&rarr;CommonEvent重新架构、ContentProvider&rarr;DataShareExtension数据格式转换、Surface共享机制</li>
+</ul>
+</div>
+
+
+<!-- ========== 第6章 ========== -->
+<h1 id="ch6">6. 反向回调适配分析（210 方法）</h1>
+
+<p>OH 系统服务通过反向回调通知 Android 应用状态变化。适配层需要实现 OH 回调接口的 Stub，接收 OH 回调后转换为 Android 回调分发给应用。</p>
+
+<!-- IAppScheduler -->
+<h2 id="ch6-1">6.1 IAppScheduler（34 个方法）&rarr; IApplicationThread</h2>
+
+<p><strong>功能：</strong>OH系统管理应用进程级别的生命周期和内存状态</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>应用生命周期</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>LaunchApp/ForegroundApp/BackgroundApp/TerminateApp/SecurityExit &rarr; bindApplication/setProcessState/scheduleExit</td>
+</tr>
+<tr>
+<td><strong>内存管理</strong></td>
+<td class="mappable">4</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>LowMemory/ShrinkMemory/MemoryLevel &rarr; scheduleLowMemory/scheduleTrimMemory</td>
+</tr>
+<tr>
+<td><strong>配置更新</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>ConfigurationUpdated/UpdateApplicationInfoInstalled &rarr; scheduleTransaction(ConfigChange)</td>
+</tr>
+<tr>
+<td><strong>故障/调试</strong></td>
+<td class="mappable">4</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>NotifyAppFault &rarr; scheduleCrash；HeapMemory/ProfileChanged/AttachDebug需转换</td>
+</tr>
+<tr>
+<td><strong>OH独有功能</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">18</td>
+<td>JS/CJ堆管理、热修复/热重载、GC状态、IPC诊断、页面栈清理等OH特有，全部可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">16</td><td class="need-oh">0</td><td class="ignorable">18</td><td></td>
+</tr>
+</table>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-low">高度可行</span> &mdash; 核心进程生命周期回调100%可映射</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-low">低</span> &mdash; 生命周期和内存状态映射直观</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（16个可映射）：约2人周 | OH独有（18个）可安全忽略</td></tr>
+</table>
+
+
+<!-- IAbilityScheduler -->
+<h2 id="ch6-2">6.2 IAbilityScheduler（35 个方法）&rarr; IApplicationThread + ContentProvider</h2>
+
+<p><strong>功能：</strong>OH系统管理单个Ability的生命周期、Service连接和数据操作</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>Ability生命周期</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>AbilityTransaction/SaveState/RestoreState &rarr; ClientTransaction；PrepareTerminate需构造Pause+Stop事务</td>
+</tr>
+<tr>
+<td><strong>Service连接</strong></td>
+<td class="mappable">4</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>ConnectAbility/DisconnectAbility/CommandAbility &rarr; scheduleBindService/unbindService/serviceArgs</td>
+</tr>
+<tr>
+<td><strong>数据操作</strong></td>
+<td class="mappable">7</td><td class="need-oh">9</td><td class="ignorable">0</td>
+<td>Insert/Update/Delete/Query/Call等需NativeRdb&harr;ContentValues转换；BatchInsert/NormalizeUri/OpenFile等需OH增强数据格式适配</td>
+</tr>
+<tr>
+<td><strong>分享/结果</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>SendResult/ShareData/OnExecuteIntent &rarr; onActivityResult/数据共享</td>
+</tr>
+<tr>
+<td><strong>观察者</strong></td>
+<td class="mappable">2</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>RegisterObserver/UnregisterObserver &rarr; ContentObserver注册</td>
+</tr>
+<tr>
+<td><strong>OH独有功能</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">5</td>
+<td>ContinueAbility、CreateModalUIExtension、Collaborate等OH特有，可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">21</td><td class="need-oh">9</td><td class="ignorable">5</td><td></td>
+</tr>
+</table>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-low">高度可行</span> &mdash; Ability生命周期和Service连接映射清晰</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-medium">中等</span> &mdash; ContentProvider数据格式转换（NativeRdb.ValuesBucket&harr;ContentValues、DataAbilityPredicates&harr;SQL）需精细处理</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（21个可映射）：约3人周 | 数据操作转换器：额外1人周</td></tr>
+</table>
+
+
+<!-- IAbilityConnection -->
+<h2 id="ch6-3">6.3 IAbilityConnection（2 个方法）&rarr; IServiceConnection</h2>
+
+<div class="success-box">
+<strong>完美映射（100%可映射）</strong>
+<table>
+<tr><th>OH方法</th><th>Android方法</th><th>状态</th></tr>
+<tr><td>OnAbilityConnectDone</td><td>IServiceConnection.onServiceConnected</td><td class="mappable">可映射</td></tr>
+<tr><td>OnAbilityDisconnectDone</td><td>IServiceConnection.onServiceDisconnected</td><td class="mappable">可映射</td></tr>
+</table>
+<p>可行性：<span class="difficulty diff-low">极高</span> | 技术难度：<span class="difficulty diff-low">极低</span> | 工作量：0.5人天</p>
+</div>
+
+
+<!-- IWindow-OH -->
+<h2 id="ch6-4">6.4 IWindow-OH（28 个方法）&rarr; IWindow-Android</h2>
+
+<p><strong>功能：</strong>OH窗口系统向应用通知窗口状态变化</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>窗口几何</strong></td>
+<td class="mappable">2</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateWindowRect &rarr; IWindow.resized()</td>
+</tr>
+<tr>
+<td><strong>焦点管理</strong></td>
+<td class="mappable">2</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateFocusStatus/UpdateActiveStatus &rarr; IWindow.windowFocusChanged()，需合并逻辑</td>
+</tr>
+<tr>
+<td><strong>避让区/Insets</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateAvoidArea/OccupiedArea等 &rarr; IWindow.insetsControlChanged()</td>
+</tr>
+<tr>
+<td><strong>可见性</strong></td>
+<td class="mappable">4</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>NotifyForeground/Background/InteractiveStatus &rarr; IWindow.dispatchAppVisibility()</td>
+</tr>
+<tr>
+<td><strong>窗口模式/状态</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateWindowMode/State &rarr; IWindow.resized() 批量更新</td>
+</tr>
+<tr>
+<td><strong>拖放/输入</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateDragInfo &rarr; IWindow.dispatchDragEvent()</td>
+</tr>
+<tr>
+<td><strong>销毁</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>NotifyDestroy &rarr; 窗口清理逻辑</td>
+</tr>
+<tr>
+<td><strong>截图/缩放/其他</strong></td>
+<td class="mappable">5</td><td class="need-oh">2</td><td class="ignorable">3</td>
+<td>截图通知、缩放变换可忽略；分屏恢复对App运行非必需</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">23</td><td class="need-oh">2</td><td class="ignorable">3</td><td></td>
+</tr>
+</table>
+
+<div class="warning-box">
+<strong>架构挑战：</strong>OH使用细粒度方法（UpdateWindowRect、UpdateWindowMode、UpdateAvoidArea各自独立调用），而Android使用批量 <code>resized()</code> 方法。适配层需要聚合多个OH回调为一次Android回调，需要引入缓冲机制和合适的触发时机。
+</div>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-medium">中等可行</span> &mdash; 核心窗口状态回调82%可映射，但需要回调聚合机制</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-high">高</span> &mdash; OH细粒度&rarr;Android批量回调的聚合逻辑是核心难点</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（23个可映射）：约3人周 | 聚合机制设计：额外1人周</td></tr>
+</table>
+
+
+<!-- ISessionStage -->
+<h2 id="ch6-5">6.5 ISessionStage（63+ 个方法）&rarr; IWindow + IApplicationThread</h2>
+
+<p><strong>功能：</strong>OH SceneSession向应用通知会话状态变化，是最复杂的回调接口</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>会话生命周期</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>SetActive/Foreground/Background/WindowVisibility &rarr; IWindow.dispatchAppVisibility + 生命周期事件</td>
+</tr>
+<tr>
+<td><strong>窗口几何</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateRect/GlobalDisplayRect/ScaledRect &rarr; IWindow.resized()</td>
+</tr>
+<tr>
+<td><strong>窗口模式</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">1</td>
+<td>UpdateWindowMode/MaximizeMode &rarr; 配置更新；LayoutFinish为OH独有</td>
+</tr>
+<tr>
+<td><strong>避让区/Insets</strong></td>
+<td class="mappable">2</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateAvoidArea/NotifyOccupiedAreaChange &rarr; IWindow.insetsControlChanged()</td>
+</tr>
+<tr>
+<td><strong>显示/密度/方向</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateDensity/Orientation/DisplayId/RotationChange &rarr; IWindow.resized(Configuration)</td>
+</tr>
+<tr>
+<td><strong>焦点</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateFocus/HighlightChange/DisplayMove &rarr; ViewRootImpl内部处理</td>
+</tr>
+<tr>
+<td><strong>PiP画中画</strong></td>
+<td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>PiP大小/状态/控制/关闭等 &rarr; Activity.onPictureInPictureModeChanged</td>
+</tr>
+<tr>
+<td><strong>键盘</strong></td>
+<td class="mappable">2</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>KeyboardAnimationBegin/Completed &rarr; IWindow.showInsets/hideInsets</td>
+</tr>
+<tr>
+<td><strong>Back导航/输入</strong></td>
+<td class="mappable">3</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>HandleBackEvent/MarkProcessed/TouchOutside &rarr; 输入通道处理</td>
+</tr>
+<tr>
+<td><strong>截图</strong></td>
+<td class="mappable">0</td><td class="need-oh">2</td><td class="ignorable">0</td>
+<td>NotifyScreenshot/ScreenshotAppEvent &rarr; 无直接对应，需OH侧定义回调协议</td>
+</tr>
+<tr>
+<td><strong>无障碍</strong></td>
+<td class="mappable">2</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>AccessibilityHoverEvent/ChildTreeRegister &rarr; AccessibilityManager</td>
+</tr>
+<tr>
+<td><strong>OH独有功能</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">27</td>
+<td>自由多窗口、旋转信息、扩展数据、横屏适配、亮度控制、关键帧、组件数据传输等OH特有，可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">33</td><td class="need-oh">2</td><td class="ignorable">28</td><td></td>
+</tr>
+</table>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-medium">中等可行</span> &mdash; 核心窗口/生命周期回调覆盖好，OH独有方法可忽略</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-very-high">很高</span> &mdash; 方法数量最多（63+），且需要将OH细粒度回调聚合为Android ClientTransaction模型</td></tr>
+<tr><td>工作量</td><td class="workload">核心方法（33个可映射）：约5人周 | PiP适配：额外1人周 | OH独有（28个）可忽略</td></tr>
+</table>
+
+
+<!-- IWindowManagerAgent -->
+<h2 id="ch6-6">6.6 IWindowManagerAgent（19 个方法）&rarr; 内部处理</h2>
+
+<p><strong>功能：</strong>OH窗口管理器向代理通知全局窗口状态变化，无直接Android IPC接口对应</p>
+
+<table>
+<tr><th>分类</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>说明</th></tr>
+<tr>
+<td><strong>焦点变化</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateFocusChangeInfo &rarr; ViewRootImpl内部焦点分发</td>
+</tr>
+<tr>
+<td><strong>窗口可见性</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateWindowVisibilityInfo &rarr; Activity生命周期/IWindow</td>
+</tr>
+<tr>
+<td><strong>窗口模式</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateWindowModeTypeInfo &rarr; Configuration变化</td>
+</tr>
+<tr>
+<td><strong>系统栏</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>UpdateSystemBarRegionTints &rarr; StatusBar/NavigationBar颜色</td>
+</tr>
+<tr>
+<td><strong>无障碍</strong></td>
+<td class="mappable">1</td><td class="need-oh">0</td><td class="ignorable">0</td>
+<td>NotifyAccessibilityWindowInfo &rarr; AccessibilityManagerService</td>
+</tr>
+<tr>
+<td><strong>OH独有</strong></td>
+<td class="mappable">0</td><td class="need-oh">0</td><td class="ignorable">14</td>
+<td>可见窗口数、PID可见性、显示组、相机窗口、手势导航、窗口样式等OH特有，可忽略</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td class="mappable">5</td><td class="need-oh">0</td><td class="ignorable">14</td><td></td>
+</tr>
+</table>
+
+<h4>可行性评估</h4>
+<table>
+<tr><th>评估维度</th><th>结论</th></tr>
+<tr><td>可行性</td><td><span class="difficulty diff-medium">中等可行</span> &mdash; 无直接Android对应，需通过内部API间接处理</td></tr>
+<tr><td>技术难度</td><td><span class="difficulty diff-medium">中等</span> &mdash; 需要了解Android内部WMS分发机制</td></tr>
+<tr><td>工作量</td><td class="workload">5个可映射方法：约1.5人周 | 14个OH独有方法可忽略</td></tr>
+</table>
+
+
+<!-- 反向总结 -->
+<h2 id="ch6-7">6.7 反向适配总结</h2>
+
+<table>
+<tr>
+<th>OH接口</th><th>总方法</th><th>可映射</th><th>需OH增强</th><th>可忽略</th><th>可映射率</th><th>技术难度</th><th>工作量</th>
+</tr>
+<tr>
+<td>IAppScheduler</td><td>34</td>
+<td class="mappable">16 (47%)</td><td class="need-oh">0 (0%)</td><td class="ignorable">18 (53%)</td>
+<td>47%</td><td><span class="difficulty diff-low">低</span></td><td>2人周</td>
+</tr>
+<tr>
+<td>IAbilityScheduler</td><td>35</td>
+<td class="mappable">21 (60%)</td><td class="need-oh">9 (26%)</td><td class="ignorable">5 (14%)</td>
+<td>60%</td><td><span class="difficulty diff-medium">中</span></td><td>4人周</td>
+</tr>
+<tr>
+<td>IAbilityConnection</td><td>2</td>
+<td class="mappable">2 (100%)</td><td class="need-oh">0 (0%)</td><td class="ignorable">0 (0%)</td>
+<td>100%</td><td><span class="difficulty diff-low">极低</span></td><td>0.1人周</td>
+</tr>
+<tr>
+<td>IWindow-OH</td><td>28</td>
+<td class="mappable">23 (82%)</td><td class="need-oh">2 (7%)</td><td class="ignorable">3 (11%)</td>
+<td>82%</td><td><span class="difficulty diff-high">高</span></td><td>4人周</td>
+</tr>
+<tr>
+<td>ISessionStage</td><td>63+</td>
+<td class="mappable">33 (52%)</td><td class="need-oh">2 (3%)</td><td class="ignorable">28 (44%)</td>
+<td>52%</td><td><span class="difficulty diff-very-high">很高</span></td><td>6人周</td>
+</tr>
+<tr>
+<td>IWindowManagerAgent</td><td>19</td>
+<td class="mappable">5 (26%)</td><td class="need-oh">0 (0%)</td><td class="ignorable">14 (74%)</td>
+<td>26%</td><td><span class="difficulty diff-medium">中</span></td><td>1.5人周</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td>181+</td>
+<td class="mappable">100 (55%)</td><td class="need-oh">13 (7%)</td><td class="ignorable">68 (38%)</td>
+<td>55%</td><td></td><td><strong>17.6人周</strong></td>
+</tr>
+</table>
+
+<div class="summary-box">
+<h4>反向回调关键发现</h4>
+<ul>
+<li><strong>完美映射：</strong>IAbilityConnection是最简单的1:1映射（2/2=100%）</li>
+<li><strong>高映射率：</strong>IWindow-OH（82%）和IAbilityScheduler（60%）映射率高</li>
+<li><strong>大量可忽略：</strong>68个OH独有方法（JS/CJ堆管理、热修复、分布式协同、自由多窗口等）可安全忽略</li>
+<li><strong>需OH增强极少：</strong>仅13个方法（7%），主要集中在数据操作格式适配（9个）和截图回调（2个）</li>
+<li><strong>核心架构挑战：</strong>OH使用细粒度通知，Android使用批量resized()，需要引入回调聚合/延迟触发机制</li>
+</ul>
+</div>
+
+
+<!-- ========== 第7章 ========== -->
+<h1 id="ch7">7. Android 回调接口缺失分析</h1>
+
+<p>本章从<strong>Android App的视角</strong>出发，分析Android系统服务回调App的3个接口（IApplicationThread、IServiceConnection、IWindow）共78个方法中，哪些方法没有任何OH回调接口方法可以提供对应回调，需要OH系统服务增强能力。</p>
+
+<div class="danger-box">
+<h4>分析视角说明</h4>
+<p>第6章从OH接口出发分析"OH方法能映射到哪些Android方法"。本章<strong>反向分析</strong>：从Android回调接口的每个方法出发，检查是否存在至少一个OH回调接口方法能够触发该Android回调。<strong>未被任何OH回调覆盖的Android方法 = 需要OH系统服务增强的缺口。</strong></p>
+</div>
+
+
+<!-- IApplicationThread 未覆盖 -->
+<h2 id="ch7-1">7.1 IApplicationThread 未覆盖方法分析</h2>
+
+<p><strong>IApplicationThread</strong>是Android系统回调App最核心的接口，共61个方法。OH侧通过IAppScheduler（进程级）和IAbilityScheduler（Ability级）两个接口提供回调。</p>
+
+<h3>7.1.1 覆盖情况总览</h3>
+
+<table>
+<tr><th>覆盖状态</th><th>方法数</th><th>占比</th><th>说明</th></tr>
+<tr><td class="mappable">已覆盖（可映射）</td><td>23</td><td>38%</td><td>OH回调可直接或逻辑转换后触发Android回调</td></tr>
+<tr><td class="need-oh">未覆盖（缺口）</td><td>38</td><td>62%</td><td><strong>无OH回调对应，需OH系统服务增强</strong></td></tr>
+</table>
+
+<h3>7.1.2 已覆盖的方法（23个）</h3>
+
+<table>
+<tr><th>Android方法</th><th>OH回调来源</th><th>覆盖状态</th></tr>
+<tr><td>bindApplication</td><td>IAppScheduler.ScheduleLaunchApplication</td><td class="mappable">可映射</td></tr>
+<tr><td>setProcessState</td><td>IAppScheduler.ScheduleForeground/BackgroundApplication</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleExit / scheduleSuicide</td><td>IAppScheduler.ScheduleTerminateApplication / ScheduleProcessSecurityExit</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleLowMemory</td><td>IAppScheduler.ScheduleLowMemory</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleTrimMemory</td><td>IAppScheduler.ScheduleShrinkMemory / ScheduleMemoryLevel</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleTransaction (Activity lifecycle)</td><td>IAbilityScheduler.ScheduleAbilityTransaction</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleTransaction (Config change)</td><td>IAppScheduler.ScheduleConfigurationUpdated</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleBindService</td><td>IAbilityScheduler.ScheduleConnectAbility</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleUnbindService</td><td>IAbilityScheduler.ScheduleDisconnectAbility</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleServiceArgs</td><td>IAbilityScheduler.ScheduleCommandAbility</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleCrash</td><td>IAppScheduler.ScheduleNotifyAppFault</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleApplicationInfoChanged</td><td>IAppScheduler.ScheduleUpdateApplicationInfoInstalled</td><td class="mappable">可映射（需转换）</td></tr>
+<tr><td>dumpHeap</td><td>IAppScheduler.ScheduleHeapMemory</td><td class="mappable">可映射（需转换）</td></tr>
+<tr><td>profilerControl</td><td>IAppScheduler.ScheduleProfileChanged</td><td class="mappable">可映射（需转换）</td></tr>
+<tr><td>attachAgent / detachAgent</td><td>IAppScheduler.AttachAppDebug / DetachAppDebug</td><td class="mappable">可映射（需转换）</td></tr>
+<tr><td>onActivityResult (sendResult)</td><td>IAbilityScheduler.SendResult</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleSaveInstanceState</td><td>IAbilityScheduler.ScheduleSaveAbilityState</td><td class="mappable">可映射</td></tr>
+<tr><td>scheduleRestoreInstanceState</td><td>IAbilityScheduler.ScheduleRestoreAbilityState</td><td class="mappable">可映射</td></tr>
+</table>
+
+<h3>7.1.3 未覆盖的方法详细分析（38个）</h3>
+
+<p>以下按对App运行的影响程度分为<strong>高影响</strong>、<strong>中影响</strong>、<strong>低影响</strong>三个级别。</p>
+
+<h4 style="color:#c0392b;">高影响 &mdash; 缺失将导致重要App功能无法工作（10个方法）</h4>
+
+<table>
+<tr><th>Android方法</th><th>功能描述</th><th>影响分析</th><th>OH增强建议</th></tr>
+<tr>
+<td><strong>scheduleReceiver</strong></td>
+<td>系统向App投递广播Intent，触发BroadcastReceiver.onReceive()</td>
+<td class="need-oh">无法接收系统广播（电池变化、网络状态、屏幕开关、包安装等），大量App依赖此机制</td>
+<td>在IAppScheduler中新增ScheduleReceiver方法，或创建独立的IBroadcastScheduler接口；OH侧需建立CommonEvent&rarr;BroadcastReceiver的转发管道</td>
+</tr>
+<tr>
+<td><strong>scheduleRegisteredReceiver</strong></td>
+<td>向动态注册的BroadcastReceiver投递Intent</td>
+<td class="need-oh">App通过registerReceiver()动态注册的广播接收器无法工作</td>
+<td>同上，需在OH AppMgr中维护动态注册表，并在CommonEvent触发时分发</td>
+</tr>
+<tr>
+<td><strong>scheduleCreateService</strong></td>
+<td>通知App创建Service实例，调用Service.onCreate()</td>
+<td class="need-oh">Service无法正确初始化，后台音乐播放、下载、位置服务等功能失效</td>
+<td>在IAbilityScheduler中增加ScheduleCreateServiceAbility方法，或利用现有ScheduleAbilityTransaction传递Service创建事件</td>
+</tr>
+<tr>
+<td><strong>scheduleStopService</strong></td>
+<td>通知App停止Service，调用Service.onDestroy()</td>
+<td class="need-oh">Service无法正确清理资源，可能导致资源泄漏</td>
+<td>在IAbilityScheduler中增加ScheduleStopServiceAbility方法</td>
+</tr>
+<tr>
+<td><strong>scheduleInstallProvider</strong></td>
+<td>通知App安装ContentProvider，调用ContentProvider.onCreate()</td>
+<td class="need-oh">ContentProvider无法在App进程中初始化，跨进程数据共享失效</td>
+<td>在IAppScheduler中新增ScheduleInstallProvider方法，传递provider信息；OH侧可在App启动时预注册所需Provider</td>
+</tr>
+<tr>
+<td><strong>notifyContentProviderPublishStatus</strong></td>
+<td>通知ContentProvider发布完成状态</td>
+<td class="need-oh">Provider发布后的同步等待机制失效，导致跨进程数据访问时序问题</td>
+<td>在IAppScheduler中增加NotifyProviderPublishStatus方法</td>
+</tr>
+<tr>
+<td><strong>setCoreSettings</strong></td>
+<td>传递系统核心设置（字体缩放、动画缩放等）到App进程</td>
+<td class="need-oh">App无法获取系统级显示设置，可能导致UI渲染异常</td>
+<td>可通过IAppScheduler.ScheduleConfigurationUpdated扩展传递，或新增ScheduleCoreSettings方法</td>
+</tr>
+<tr>
+<td><strong>updateTimeZone</strong></td>
+<td>通知App时区变更</td>
+<td class="need-oh">App中的时间显示不会随系统时区变化更新</td>
+<td>在IAppScheduler中增加ScheduleTimeZoneChanged方法</td>
+</tr>
+<tr>
+<td><strong>updateHttpProxy</strong></td>
+<td>通知App HTTP代理配置变更</td>
+<td class="need-oh">App网络请求无法使用系统代理，企业环境和VPN场景受影响</td>
+<td>在IAppScheduler中增加ScheduleHttpProxyChanged方法</td>
+</tr>
+<tr>
+<td><strong>notifyCleartextNetwork</strong></td>
+<td>通知App检测到明文网络传输</td>
+<td class="need-oh">网络安全策略无法执行</td>
+<td>在IAppScheduler中增加NotifyCleartextNetwork方法</td>
+</tr>
+</table>
+
+<h4 style="color:#b7950b;">中影响 &mdash; 缺失将导致部分功能异常但App仍可运行（13个方法）</h4>
+
+<table>
+<tr><th>Android方法</th><th>功能描述</th><th>影响分析</th><th>OH增强建议</th></tr>
+<tr>
+<td><strong>scheduleReceiverList</strong></td><td>批量投递广播Intent列表</td>
+<td class="partial">性能优化版的scheduleReceiver，功能上被scheduleReceiver覆盖</td>
+<td>随scheduleReceiver一起实现，增加批量投递能力</td>
+</tr>
+<tr>
+<td><strong>scheduleCreateBackupAgent</strong></td><td>创建备份代理</td>
+<td class="need-oh">App无法进行数据备份和恢复</td><td>可延后支持；OH侧需建立备份框架对接</td>
+</tr>
+<tr>
+<td><strong>scheduleDestroyBackupAgent</strong></td><td>销毁备份代理</td>
+<td class="need-oh">同上</td><td>同上</td>
+</tr>
+<tr>
+<td><strong>updatePackageCompatibilityInfo</strong></td><td>更新包的兼容性信息</td>
+<td class="need-oh">旧版App的兼容模式不工作</td><td>可通过ScheduleConfigurationUpdated间接处理</td>
+</tr>
+<tr>
+<td><strong>updateTimePrefs</strong></td><td>通知时间格式偏好变更（12/24小时制）</td>
+<td class="need-oh">时间显示格式不随系统设置变化</td><td>可与updateTimeZone合并</td>
+</tr>
+<tr>
+<td><strong>processInBackground</strong></td><td>通知App进入后台处理模式，触发GC</td>
+<td class="need-oh">后台GC不会被触发</td><td>可通过ScheduleShrinkMemory替代</td>
+</tr>
+<tr>
+<td><strong>scheduleOnNewActivityOptions</strong></td><td>传递新的ActivityOptions</td>
+<td class="need-oh">共享元素转场动画中的动态选项更新失效</td><td>可通过ScheduleAbilityTransaction扩展</td>
+</tr>
+<tr>
+<td><strong>scheduleEnterAnimationComplete</strong></td><td>通知进入动画完成</td>
+<td class="need-oh">onEnterAnimationComplete()回调不触发</td><td>可由SessionStageBridge在SetActive后合成</td>
+</tr>
+<tr>
+<td><strong>scheduleTranslucentConversionComplete</strong></td><td>通知半透明转换完成</td>
+<td class="need-oh">半透明Activity切换动画不完整</td><td>低优先级，可间接处理</td>
+</tr>
+<tr>
+<td><strong>handleTrustStorageUpdate</strong></td><td>通知信任证书库更新</td>
+<td class="need-oh">企业CA部署场景受影响</td><td>在IAppScheduler中增加TrustStoreChanged通知</td>
+</tr>
+<tr>
+<td><strong>scheduleLocalVoiceInteractionStarted</strong></td><td>通知本地语音交互开始</td>
+<td class="need-oh">语音助手集成不工作</td><td>OH暂无对应能力，可延后</td>
+</tr>
+<tr>
+<td><strong>requestDirectActions</strong></td><td>请求App提供Direct Actions列表</td>
+<td class="need-oh">Assistant框架集成不工作</td><td>可延后</td>
+</tr>
+<tr>
+<td><strong>performDirectAction</strong></td><td>执行App提供的Direct Action</td>
+<td class="need-oh">同上</td><td>可延后</td>
+</tr>
+</table>
+
+<h4 style="color:#7f8c8d;">低影响 &mdash; 缺失不影响App正常运行（15个方法）</h4>
+
+<table>
+<tr><th>Android方法</th><th>功能描述</th><th>忽略理由</th></tr>
+<tr><td>dumpActivity</td><td>Dump Activity状态（调试用）</td><td>仅开发调试场景使用</td></tr>
+<tr><td>dumpHeap (complete)</td><td>完整堆转储</td><td>调试和性能分析工具使用</td></tr>
+<tr><td>dumpResources</td><td>资源转储</td><td>开发调试</td></tr>
+<tr><td>dumpMemInfo / dumpMemInfoProto</td><td>内存信息转储</td><td>dumpsys meminfo使用</td></tr>
+<tr><td>dumpGfxInfo</td><td>图形信息转储</td><td>GPU渲染分析</td></tr>
+<tr><td>dumpCacheInfo</td><td>缓存信息转储</td><td>存储分析</td></tr>
+<tr><td>dumpProvider</td><td>Provider状态转储</td><td>开发调试</td></tr>
+<tr><td>dumpDbInfo</td><td>数据库信息转储</td><td>开发调试</td></tr>
+<tr><td>dumpService</td><td>Service状态转储</td><td>开发调试</td></tr>
+<tr><td>startBinderTracking / stopBinderTrackingAndDump</td><td>Binder调用追踪</td><td>系统调试工具</td></tr>
+<tr><td>schedulePing</td><td>看门狗ping回复</td><td>系统内部ANR检测机制</td></tr>
+<tr><td>instrumentWithoutRestart</td><td>运行时插桩</td><td>测试框架专用</td></tr>
+<tr><td>updateUiTranslationState</td><td>UI翻译状态</td><td>极少App使用</td></tr>
+<tr><td>runIsolatedEntryPoint</td><td>隔离进程入口</td><td>极少使用的隔离进程特性</td></tr>
+<tr><td>scheduleTimeoutService</td><td>Service超时处理</td><td>系统内部超时机制</td></tr>
+</table>
+
+
+<!-- IWindow-Android 未覆盖 -->
+<h2 id="ch7-2">7.2 IWindow-Android 未覆盖方法分析</h2>
+
+<p><strong>IWindow</strong>是Android WMS回调App窗口的接口，共16个方法。OH侧通过IWindow-OH（28方法）、ISessionStage（63+方法）和IWindowManagerAgent（19方法）三个接口提供回调。</p>
+
+<h3>7.2.1 覆盖情况总览</h3>
+
+<table>
+<tr><th>覆盖状态</th><th>方法数</th><th>占比</th><th>说明</th></tr>
+<tr><td class="mappable">已覆盖（可映射）</td><td>7</td><td>44%</td><td>OH回调可直接或转换后触发</td></tr>
+<tr><td class="need-oh">未覆盖（缺口）</td><td>9</td><td>56%</td><td><strong>无OH回调对应</strong></td></tr>
+</table>
+
+<h3>7.2.2 已覆盖的方法（7个）</h3>
+
+<table>
+<tr><th>Android方法</th><th>OH回调来源</th><th>覆盖状态</th></tr>
+<tr><td>resized</td><td>IWindow-OH.UpdateWindowRect + ISessionStage.UpdateRect + UpdateAvoidArea等聚合</td><td class="mappable">可映射（聚合）</td></tr>
+<tr><td>insetsControlChanged</td><td>IWindow-OH.UpdateAvoidArea / ISessionStage.UpdateAvoidArea</td><td class="mappable">可映射</td></tr>
+<tr><td>showInsets / hideInsets</td><td>ISessionStage.NotifyKeyboardAnimationWillBegin / Completed</td><td class="mappable">可映射</td></tr>
+<tr><td>dispatchAppVisibility</td><td>IWindow-OH.NotifyForeground/Background / ISessionStage.NotifySessionForeground/Background</td><td class="mappable">可映射</td></tr>
+<tr><td>moved</td><td>IWindow-OH.UpdateWindowRect（含位置信息）</td><td class="mappable">可映射（需转换）</td></tr>
+<tr><td>dispatchDragEvent</td><td>IWindow-OH.UpdateWindowDragInfo</td><td class="mappable">可映射（需转换）</td></tr>
+</table>
+
+<h3>7.2.3 未覆盖的方法详细分析（9个）</h3>
+
+<table>
+<tr><th>Android方法</th><th>功能描述</th><th>影响级别</th><th>影响分析</th><th>OH增强建议</th></tr>
+<tr>
+<td><strong>dispatchWallpaperOffsets</strong></td>
+<td>通知壁纸窗口当前偏移量</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>壁纸App无法实现视差滚动效果；普通App不受影响</td>
+<td>在OH IWindow-OH中新增壁纸回调</td>
+</tr>
+<tr>
+<td><strong>dispatchWallpaperCommand</strong></td>
+<td>向壁纸窗口分发命令</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>壁纸App无法接收触摸点击反馈命令</td>
+<td>在OH IWindow-OH中新增WallpaperCommand回调</td>
+</tr>
+<tr>
+<td><strong>closeSystemDialogs</strong></td>
+<td>通知App关闭系统对话框</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>Dialog/PopupWindow在Home键按下时不会自动关闭</td>
+<td>在ISessionStage中新增NotifyCloseSystemDialogs方法</td>
+</tr>
+<tr>
+<td><strong>executeCommand</strong></td>
+<td>执行窗口调试命令</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>窗口调试信息不可用</td>
+<td>可延后</td>
+</tr>
+<tr>
+<td><strong>requestAppKeyboardShortcuts</strong></td>
+<td>请求App报告键盘快捷键列表</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>仅影响物理键盘用户</td>
+<td>可延后</td>
+</tr>
+<tr>
+<td><strong>requestScrollCapture</strong></td>
+<td>请求App提供滚动截图支持</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>系统长截图功能不可用</td>
+<td>在ISessionStage中新增RequestScrollCapture回调</td>
+</tr>
+<tr>
+<td><strong>updatePointerIcon</strong></td>
+<td>通知App更新鼠标指针图标</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>仅影响Pad/PC模式</td>
+<td>在ISessionStage中新增UpdatePointerIcon回调</td>
+</tr>
+<tr>
+<td><strong>dispatchWindowShown</strong></td>
+<td>通知窗口已显示完成</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>reportFullyDrawn()时机不准确</td>
+<td>可由SessionStageBridge在SetActive后合成，无需OH新增接口</td>
+</tr>
+<tr>
+<td><strong>insetsSourceConsumed</strong></td>
+<td>通知Insets来源被消费</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>Insets消费状态通知缺失</td>
+<td>可在回调聚合机制中通过状态跟踪解决</td>
+</tr>
+</table>
+
+
+<!-- IServiceConnection -->
+<h2 id="ch7-3">7.3 IServiceConnection 覆盖情况</h2>
+
+<div class="success-box">
+<strong>IServiceConnection：100%覆盖，无缺口</strong>
+<p>IServiceConnection仅有1个方法<code>connected(ComponentName, IBinder, boolean)</code>，通过AbilityConnectionBridge的OnAbilityConnectDone / OnAbilityDisconnectDone完全覆盖。<strong>无需OH增强。</strong></p>
+</div>
+
+
+<!-- OH增强优先级 -->
+<h2 id="ch7-4">7.4 OH 系统服务增强优先级（P0-P3 矩阵）</h2>
+
+<p>以下按优先级排列需要OH系统服务增强的能力，综合考虑<strong>影响App数量</strong>、<strong>功能重要性</strong>和<strong>实现复杂度</strong>。</p>
+
+<table>
+<tr>
+<th>优先级</th><th>增强项</th><th>涉及Android方法</th><th>影响范围</th><th>实现复杂度</th><th>OH侧改造方案</th><th>工作量</th>
+</tr>
+<tr style="background:#fdedec;">
+<td><strong>P0<br>必须</strong></td>
+<td><strong>广播投递机制</strong></td>
+<td>scheduleReceiver<br>scheduleRegisteredReceiver<br>scheduleReceiverList</td>
+<td>所有使用BroadcastReceiver的App（覆盖率&gt;80%）</td>
+<td><span class="difficulty diff-very-high">很高</span></td>
+<td>
+<ol>
+<li>在IAppScheduler中新增<code>ScheduleReceiver(Want, resultCode, data, extras, ordered)</code>方法</li>
+<li>OH AppMgr维护动态注册表</li>
+<li>OH CommonEventManager事件 &rarr; 转换为Android广播分发</li>
+<li>实现有序广播链和结果传递</li>
+</ol>
+</td>
+<td>6人周</td>
+</tr>
+<tr style="background:#fdedec;">
+<td><strong>P0<br>必须</strong></td>
+<td><strong>Service创建/销毁</strong></td>
+<td>scheduleCreateService<br>scheduleStopService</td>
+<td>所有使用Service的App</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>
+<ol>
+<li>在IAbilityScheduler中新增<code>ScheduleCreateServiceAbility(token, serviceInfo)</code></li>
+<li>在IAbilityScheduler中新增<code>ScheduleStopServiceAbility(token)</code></li>
+<li>或复用ScheduleAbilityTransaction，增加Service类型事务</li>
+</ol>
+</td>
+<td>2人周</td>
+</tr>
+<tr style="background:#fdedec;">
+<td><strong>P0<br>必须</strong></td>
+<td><strong>ContentProvider生命周期</strong></td>
+<td>scheduleInstallProvider<br>notifyContentProviderPublishStatus</td>
+<td>所有使用ContentProvider的App</td>
+<td><span class="difficulty diff-high">高</span></td>
+<td>
+<ol>
+<li>在IAppScheduler中新增<code>ScheduleInstallProvider(providerInfoList)</code></li>
+<li>在IAppScheduler中新增<code>NotifyProviderPublishStatus(authority, published)</code></li>
+<li>OH侧在App启动时解析AndroidManifest获取Provider声明</li>
+</ol>
+</td>
+<td>3人周</td>
+</tr>
+<tr style="background:#fef9e7;">
+<td><strong>P1<br>重要</strong></td>
+<td><strong>系统核心设置分发</strong></td>
+<td>setCoreSettings<br>updateTimeZone<br>updateTimePrefs</td>
+<td>所有App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>在IAppScheduler中新增相关方法，可复用ScheduleConfigurationUpdated扩展</td>
+<td>1人周</td>
+</tr>
+<tr style="background:#fef9e7;">
+<td><strong>P1<br>重要</strong></td>
+<td><strong>网络安全策略通知</strong></td>
+<td>notifyCleartextNetwork<br>updateHttpProxy</td>
+<td>所有进行网络通信的App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>在IAppScheduler中新增通知方法，OH网络栈事件监听 &rarr; 回调分发</td>
+<td>1人周</td>
+</tr>
+<tr style="background:#fef9e7;">
+<td><strong>P1<br>重要</strong></td>
+<td><strong>关闭系统对话框</strong></td>
+<td>closeSystemDialogs (IWindow)</td>
+<td>使用Dialog/PopupWindow的App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>在ISessionStage中新增<code>NotifyCloseSystemDialogs(reason)</code></td>
+<td>0.5人周</td>
+</tr>
+<tr style="background:#fef9e7;">
+<td><strong>P1<br>重要</strong></td>
+<td><strong>窗口显示完成通知</strong></td>
+<td>dispatchWindowShown (IWindow)</td>
+<td>依赖reportFullyDrawn()的App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>无需OH新增接口，在SessionStageBridge中SetActive后延迟合成</td>
+<td>0.5人周</td>
+</tr>
+<tr style="background:#eaf2f8;">
+<td><strong>P2<br>可选</strong></td>
+<td><strong>备份/恢复代理</strong></td>
+<td>scheduleCreateBackupAgent<br>scheduleDestroyBackupAgent</td>
+<td>支持备份的App</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>需建立OH备份框架与Android BackupAgent对接</td>
+<td>3人周</td>
+</tr>
+<tr style="background:#eaf2f8;">
+<td><strong>P2<br>可选</strong></td>
+<td><strong>壁纸回调</strong></td>
+<td>dispatchWallpaperOffsets<br>dispatchWallpaperCommand (IWindow)</td>
+<td>壁纸类App</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>OH WMS增加壁纸偏移管理，在IWindow-OH中新增壁纸回调</td>
+<td>2人周</td>
+</tr>
+<tr style="background:#eaf2f8;">
+<td><strong>P2<br>可选</strong></td>
+<td><strong>兼容性信息</strong></td>
+<td>updatePackageCompatibilityInfo</td>
+<td>旧版API的App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>可通过Configuration变更间接处理</td>
+<td>0.5人周</td>
+</tr>
+<tr style="background:#eaf2f8;">
+<td><strong>P2<br>可选</strong></td>
+<td><strong>Activity动画回调</strong></td>
+<td>scheduleOnNewActivityOptions<br>scheduleEnterAnimationComplete<br>scheduleTranslucentConversionComplete</td>
+<td>使用共享元素转场的App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>可通过IAbilityScheduler.ScheduleAbilityTransaction扩展</td>
+<td>1人周</td>
+</tr>
+<tr style="background:#f8f9fa;">
+<td><strong>P3<br>延后</strong></td>
+<td><strong>语音/Direct Actions</strong></td>
+<td>scheduleLocalVoiceInteractionStarted<br>requestDirectActions<br>performDirectAction</td>
+<td>语音助手集成（极少App）</td>
+<td><span class="difficulty diff-high">高</span></td>
+<td>需OH建立语音交互框架</td>
+<td>5人周</td>
+</tr>
+<tr style="background:#f8f9fa;">
+<td><strong>P3<br>延后</strong></td>
+<td><strong>信任证书</strong></td>
+<td>handleTrustStorageUpdate</td>
+<td>企业环境App</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>OH安全框架对接</td>
+<td>0.5人周</td>
+</tr>
+<tr style="background:#f8f9fa;">
+<td><strong>P3<br>延后</strong></td>
+<td><strong>滚动截图</strong></td>
+<td>requestScrollCapture (IWindow)</td>
+<td>系统截图功能</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>OH截图服务新增ScrollCapture支持</td>
+<td>2人周</td>
+</tr>
+<tr style="background:#f8f9fa;">
+<td><strong>P3<br>延后</strong></td>
+<td><strong>调试诊断（全部）</strong></td>
+<td>dumpActivity/Heap/Resources/MemInfo等<br>startBinderTracking/schedulePing等</td>
+<td>开发调试场景</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>可复用OH IAppScheduler现有dump机制</td>
+<td>3人周</td>
+</tr>
+<tr style="background:#f8f9fa;">
+<td><strong>P3<br>延后</strong></td>
+<td><strong>其他IWindow方法</strong></td>
+<td>executeCommand<br>requestAppKeyboardShortcuts<br>updatePointerIcon<br>insetsSourceConsumed</td>
+<td>特定场景</td>
+<td><span class="difficulty diff-low">低</span></td>
+<td>在ISessionStage中按需新增</td>
+<td>1人周</td>
+</tr>
+</table>
+
+
+<!-- 缺失分析总结 -->
+<h2 id="ch7-5">7.5 缺失分析总结</h2>
+
+<div class="summary-box">
+<h4>Android回调接口覆盖缺口总览</h4>
+
+<table>
+<tr><th>Android回调接口</th><th>总方法</th><th>已覆盖（可映射）</th><th>未覆盖（缺口）</th><th>缺口中高影响</th><th>缺口中可忽略</th></tr>
+<tr><td>IApplicationThread</td><td>61</td><td class="mappable">23 (38%)</td><td class="need-oh">38 (62%)</td><td class="need-oh">10</td><td class="ignorable">15</td></tr>
+<tr><td>IWindow-Android</td><td>16</td><td class="mappable">7 (44%)</td><td class="need-oh">9 (56%)</td><td class="need-oh">1</td><td class="ignorable">5</td></tr>
+<tr><td>IServiceConnection</td><td>1</td><td class="mappable">1 (100%)</td><td class="mappable">0 (0%)</td><td>0</td><td>0</td></tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td>78</td><td class="mappable">31 (40%)</td><td class="need-oh">47 (60%)</td><td class="need-oh">11</td><td class="ignorable">20</td></tr>
+</table>
+
+<h4>OH系统服务增强工作量估算</h4>
+
+<table>
+<tr><th>优先级</th><th>增强项数</th><th>涉及方法数</th><th>工作量</th><th>说明</th></tr>
+<tr style="background:#fdedec;">
+<td><strong>P0 必须</strong></td><td>3项</td><td>7个方法</td><td><strong>11人周</strong></td>
+<td>广播投递（6人周）、Service创建/销毁（2人周）、ContentProvider生命周期（3人周）</td>
+</tr>
+<tr style="background:#fef9e7;">
+<td><strong>P1 重要</strong></td><td>4项</td><td>8个方法</td><td><strong>3人周</strong></td>
+<td>系统设置分发（1人周）、网络安全（1人周）、关闭系统对话框（0.5人周）、窗口显示完成（0.5人周）</td>
+</tr>
+<tr style="background:#eaf2f8;">
+<td><strong>P2 可选</strong></td><td>4项</td><td>8个方法</td><td><strong>6.5人周</strong></td>
+<td>备份代理（3人周）、壁纸回调（2人周）、兼容性（0.5人周）、动画回调（1人周）</td>
+</tr>
+<tr style="background:#f8f9fa;">
+<td><strong>P3 延后</strong></td><td>5项</td><td>24个方法</td><td><strong>11.5人周</strong></td>
+<td>语音交互（5人周）、证书（0.5人周）、滚动截图（2人周）、调试诊断（3人周）、其他IWindow（1人周）</td>
+</tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td>16项</td><td>47个方法</td><td><strong>32人周</strong></td>
+<td>P0+P1（核心）：14人周；P2+P3（完整）：18人周</td>
+</tr>
+</table>
+</div>
+
+<div class="danger-box">
+<h4>核心结论</h4>
+<p><strong>47个Android回调方法（60%）缺少OH回调接口对应</strong>，但其中：</p>
+<ul>
+<li><strong>11个高影响方法</strong>（P0）必须由OH系统服务增强能力提供，否则广播接收、Service运行、ContentProvider等核心功能无法工作</li>
+<li><strong>8个中影响方法</strong>（P1）建议OH尽快支持，影响系统设置同步和网络安全</li>
+<li><strong>8个可选方法</strong>（P2）可根据项目进度安排</li>
+<li><strong>20个低影响方法</strong>（P3）可安全忽略或延后</li>
+</ul>
+<p>OH侧核心改造集中在<strong>IAppScheduler</strong>（新增约6个方法）和<strong>IAbilityScheduler</strong>（新增约2个方法）两个接口，预计P0+P1工作量约<strong>14人周</strong>。</p>
+</div>
+
+
+<!-- ========== 第8章 ========== -->
+<h1 id="ch8">8. 核心技术挑战</h1>
+
+<h2>8.1 Binder 跨系统互通</h2>
+<ul>
+  <li>Android Binder 和 OH IPC 框架是<strong>两套独立的内核驱动和用户态框架</strong></li>
+  <li>Android 使用 AIDL 生成 Java Proxy/Stub；OH 使用 C++ <code>IRemoteProxy</code>/<code>IRemoteStub</code></li>
+  <li><strong>必须解决</strong>：两个 Binder 域之间的消息转发机制</li>
+  <li>方案：在 App 进程内通过 JNI 桥接，Java 层拦截 Android Binder 调用，转入 C++ 层使用 OH IPC 框架发起跨进程调用</li>
+</ul>
+
+<h2>8.2 Intent &harr; Want 转换</h2>
+<ul>
+  <li>Android <code>Intent</code> (Java)：action / category / data(URI) / extras(Bundle) / component</li>
+  <li>OH <code>Want</code> (C++)：bundleName / abilityName / action / entities / parameters</li>
+  <li>需要建立完整的映射规则和转换层，尤其是隐式 Intent 的解析</li>
+</ul>
+
+<h2>8.3 图形渲染管道</h2>
+<ul>
+  <li>Android：SurfaceFlinger + BufferQueue + HWC</li>
+  <li>OH：RenderService + Surface + HWC</li>
+  <li>这是<strong>最大的难点</strong>，窗口合成和显示是底层紧耦合的</li>
+  <li>需要共享 GraphicBuffer 或建立 Surface 代理层</li>
+</ul>
+
+<h2>8.4 输入系统</h2>
+<ul>
+  <li>Android：InputManagerService &rarr; InputChannel (socketpair) &rarr; App</li>
+  <li>OH：多模输入子系统 &rarr; Session &rarr; App</li>
+  <li>输入事件格式（MotionEvent vs. PointerEvent）和分发路径完全不同</li>
+</ul>
+
+<h2>8.5 运行环境共存</h2>
+<ul>
+  <li>Android App 进程运行在 ART (Android Runtime) 上</li>
+  <li>OH IPC 客户端库是 C++ 实现</li>
+  <li>需要确保同一进程中可同时加载 ART 和 OH IPC 动态库</li>
+</ul>
+
+<h2>8.6 技术挑战优先级排序</h2>
+
+<table>
+<tr><th>优先级</th><th>挑战</th><th>影响范围</th><th>难度</th><th>建议方案</th></tr>
+<tr>
+<td>P0</td><td><strong>Intent &harr; Want转换</strong></td><td>所有Activity/Service启动</td>
+<td><span class="difficulty diff-high">高</span></td>
+<td>完善IntentWantConverter，建立Action映射表，处理extras序列化</td>
+</tr>
+<tr>
+<td>P0</td><td><strong>窗口Surface共享</strong></td><td>所有UI渲染</td>
+<td><span class="difficulty diff-very-high">很高</span></td>
+<td>研究OH RenderService共享内存机制，建立Surface桥接</td>
+</tr>
+<tr>
+<td>P0</td><td><strong>OH细粒度&rarr;Android批量回调聚合</strong></td><td>IWindow-OH/ISessionStage回调</td>
+<td><span class="difficulty diff-high">高</span></td>
+<td>引入缓冲+定时/条件触发的回调聚合机制</td>
+</tr>
+<tr>
+<td>P1</td><td><strong>生命周期状态映射</strong></td><td>Activity生命周期</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>Android 6态&rarr;OH 4态映射已设计，需处理反向映射歧义</td>
+</tr>
+<tr>
+<td>P1</td><td><strong>ClientTransaction构造</strong></td><td>AbilityScheduler&rarr;IApplicationThread</td>
+<td><span class="difficulty diff-high">高</span></td>
+<td>根据OH Ability状态变化构造对应的ClientTransaction</td>
+</tr>
+<tr>
+<td>P2</td><td><strong>广播系统重新架构</strong></td><td>11+个方法</td>
+<td><span class="difficulty diff-very-high">很高</span></td>
+<td>OH CommonEventManager&rarr;Android BroadcastReceiver转换层</td>
+</tr>
+<tr>
+<td>P2</td><td><strong>ContentProvider数据格式</strong></td><td>10+个方法</td>
+<td><span class="difficulty diff-high">高</span></td>
+<td>NativeRdb.ValuesBucket&harr;ContentValues、DataAbilityPredicates&harr;SQL转换器</td>
+</tr>
+<tr>
+<td>P3</td><td><strong>权限模型适配</strong></td><td>18+个方法</td>
+<td><span class="difficulty diff-medium">中</span></td>
+<td>OH与Android权限字符串映射，运行时权限流程桥接</td>
+</tr>
+</table>
+
+
+<!-- ========== 第9章 ========== -->
+<h1 id="ch9">9. 架构设计方案</h1>
+
+<h2 id="ch9-1">9.1 系统架构图</h2>
+
+<pre>
++---------------------------------------------------+
+|              Android App Process                  |
+|                                                   |
+|  +----------+  +---------+  +--------------+      |
+|  | Activity |  | Service |  | ViewRootImpl |      |
+|  +----+-----+  +----+----+  +------+-------+      |
+|       |              |             |               |
+|  +----v--------------v-------------v-----------+   |
+|  |       Android Framework API Layer           |   |
+|  |  (ActivityManager, WindowManager, etc.)     |   |
+|  +---------------------+-----------------------+   |
+|                         |                          |
+|  +======================v========================+ |
+|  ||         Adaptation Layer (适配层)           || |
+|  ||                                             || |
+|  ||  +----------------+  +-------------------+  || |
+|  ||  |LifecycleAdapter|  |  WindowAdapter    |  || |
+|  ||  |                |  |                   |  || |
+|  ||  | Intent-&gt;Want   |  | Surface桥接      |  || |
+|  ||  | 生命周期映射   |  | 输入事件转换     |  || |
+|  ||  | 连接管理       |  | 布局参数转换     |  || |
+|  ||  +-------+--------+  +--------+---------+  || |
+|  ||          |                     |            || |
+|  ||  +-------v---------------------v---------+  || |
+|  ||  |    OH IPC Client (C++ / JNI Bridge)   |  || |
+|  ||  |                                       |  || |
+|  ||  |  AbilityManagerProxy                  |  || |
+|  ||  |  AppMgrProxy                          |  || |
+|  ||  |  SceneSessionManagerProxy (SA 4607)   |  || |
+|  ||  |  ISession Proxy (per-window)          |  || |
+|  ||  +-------+-------------------------------+  || |
+|  ||          |                                  || |
+|  ||  +-------v-------------------------------+  || |
+|  ||  | Callback Stub (OH-&gt;Android 反向通道)  |  || |
+|  ||  |                                       |  || |
+|  ||  | AppSchedulerHost -&gt; IApplicationThread|  || |
+|  ||  | AbilitySchedulerStub -&gt; Activity回调  |  || |
+|  ||  | SessionStageStub -&gt; IWindow回调       |  || |
+|  ||  +---------------------------------------+  || |
+|  +==============================================+ |
+|                    | OH Binder IPC                 |
++--------------------+------------------------------+
+                     |
++--------------------v------------------------------+
+|         OpenHarmony System Services               |
+|                                                   |
+|  +--------------+ +----------+ +---------------+  |
+|  |AbilityManager| |  AppMgr  | |SceneSession   |  |
+|  |   Service    | |  Service | |  Manager      |  |
+|  |  (SA 180)    | | (SA 501) | | (SA 4607)     |  |
+|  +--------------+ +----------+ +---------------+  |
+|  +--------------+ +---------------------------+   |
+|  | ISession     | |     RenderService         |   |
+|  | (per-window) | |     (图形合成)            |   |
+|  +--------------+ +---------------------------+   |
++---------------------------------------------------+
+</pre>
+
+
+<h2 id="ch9-2">9.2 适配层核心模块设计</h2>
+
+<h3>模块1：LifecycleAdapter（生命周期适配）</h3>
+
+<h4>App &rarr; 系统服务方向</h4>
+<pre>
+ActivityManager.startActivity(Intent)
+  &rarr; LifecycleAdapter.convertIntent(Intent) &rarr; Want
+  &rarr; [JNI Bridge]
+  &rarr; AbilityManagerProxy.StartAbility(Want)
+</pre>
+
+<h4>系统服务 &rarr; App 方向</h4>
+<pre>
+IAppScheduler.ScheduleLaunchAbility()
+  &rarr; [JNI Bridge]
+  &rarr; LifecycleAdapter.convertToClientTransaction()
+  &rarr; IApplicationThread.scheduleTransaction(ClientTransaction)
+</pre>
+
+<h3>模块2：WindowAdapter（窗口适配）</h3>
+
+<h4>App &rarr; 系统服务方向</h4>
+<pre>
+ViewRootImpl &rarr; IWindowSession.addToDisplay()
+  &rarr; WindowSessionAdapter.addToDisplay()
+  &rarr; [JNI Bridge]
+  &rarr; ISceneSessionManager.CreateAndConnectSpecificSession() (SA 4607)
+  &rarr; 返回 ISession 每窗口代理（存储供后续使用）
+
+ViewRootImpl &rarr; IWindowSession.relayout()
+  &rarr; WindowSessionAdapter.relayout()
+  &rarr; [JNI Bridge]
+  &rarr; ISession.UpdateSessionRect()  (每窗口代理)
+</pre>
+
+<h4>系统服务 &rarr; App 方向</h4>
+<pre>
+ISessionStage.UpdateRect()
+  &rarr; [JNI Bridge] &rarr; SessionStageBridge
+  &rarr; IWindow.resized()
+</pre>
+
+<h3>模块3：IPC Bridge（跨 Binder 域桥接）</h3>
+<p>核心设计思路：</p>
+<ol>
+  <li><strong>拦截点：</strong>在 Android Framework 的 <code>ServiceManager.getService()</code> 处拦截，返回适配层的 Proxy 替代原 SystemServer 的 Binder</li>
+  <li><strong>JNI 层：</strong>Java Proxy 通过 JNI 调用 C++ 适配代码</li>
+  <li><strong>OH IPC 调用：</strong>C++ 层使用 OH 的 <code>IRemoteProxy</code> 发起真正的跨进程调用</li>
+  <li><strong>反向回调：</strong>C++ 层实现 OH 的 <code>IRemoteStub</code> 接收系统服务回调，通过 JNI 调回 Java 层</li>
+</ol>
+
+
+<!-- ========== 第10章 ========== -->
+<h1 id="ch10">10. 可行性评估与工作量估算</h1>
+
+<h2 id="ch10-1">10.1 整体可行性评估</h2>
+
+<div class="success-box">
+<h4>结论：技术方案整体可行</h4>
+<p>基于对711+个接口方法的逐一分析（三级分类）：</p>
+<ul>
+<li><strong>43%（306个）可映射</strong> &mdash; 存在OH对应接口，可直接映射或逻辑转换完成适配</li>
+<li><strong>43%（303个）可忽略</strong> &mdash; 可安全忽略（返回默认值/空操作），不影响App运行</li>
+<li><strong>仅14%（102个）需OH增强</strong> &mdash; 需要OH系统服务新增能力，主要集中在广播系统和ContentProvider</li>
+<li>实际需适配的408个方法中，<strong>75%可映射</strong>，仅25%需OH侧配合</li>
+<li>Class继承模式（extends IXxx.Stub）的桥接架构已验证可行</li>
+</ul>
+</div>
+
+<table>
+  <tr><th>维度</th><th>评估</th><th>说明</th></tr>
+  <tr><td>基本生命周期</td><td><span class="tag-green">可行</span></td><td>startAbility、前后台切换、销毁等核心流程可映射</td></tr>
+  <tr><td>Service 绑定</td><td><span class="tag-green">可行</span></td><td>bindService &harr; ConnectAbility 语义相近</td></tr>
+  <tr><td>简单 UI 渲染</td><td><span class="tag-yellow">有条件可行</span></td><td>需要桥接图形 Surface，工作量极大</td></tr>
+  <tr><td>输入事件</td><td><span class="tag-yellow">有条件可行</span></td><td>需要转换输入事件格式和分发通道</td></tr>
+  <tr><td>多窗口/分屏</td><td><span class="tag-red">极难</span></td><td>两套窗口模型差异太大</td></tr>
+  <tr><td>ContentProvider / DataAbility</td><td><span class="tag-yellow">有条件可行</span></td><td>数据访问模式不同但可桥接</td></tr>
+  <tr><td>通知/广播</td><td><span class="tag-yellow">需额外适配</span></td><td>OH 无广播机制，需用 CommonEvent 替代</td></tr>
+  <tr><td>权限模型</td><td><span class="tag-yellow">需映射</span></td><td>两套权限系统不同</td></tr>
+</table>
+
+
+<h2 id="ch10-2">10.2 工作量估算总表</h2>
+
+<table>
+<tr><th>模块</th><th>核心适配（人周）</th><th>完整适配（人周）</th><th>说明</th></tr>
+<tr><td>IActivityManager正向适配</td><td>6</td><td>16</td><td>广播/ContentProvider为主要增量</td></tr>
+<tr><td>IActivityTaskManager正向适配</td><td>4</td><td>8</td><td>Activity启动和任务管理为主</td></tr>
+<tr><td>IWindowManager正向适配</td><td>5</td><td>14</td><td>锁屏/壁纸/动画为主要增量</td></tr>
+<tr><td>IWindowSession正向适配</td><td>3</td><td>5</td><td>窗口核心操作</td></tr>
+<tr><td>反向回调适配</td><td>17.6</td><td>17.6</td><td>6个OH回调接口</td></tr>
+<tr><td>公共组件（转换器/聚合器）</td><td>4</td><td>6</td><td>Intent&harr;Want、回调聚合、数据格式转换</td></tr>
+<tr><td>JNI层实现</td><td>6</td><td>10</td><td>OH IPC Client实现、reverse callback Stub</td></tr>
+<tr><td>测试与验证</td><td>4</td><td>8</td><td>单元测试、集成测试、Hello World验证</td></tr>
+<tr><td><strong>OH系统服务增强（第7章）</strong></td><td>14</td><td>32</td><td>P0广播/Service/Provider（11人周）+ P1设置/网络/UI（3人周）；完整含P2+P3</td></tr>
+<tr style="font-weight:bold; background:#e8f4f8;">
+<td>合计</td><td><strong>63.6人周</strong></td><td><strong>116.6人周</strong></td><td>核心约15.9人月，完整约29.2人月</td>
+</tr>
+</table>
+
+
+<h2 id="ch10-3">10.3 风险评估</h2>
+
+<div class="warning-box">
+<h4>风险提示</h4>
+<ul>
+<li><strong>Surface共享机制</strong>尚未验证可行性，可能需要OH RenderService侧的协助，是最大技术风险</li>
+<li><strong>广播系统重新架构</strong>涉及OH CommonEventManager和Android BroadcastReceiver两个不同模型的桥接，复杂度高</li>
+<li><strong>AOSP版本跟随</strong>：AOSP源码补丁需要随Android版本更新维护，长期成本需考虑</li>
+<li><strong>性能开销</strong>：JNI桥接和数据格式转换（特别是Intent&harr;Want、ContentValues&harr;ValuesBucket）的性能影响需要评估</li>
+<li><strong>OH系统服务改造依赖</strong>（第7章）：广播投递、Service创建/销毁、ContentProvider生命周期3项P0增强需要OH系统服务（IAppScheduler/IAbilityScheduler）新增接口方法，涉及OH侧AbilityManagerService和AppMgrService代码修改，需与OH系统团队协调</li>
+</ul>
+</div>
+
+
+<!-- ========== 第11章 ========== -->
+<h1 id="ch11">11. 实施路径建议</h1>
+
+<table>
+<tr><th>阶段</th><th>目标</th><th>工作量</th><th>里程碑</th></tr>
+<tr>
+<td><strong>Phase 1</strong><br>最小闭环验证</td>
+<td>
+  <ol>
+    <li>实现 IPC Bridge 基础框架（JNI 桥接 Android Binder &rarr; OH IPC）</li>
+    <li>打通 <code>startActivity(Intent)</code> &rarr; 适配层 &rarr; OH <code>AbilityManager.StartAbility(Want)</code> 一条链路</li>
+    <li>实现反向回调：OH 通知 App 进入前台</li>
+    <li>Activity启动/显示/生命周期</li>
+  </ol>
+</td>
+<td>~15人周</td>
+<td>简单Android App可在OH上启动并显示UI</td>
+</tr>
+<tr>
+<td><strong>Phase 2</strong><br>核心交互</td>
+<td>
+  <ol>
+    <li>完成完整的 Activity/Ability 生命周期映射</li>
+    <li>实现 Service/ServiceExtension 绑定</li>
+    <li>实现 <code>attachApplication</code> 流程</li>
+    <li>多Activity导航、窗口操作</li>
+  </ol>
+</td>
+<td>~20人周</td>
+<td>中等复杂度Android App可正常交互</td>
+</tr>
+<tr>
+<td><strong>Phase 3</strong><br>高级功能</td>
+<td>
+  <ol>
+    <li>广播 &rarr; CommonEvent 桥接</li>
+    <li>ContentProvider &rarr; DataShareExtension 适配</li>
+    <li>权限模型映射</li>
+    <li>画中画(PiP)等高级特性</li>
+  </ol>
+</td>
+<td>~25人周</td>
+<td>复杂Android App可在OH上运行</td>
+</tr>
+<tr>
+<td><strong>Phase 4</strong><br>完整适配</td>
+<td>
+  <ol>
+    <li>桥接 Surface 系统（可能需修改 OH RenderService）</li>
+    <li>桥接输入事件分发</li>
+    <li>覆盖所有非忽略方法，边缘场景</li>
+  </ol>
+</td>
+<td>~25人周</td>
+<td>生产环境就绪</td>
+</tr>
+</table>
+
+
+<!-- ========== 第12章 ========== -->
+<h1 id="ch12">12. 结论</h1>
+
+<p><strong>技术上有条件可行，工程量可控。</strong>核心判断如下：</p>
+
+<ol>
+  <li><strong>接口映射可行性高：</strong>711个方法中，43%可直接映射，43%可安全忽略，仅14%需OH增强。实际需适配的408个方法中75%可映射。Class继承模式（extends IXxx.Stub）的桥接架构已验证可行。</li>
+
+  <li><strong>生命周期和服务管理层</strong>的适配是可行的。两套系统的概念模型足够相似（Activity &harr; Ability, Service &harr; ServiceExtension, Intent &harr; Want），可以建立合理的映射关系。</li>
+
+  <li><strong>图形/窗口系统</strong>是最大瓶颈。Surface 和输入通道是底层紧耦合的，需要 kernel 层面的协调或图形缓冲区共享机制。</li>
+
+  <li><strong>OH系统服务增强</strong>是可控的。47个缺口方法中，P0+P1核心增强仅需14人周OH侧改造，集中在IAppScheduler和IAbilityScheduler两个接口。</li>
+
+  <li><strong>前提条件</strong>：Android App 进程需要能同时加载 Android Runtime (ART) 和 OH IPC 动态库，即运行环境需要支持两套框架共存。这要求底层 Linux 内核同时加载两个 Binder 驱动（或 OH 使用用户态 IPC 方案）。</li>
+
+  <li><strong>工作量估算</strong>：核心适配约63.6人周（~15.9人月），完整适配约116.6人周（~29.2人月），分4个阶段实施。</li>
+
+  <li><strong>建议</strong>：先用阶段一做最小 POC 验证，打通一条完整的调用链路（startActivity &rarr; Ability 启动 &rarr; 前台回调），再决定是否全面推进。</li>
+</ol>
+
+<p>该方案的本质类似于 Android 兼容层（如 Windows Subsystem for Android 的逆向思路），在工业界有类似先例，但需要大量底层系统级开发工作。</p>
+
+
+<footer>
+  <p>本报告合并自 <code>android_oh_adaptation_report.html</code>（战略可行性分析）与 <code>android_oh_interface_feasibility_report_v2.html</code>（方法级接口分析）</p>
+  <p>基于 AOSP 14 IActivityManager/IActivityTaskManager/IWindowManager/IWindowSession 接口定义<br>
+  和 OpenHarmony 5.0/6.1 IAbilityManager/IAppMgr/IMissionManager/ISceneSessionManager/ISession/DisplayManager 接口定义分析</p>
+  <p>合并版 v2.0 | 2026年3月</p>
+</footer>
+
+</div>
+</body>
+</html>

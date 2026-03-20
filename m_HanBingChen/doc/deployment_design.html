@@ -1,0 +1,2831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android-OH 适配层部署设计方案 — DAYU600 开发板部署与运行</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(90deg, #e3f2fd, transparent); padding: 10px 14px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #e8eaf6, transparent); padding: 6px 12px; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #1565c0, #00695c); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-bridged { background: var(--bridged); }
+  .tag-stub { background: var(--stub); }
+  .tag-partial { background: var(--partial); }
+  .tag-ohonly { background: var(--ohonly); }
+  .tag-new { background: #00695c; }
+  .tag-fix { background: var(--high); }
+  .impact-high { color: var(--high); font-weight: 600; }
+  .impact-medium { color: var(--medium); font-weight: 600; }
+  .impact-low { color: var(--low); font-weight: 600; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .toc .sub2 { padding-left: 48px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .scenario { background: #f3e5f5; border-left: 4px solid #7b1fa2; padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .status-ready { color: var(--bridged); font-weight: bold; }
+  .status-partial { color: var(--medium); font-weight: bold; }
+  .status-todo { color: var(--high); font-weight: bold; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Android-OH 适配层部署设计方案</h1>
+  <p>DAYU600 (Unisoc UMS9620) 开发板部署与运行</p>
+  <p>版本 1.0 | 2026年3月20日 | Adapter Team</p>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 部署概述</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 部署目标</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 部署前提条件</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 部署工具</a></li>
+    <li class="sub"><a href="#ch1-4">1.4 部署原则</a></li>
+
+    <li><a href="#ch2">2. 编译产物清单与部署位置</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 AOSP Java/DEX 产物</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 OH 系统服务产物</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 交叉编译产物（AOSP Native &rarr; musl）</a></li>
+    <li class="sub"><a href="#ch2-4">2.4 适配层自有产物</a></li>
+    <li class="sub"><a href="#ch2-5">2.5 完整文件布局图</a></li>
+
+    <li><a href="#ch3">3. 部署脚本设计</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 deploy.sh 脚本结构</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 分模块部署流程</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 回滚机制</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 部署验证</a></li>
+
+    <li><a href="#ch4">4. 系统启动流程</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 OH init 启动 appspawn-x 服务</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 appspawn-x 4 阶段初始化</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 App 启动流程</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 App 运行时 IPC 流程</a></li>
+
+    <li><a href="#ch5">5. 环境变量与配置</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 appspawn-x 环境变量</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 OH 系统属性</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 SELinux 上下文</a></li>
+    <li class="sub"><a href="#ch5-4">5.4 沙箱配置详解</a></li>
+
+    <li><a href="#ch6">6. 部署操作手册</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 首次部署（从零开始）</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 增量更新</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 回滚操作</a></li>
+    <li class="sub"><a href="#ch6-4">6.4 日志查看与调试</a></li>
+
+    <li><a href="#ch7">7. 当前状态与后续计划</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 产物就绪度矩阵</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 最小可运行集（MVP）</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 分阶段部署计划</a></li>
+
+    <li><a href="#appA">附录 A. 开发环境搭建</a></li>
+    <li class="sub"><a href="#appA-1">A.1 硬件准备（DAYU600 开发板、USB 连接线）</a></li>
+    <li class="sub"><a href="#appA-2">A.2 华为云服务器搭建（ECS 创建、SSH 配置、安全组）</a></li>
+    <li class="sub"><a href="#appA-3">A.3 OH 编译环境搭建（依赖安装、工具链验证）</a></li>
+    <li class="sub"><a href="#appA-4">A.4 本地 PC hdc 调试环境</a></li>
+    <li class="sub"><a href="#appA-5">A.5 OH 系统镜像烧录</a></li>
+
+    <li><a href="#appB">附录 B. 日常开发与调试</a></li>
+    <li class="sub"><a href="#appB-1">B.1 PC &harr; 华为云文件同步</a></li>
+    <li class="sub"><a href="#appB-2">B.2 增量编译与部署流程</a></li>
+    <li class="sub"><a href="#appB-3">B.3 高级调试技巧（GDB 远程调试、系统服务 dump、性能 trace）</a></li>
+    <li class="sub"><a href="#appB-4">B.4 常见问题与解决方案</a></li>
+    <li class="sub"><a href="#appB-5">B.5 操作检查清单</a></li>
+  </ul>
+</div>
+
+<!-- ==================== 第1章 ==================== -->
+<h1 id="ch1">1. 部署概述</h1>
+
+<h2 id="ch1-1">1.1 部署目标</h2>
+
+<p>在 DAYU600 开发板（Unisoc UMS9620 SoC）上，通过 hdc 工具将 Android-OH 适配层的所有编译产物部署到设备，使 Android App 能够在 OpenHarmony 6.1 系统上运行。</p>
+
+<div class="card">
+  <h4>目标设备信息</h4>
+  <table>
+    <tr><th>属性</th><th>值</th></tr>
+    <tr><td>开发板型号</td><td>HH-SCDAYU600 (DAYU600)</td></tr>
+    <tr><td>SoC</td><td>Unisoc UMS9620 (ums512-base)</td></tr>
+    <tr><td>CPU</td><td>8 核 ARMv8 (6&times;Cortex-A55 + 2&times;Cortex-A76)</td></tr>
+    <tr><td>操作系统</td><td>OpenHarmony 6.1.0.19 (Canary1, API 23)</td></tr>
+    <tr><td>内核</td><td>Linux 5.15.180 aarch64</td></tr>
+    <tr><td>设备 ID</td><td><code>5bb5b1ae00000000000000000823012c</code></td></tr>
+  </table>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="number">4</div>
+    <div class="label">部署模块</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">~25</div>
+    <div class="label">部署文件总数</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">~85 MB</div>
+    <div class="label">部署总大小</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">3</div>
+    <div class="label">分阶段部署</div>
+  </div>
+</div>
+
+<h2 id="ch1-2">1.2 部署前提条件</h2>
+
+<p>以下是所有编译产物的就绪清单，部署前需确认各项状态：</p>
+
+<div class="card">
+  <table>
+    <tr><th>前提条件</th><th>状态</th><th>说明</th></tr>
+    <tr>
+      <td>DAYU600 设备可通过 hdc 连接</td>
+      <td class="status-ready">&#x2705; 就绪</td>
+      <td>设备已确认，hdc shell 可用</td>
+    </tr>
+    <tr>
+      <td>OH 6.1 源码已同步至云服务器</td>
+      <td class="status-ready">&#x2705; 就绪</td>
+      <td><code>~/oh/</code> (78 GB)，OpenHarmony 6.1-Release</td>
+    </tr>
+    <tr>
+      <td>AOSP 14 源码已部分同步至云服务器</td>
+      <td class="status-ready">&#x2705; 就绪</td>
+      <td><code>~/aosp/</code> (24 GB)，30 个 projects</td>
+    </tr>
+    <tr>
+      <td>OH 系统服务补丁已编译</td>
+      <td class="status-ready">&#x2705; 已完成</td>
+      <td>libabilityms (6.2MB), libappms (2.4MB), libwms (1.5MB), libbms (6.8MB)</td>
+    </tr>
+    <tr>
+      <td>AOSP framework.jar 已编译</td>
+      <td class="status-ready">&#x2705; 已完成</td>
+      <td>framework.jar (39MB), framework-classes.dex.jar (38MB), framework-res-package.jar (33MB)</td>
+    </tr>
+    <tr>
+      <td>ART 运行时 .so 已交叉编译</td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 部分完成</td>
+      <td>Layer 2 基础库全部完成 (10个)；libdexfile/libartbase/libart-compiler 待完成</td>
+    </tr>
+    <tr>
+      <td>适配层 Java + JNI 已编译</td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 部分完成</td>
+      <td>liboh_adapter_bridge.so (92KB) 已完成；oh-adapter-framework.jar 待 AOSP 构建</td>
+    </tr>
+    <tr>
+      <td>appspawn-x 已编译</td>
+      <td class="status-todo">&#x274C; 未编译</td>
+      <td>依赖 Layer 4 libandroid_runtime.so 完成</td>
+    </tr>
+    <tr>
+      <td>Hello World 测试 APK 已打包</td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 部分完成</td>
+      <td>源码就绪，需 AOSP 构建系统打包签名</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch1-3">1.3 部署工具</h2>
+
+<div class="card">
+  <h4>hdc (HarmonyOS Device Connector)</h4>
+  <p>hdc 是 OpenHarmony 设备调试与文件传输工具，功能类似 Android adb，但使用 OH 专有协议。</p>
+
+  <table>
+    <tr><th>属性</th><th>值</th></tr>
+    <tr><td>工具名称</td><td>hdc (HDC Client)</td></tr>
+    <tr><td>版本</td><td>3.2.0c</td></tr>
+    <tr><td>来源</td><td>DevEco Studio 内置，位于安装目录 <code>toolchains/</code></td></tr>
+    <tr><td>连接方式</td><td>USB 连接（默认），也支持 TCP 网络连接</td></tr>
+    <tr><td>设备发现</td><td><code>hdc list targets</code></td></tr>
+    <tr><td>文件传输</td><td><code>hdc file send &lt;local&gt; &lt;remote&gt;</code></td></tr>
+    <tr><td>Shell 执行</td><td><code>hdc shell &lt;command&gt;</code></td></tr>
+    <tr><td>设备挂载</td><td><code>hdc shell mount -o rw,remount /</code></td></tr>
+  </table>
+</div>
+
+<div class="info">
+  <strong>连接验证命令：</strong>
+  <pre><code># 查看已连接设备
+hdc list targets
+# 预期输出: 5bb5b1ae00000000000000000823012c
+
+# 验证 shell 可用
+hdc shell "uname -a"
+# 预期输出: Linux localhost 5.15.180 ... aarch64
+
+# 查看 OH 版本
+hdc shell "param get const.ohos.fullname"
+# 预期输出: OpenHarmony-6.1.0.19(Canary1)</code></pre>
+</div>
+
+<h2 id="ch1-4">1.4 部署原则</h2>
+
+<div class="card">
+  <ol>
+    <li><strong>不刷机</strong> &mdash; 不烧写分区镜像，仅通过 <code>hdc file send</code> 向设备推送/替换文件。保留原有 OH 系统完整性。</li>
+    <li><strong>Remount /system</strong> &mdash; 部署前需要将 <code>/system</code> 分区重新挂载为读写模式 (<code>mount -o rw,remount /</code>)。</li>
+    <li><strong>可回滚</strong> &mdash; 替换系统文件前先备份为 <code>.bak</code> 文件，提供一键回滚脚本恢复原始状态。</li>
+    <li><strong>分模块部署</strong> &mdash; 支持 OH 系统服务、Android 运行时、适配层 三个模块独立部署和更新。</li>
+    <li><strong>部署验证</strong> &mdash; 每次部署后执行检查脚本，确认所有文件到位、权限正确、服务可启动。</li>
+  </ol>
+</div>
+
+<div class="warn">
+  <strong>注意：</strong>替换 OH 系统服务 .so 文件（如 libabilityms.z.so）具有一定风险，可能导致 OH 系统服务异常。建议先在 Phase 1 验证补丁不影响 OH 正常功能，确认无误后再进行后续部署。
+</div>
+
+<!-- ==================== 第2章 ==================== -->
+<h1 id="ch2">2. 编译产物清单与部署位置</h1>
+
+<h2 id="ch2-1">2.1 AOSP Java/DEX 产物</h2>
+
+<p>AOSP 框架层 Java 库，编译为 DEX 格式，放置在设备的 Android 框架目录下，供 ART VM 在启动时加载。</p>
+
+<div class="card">
+  <table>
+    <tr><th>产物文件</th><th>大小</th><th>状态</th><th>编译来源</th><th>设备路径</th><th>说明</th></tr>
+    <tr>
+      <td><code>framework.jar</code></td>
+      <td>39 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>AOSP 14 <code>make framework</code></td>
+      <td><code>/system/android/framework/</code></td>
+      <td>Android 核心框架库（含适配层补丁的 ActivityManager 等）</td>
+    </tr>
+    <tr>
+      <td><code>framework-classes.dex.jar</code></td>
+      <td>38 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>AOSP 14 <code>make framework</code></td>
+      <td><code>/system/android/framework/</code></td>
+      <td>Framework DEX 字节码（从 framework.jar 中提取的 classes.dex）</td>
+    </tr>
+    <tr>
+      <td><code>framework-res-package.jar</code></td>
+      <td>33 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>AOSP 14 <code>make framework-res</code></td>
+      <td><code>/system/android/framework/</code></td>
+      <td>Android 框架资源包（layouts, drawables, strings 等）</td>
+    </tr>
+    <tr>
+      <td><code>oh-adapter-framework.jar</code></td>
+      <td>~2 MB</td>
+      <td class="status-todo">&#x274C;</td>
+      <td>Adapter <code>Android.bp</code></td>
+      <td><code>/system/android/framework/</code></td>
+      <td>适配层 Java 代码（Adapter 类、Bridge 类、Converter 类）</td>
+    </tr>
+  </table>
+</div>
+
+<div class="note">
+  <strong>BOOTCLASSPATH 配置：</strong>这三个 JAR 文件都需要加入到 appspawn-x 的 <code>BOOTCLASSPATH</code> 环境变量中，ART VM 启动时会从此路径加载框架类。加载顺序为：<code>framework.jar</code> &rarr; <code>framework-res-package.jar</code> &rarr; <code>oh-adapter-framework.jar</code>。
+</div>
+
+<h2 id="ch2-2">2.2 OH 系统服务产物</h2>
+
+<p>应用了适配层补丁的 OH 系统服务动态库，需替换设备上的原始 .so 文件。这些补丁使 OH 系统服务能识别和管理通过适配层注册的 Android App 实例。</p>
+
+<div class="card">
+  <table>
+    <tr><th>产物文件</th><th>大小</th><th>状态</th><th>编译目标</th><th>设备路径（替换）</th><th>补丁内容</th></tr>
+    <tr>
+      <td><code>libabilityms.z.so</code></td>
+      <td>6.2 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>OH <code>dayu210</code></td>
+      <td><code>/system/lib64/platformsdk/</code></td>
+      <td>AbilityManagerService：Android App 作为 Ability 的生命周期管理、Mission 分组</td>
+    </tr>
+    <tr>
+      <td><code>libappms.z.so</code></td>
+      <td>2.4 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>OH <code>dayu210</code></td>
+      <td><code>/system/lib64/platformsdk/</code></td>
+      <td>AppMgrService：Android 进程识别、RemoteClientManager 扩展</td>
+    </tr>
+    <tr>
+      <td><code>libwms.z.so</code></td>
+      <td>1.5 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>OH <code>dayu210</code></td>
+      <td><code>/system/lib64/platformsdk/</code></td>
+      <td>WindowManagerService：Android Window 属性映射</td>
+    </tr>
+    <tr>
+      <td><code>libbms.z.so</code></td>
+      <td>6.8 MB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>OH <code>dayu210</code></td>
+      <td><code>/system/lib64/platformsdk/</code></td>
+      <td>BundleManagerService：APK 安装注册、BundleInfo 扩展</td>
+    </tr>
+  </table>
+</div>
+
+<div class="warn">
+  <strong>风险提示：</strong>这 4 个 .so 文件是 OH 核心系统服务库，替换后若有兼容性问题会导致对应系统服务无法启动。部署前<strong>必须</strong>备份原始文件，并在 Phase 1 中先验证补丁对 OH 原生功能无影响。
+</div>
+
+<h2 id="ch2-3">2.3 交叉编译产物（AOSP Native &rarr; musl）</h2>
+
+<p>Android 运行时（ART）及其依赖库，需要从 AOSP 源码交叉编译为 aarch64-linux-musl 目标（OH 使用 musl libc 而非 glibc/bionic）。这些库提供了 ART 虚拟机、JNI 环境和 Android 原生基础设施。</p>
+
+<div class="card">
+  <table>
+    <tr><th>产物文件</th><th>大小</th><th>状态</th><th>AOSP 源码模块</th><th>设备路径</th><th>功能</th></tr>
+    <tr>
+      <td><code>libart.so</code></td>
+      <td>14 MB</td>
+      <td class="status-partial">&#x26A0;&#xFE0F;</td>
+      <td><code>art/runtime/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>ART 虚拟机核心（GC、JIT、解释器、class loading）— asm stubs 待完善</td>
+    </tr>
+    <tr>
+      <td><code>libdexfile.so</code></td>
+      <td>400 KB</td>
+      <td class="status-todo">&#x274C;</td>
+      <td><code>art/libdexfile/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>DEX 文件解析库 — Layer 3 待完成</td>
+    </tr>
+    <tr>
+      <td><code>libartbase.so</code></td>
+      <td>312 KB</td>
+      <td class="status-todo">&#x274C;</td>
+      <td><code>art/libartbase/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>ART 基础工具库（日志、文件操作、字符串）— Layer 3 待完成</td>
+    </tr>
+    <tr>
+      <td><code>libartpalette.so</code></td>
+      <td>22 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>art/libartpalette/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>ART 平台抽象层（线程、信号处理适配）</td>
+    </tr>
+    <tr>
+      <td><code>libbionic_compat.so</code></td>
+      <td>17 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>自建适配层</td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>Bionic &rarr; musl 兼容层（property_get 等）</td>
+    </tr>
+    <tr>
+      <td><code>liblog.so</code></td>
+      <td>70 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>system/logging/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>Android 日志库（重定向到 OH hilog）</td>
+    </tr>
+    <tr>
+      <td><code>libbase.so</code></td>
+      <td>140 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>system/libbase/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>Android 基础库（strings、files、logging）</td>
+    </tr>
+    <tr>
+      <td><code>libcutils.so</code></td>
+      <td>39 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>system/core/libcutils/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>Android C 工具库（properties、ashmem、trace）</td>
+    </tr>
+    <tr>
+      <td><code>libutils.so</code></td>
+      <td>169 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>system/core/libutils/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>Android C++ 工具库（RefBase、String8/16、Looper）</td>
+    </tr>
+    <tr>
+      <td><code>libnativehelper.so</code></td>
+      <td>28 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>libnativehelper/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>JNI 辅助库（JniInvocation、JNIHelp）</td>
+    </tr>
+    <tr>
+      <td><code>libsigchain.so</code></td>
+      <td>23 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td><code>art/sigchainlib/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>信号链库（拦截 SIGSEGV 等信号给 ART 处理）</td>
+    </tr>
+    <tr>
+      <td><code>libart-compiler.so</code></td>
+      <td>—</td>
+      <td class="status-todo">&#x274C;</td>
+      <td><code>art/compiler/</code></td>
+      <td><code>/system/android/lib64/</code></td>
+      <td>ART 编译器库 — Layer 3 待完成</td>
+    </tr>
+  </table>
+</div>
+
+<div class="info">
+  <strong>交叉编译要点：</strong>OH 系统使用 musl libc，而 AOSP 原生库基于 bionic。交叉编译需要使用 OH SDK 自带的 <code>aarch64-linux-ohos</code> 工具链（基于 clang/LLVM），并通过 <code>libbionic_compat.so</code> 提供 bionic 特有 API 的兼容实现。
+</div>
+
+<h2 id="ch2-4">2.4 适配层自有产物</h2>
+
+<p>适配层项目自身的编译产物，包括 appspawn-x 进程孵化器、JNI 桥接库、APK 安装器以及配置文件。</p>
+
+<div class="card">
+  <table>
+    <tr><th>产物文件</th><th>大小</th><th>状态</th><th>编译方式</th><th>设备路径</th><th>功能</th></tr>
+    <tr>
+      <td><code>appspawn-x</code></td>
+      <td>~800 KB</td>
+      <td class="status-todo">&#x274C;</td>
+      <td>OH GN (<code>BUILD.gn</code>)</td>
+      <td><code>/system/bin/</code></td>
+      <td>混合进程孵化器（OH appspawn + Android Zygote）— 依赖 Layer 4</td>
+    </tr>
+    <tr>
+      <td><code>liboh_adapter_bridge.so</code></td>
+      <td>92 KB</td>
+      <td class="status-ready">&#x2705;</td>
+      <td>OH 工具链交叉编译</td>
+      <td><code>/system/lib64/</code></td>
+      <td>适配层 JNI 桥接库（所有 Adapter 的 native 方法实现）</td>
+    </tr>
+    <tr>
+      <td><code>libapk_installer.z.so</code></td>
+      <td>~600 KB</td>
+      <td class="status-todo">&#x274C;</td>
+      <td>OH GN (<code>BUILD.gn</code>)</td>
+      <td><code>/system/lib64/</code></td>
+      <td>APK 安装库（解析 AndroidManifest、注册 BundleInfo）</td>
+    </tr>
+    <tr>
+      <td><code>appspawn_x.cfg</code></td>
+      <td>~2 KB</td>
+      <td>配置文件</td>
+      <td><code>/system/etc/init/</code></td>
+      <td>OH init 服务配置（启动 appspawn-x 守护进程）</td>
+    </tr>
+    <tr>
+      <td><code>appspawn_x_sandbox.json</code></td>
+      <td>~5 KB</td>
+      <td>配置文件</td>
+      <td><code>/system/etc/</code></td>
+      <td>Android App 沙箱 mount 规则</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch2-5">2.5 完整文件布局图</h2>
+
+<p>以下为所有编译产物部署到 DAYU600 设备后的完整目录树：</p>
+
+<div class="diagram">/system/
+├── bin/
+│   └── appspawn-x                              # 混合进程孵化器 (~800 KB)
+│
+├── lib64/
+│   ├── liboh_adapter_bridge.so                  # 适配层 JNI 桥接库 (92 KB) ✅
+│   ├── libapk_installer.z.so                   # APK 安装库 (~600 KB)
+│   └── platformsdk/
+│       ├── libabilityms.z.so                   # [替换] OH AbilityManagerService (6.2 MB) ✅
+│       ├── libappms.z.so                       # [替换] OH AppMgrService (2.4 MB) ✅
+│       ├── libwms.z.so                         # [替换] OH WindowManagerService (1.5 MB) ✅
+│       └── libbms.z.so                         # [替换] OH BundleManagerService (6.8 MB) ✅
+│
+├── android/                                     # [新建] Android 运行时根目录
+│   ├── framework/
+│   │   ├── framework.jar                       # AOSP 核心框架 (39 MB) ✅
+│   │   ├── framework-classes.dex.jar           # Framework DEX 字节码 (38 MB) ✅
+│   │   ├── framework-res-package.jar           # AOSP 框架资源 (33 MB) ✅
+│   │   └── oh-adapter-framework.jar            # 适配层 Java 库 (~2 MB) ❌ 待完成
+│   └── lib64/
+│       ├── libart.so                           # ART 虚拟机 (14 MB) ✅ (asm stubs pending)
+│       ├── libdexfile.so                       # DEX 文件解析 (400 KB) ❌ 待完成
+│       ├── libartbase.so                       # ART 基础库 (312 KB) ❌ 待完成
+│       ├── libartpalette.so                    # ART 平台抽象层 (22 KB) ✅
+│       ├── libbionic_compat.so                 # Bionic 兼容层 (17 KB) ✅
+│       ├── liblog.so                           # Android 日志库 (70 KB) ✅
+│       ├── libbase.so                          # Android 基础库 (140 KB) ✅
+│       ├── libcutils.so                        # Android C 工具库 (39 KB) ✅
+│       ├── libutils.so                         # Android C++ 工具库 (169 KB) ✅
+│       ├── libnativehelper.so                  # JNI 辅助库 (28 KB) ✅
+│       └── libsigchain.so                     # 信号链库 (23 KB) ✅
+│
+├── etc/
+│   ├── init/
+│   │   └── appspawn_x.cfg                      # [新增] appspawn-x 服务配置 (~2 KB)
+│   └── appspawn_x_sandbox.json                 # [新增] Android 沙箱规则 (~5 KB)
+│
+/data/
+├── service/el1/public/
+│   └── appspawnx/                               # [运行时创建] appspawn-x 工作目录
+│       └── dalvik-cache/                        # DEX 优化缓存
+└── misc/
+    └── appspawnx/
+        └── dalvik-cache/                        # 备用 DEX 缓存目录
+            └── arm64/                           # aarch64 编译后的 OAT 文件</div>
+
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="number">74 MB</div>
+    <div class="label">AOSP Java/DEX 产物</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">5.2 MB</div>
+    <div class="label">ART 运行时 Native</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">16.9 MB</div>
+    <div class="label">OH 系统服务（替换）</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">~2.9 MB</div>
+    <div class="label">适配层产物</div>
+  </div>
+</div>
+
+<!-- ==================== 第3章 ==================== -->
+<h1 id="ch3">3. 部署脚本设计</h1>
+
+<h2 id="ch3-1">3.1 deploy.sh 脚本结构</h2>
+
+<p>部署脚本 <code>deploy.sh</code> 位于项目根目录 <code>D:\code\adapter\deploy.sh</code>，支持按模块独立部署。</p>
+
+<div class="card">
+  <h4>脚本使用方式</h4>
+  <pre><code># 部署所有模块
+./deploy.sh --target=all
+
+# 仅部署 OH 系统服务 .so（替换原始文件）
+./deploy.sh --target=oh-services
+
+# 仅部署 Android 运行时（framework JAR + ART .so）
+./deploy.sh --target=android-rt
+
+# 仅部署适配层产物（appspawn-x + bridge .so + 配置文件）
+./deploy.sh --target=adapter
+
+# 检查部署是否完整
+./deploy.sh --target=check
+
+# 回滚所有替换的文件
+./deploy.sh --target=rollback</code></pre>
+</div>
+
+<div class="card">
+  <h4>脚本核心参数</h4>
+  <table>
+    <tr><th>参数</th><th>说明</th></tr>
+    <tr><td><code>--target=&lt;module&gt;</code></td><td>部署目标：<code>oh-services</code> | <code>android-rt</code> | <code>adapter</code> | <code>all</code> | <code>check</code> | <code>rollback</code></td></tr>
+    <tr><td><code>--device=&lt;id&gt;</code></td><td>指定设备 ID（默认使用 <code>hdc list targets</code> 发现的第一个设备）</td></tr>
+    <tr><td><code>--build-dir=&lt;path&gt;</code></td><td>编译产物根目录（默认 <code>./out/</code>）</td></tr>
+    <tr><td><code>--no-backup</code></td><td>跳过备份（仅建议增量更新时使用）</td></tr>
+    <tr><td><code>--dry-run</code></td><td>仅打印将要执行的命令，不实际执行</td></tr>
+    <tr><td><code>--reboot</code></td><td>部署完成后自动重启设备</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h4>脚本内部结构</h4>
+  <pre><code>deploy.sh
+├── 公共函数
+│   ├── log_info() / log_warn() / log_error()   # 日志输出（带颜色）
+│   ├── hdc_send()                               # 封装 hdc file send + 权限设置
+│   ├── hdc_shell()                              # 封装 hdc shell 执行
+│   ├── backup_file()                            # 备份设备上的原始文件
+│   ├── verify_file()                            # 验证文件大小和权限
+│   └── check_device()                           # 检查设备连接状态
+│
+├── 部署模块
+│   ├── deploy_oh_services()                     # OH 系统服务 .so 替换
+│   ├── deploy_android_rt()                      # Android 运行时部署
+│   ├── deploy_adapter()                         # 适配层产物部署
+│   └── deploy_all()                             # 全量部署（按顺序调用上述三个）
+│
+├── 验证与回滚
+│   ├── check_deployment()                       # 验证所有文件到位
+│   └── rollback()                               # 从 .bak 恢复原始文件
+│
+└── 入口
+    └── main()                                   # 参数解析、设备检查、执行部署</code></pre>
+</div>
+
+<h2 id="ch3-2">3.2 分模块部署流程</h2>
+
+<h3>Target: oh-services（OH 系统服务替换）</h3>
+
+<div class="card">
+  <p>替换设备上的 4 个 OH 系统服务动态库。这是风险最高的部署步骤，必须备份原始文件。</p>
+  <pre><code># 1. Remount 文件系统
+hdc shell mount -o rw,remount /
+
+# 2. 备份原始 .so 文件
+hdc shell cp /system/lib64/platformsdk/libabilityms.z.so /system/lib64/platformsdk/libabilityms.z.so.bak
+hdc shell cp /system/lib64/platformsdk/libappms.z.so /system/lib64/platformsdk/libappms.z.so.bak
+hdc shell cp /system/lib64/platformsdk/libwms.z.so /system/lib64/platformsdk/libwms.z.so.bak
+hdc shell cp /system/lib64/platformsdk/libbms.z.so /system/lib64/platformsdk/libbms.z.so.bak
+
+# 3. 推送新的 .so 文件
+hdc file send out/oh-services/libabilityms.z.so /system/lib64/platformsdk/libabilityms.z.so
+hdc file send out/oh-services/libappms.z.so /system/lib64/platformsdk/libappms.z.so
+hdc file send out/oh-services/libwms.z.so /system/lib64/platformsdk/libwms.z.so
+hdc file send out/oh-services/libbms.z.so /system/lib64/platformsdk/libbms.z.so
+
+# 4. 设置权限
+hdc shell chmod 644 /system/lib64/platformsdk/libabilityms.z.so
+hdc shell chmod 644 /system/lib64/platformsdk/libappms.z.so
+hdc shell chmod 644 /system/lib64/platformsdk/libwms.z.so
+hdc shell chmod 644 /system/lib64/platformsdk/libbms.z.so
+
+# 5. 重启设备使 OH 服务加载新的 .so
+hdc shell reboot</code></pre>
+</div>
+
+<h3>Target: android-rt（Android 运行时部署）</h3>
+
+<div class="card">
+  <p>创建 Android 运行时目录结构，部署 framework JAR 文件和 ART 运行时 .so 文件。</p>
+  <pre><code># 1. 创建目录结构
+hdc shell mkdir -p /system/android/framework
+hdc shell mkdir -p /system/android/lib64
+
+# 2. 推送 Java 框架库
+hdc file send out/android-rt/framework.jar /system/android/framework/framework.jar
+hdc file send out/android-rt/framework-res-package.jar /system/android/framework/framework-res-package.jar
+hdc file send out/android-rt/oh-adapter-framework.jar /system/android/framework/oh-adapter-framework.jar
+
+# 3. 推送 ART 运行时 .so 文件
+hdc file send out/android-rt/libart.so /system/android/lib64/libart.so
+hdc file send out/android-rt/libdexfile.so /system/android/lib64/libdexfile.so
+hdc file send out/android-rt/libartbase.so /system/android/lib64/libartbase.so
+hdc file send out/android-rt/libartpalette.so /system/android/lib64/libartpalette.so
+hdc file send out/android-rt/libbionic_compat.so /system/android/lib64/libbionic_compat.so
+hdc file send out/android-rt/liblog.so /system/android/lib64/liblog.so
+hdc file send out/android-rt/libbase.so /system/android/lib64/libbase.so
+hdc file send out/android-rt/libcutils.so /system/android/lib64/libcutils.so
+hdc file send out/android-rt/libutils.so /system/android/lib64/libutils.so
+hdc file send out/android-rt/libnativehelper.so /system/android/lib64/libnativehelper.so
+hdc file send out/android-rt/libsigchain.so /system/android/lib64/libsigchain.so
+
+# 4. 设置权限
+hdc shell chmod 644 /system/android/framework/*.jar
+hdc shell chmod 755 /system/android/lib64/*.so</code></pre>
+</div>
+
+<h3>Target: adapter（适配层产物部署）</h3>
+
+<div class="card">
+  <p>部署适配层自身的二进制文件和配置文件。</p>
+  <pre><code># 1. 推送 appspawn-x 可执行文件
+hdc file send out/adapter/appspawn-x /system/bin/appspawn-x
+hdc shell chmod 755 /system/bin/appspawn-x
+
+# 2. 推送适配层 JNI 库
+hdc file send out/adapter/liboh_adapter_bridge.z.so /system/lib64/liboh_adapter_bridge.z.so
+hdc file send out/adapter/libapk_installer.z.so /system/lib64/libapk_installer.z.so
+hdc shell chmod 644 /system/lib64/liboh_adapter_bridge.z.so
+hdc shell chmod 644 /system/lib64/libapk_installer.z.so
+
+# 3. 推送配置文件
+hdc file send out/adapter/appspawn_x.cfg /system/etc/init/appspawn_x.cfg
+hdc file send out/adapter/appspawn_x_sandbox.json /system/etc/appspawn_x_sandbox.json
+hdc shell chmod 644 /system/etc/init/appspawn_x.cfg
+hdc shell chmod 644 /system/etc/appspawn_x_sandbox.json
+
+# 4. 创建运行时数据目录
+hdc shell mkdir -p /data/service/el1/public/appspawnx/dalvik-cache
+hdc shell mkdir -p /data/misc/appspawnx/dalvik-cache/arm64
+
+# 5. 设置 OH 系统属性
+hdc shell param set persist.oh.adapter.enabled true</code></pre>
+</div>
+
+<h2 id="ch3-3">3.3 回滚机制</h2>
+
+<div class="card">
+  <h4>回滚策略</h4>
+  <p>每次替换系统文件前，部署脚本自动将原始文件备份为 <code>.bak</code> 后缀。回滚时只需将 <code>.bak</code> 文件恢复即可。</p>
+
+  <pre><code># 回滚 OH 系统服务（恢复原始 .so）
+hdc shell mount -o rw,remount /
+
+hdc shell mv /system/lib64/platformsdk/libabilityms.z.so.bak /system/lib64/platformsdk/libabilityms.z.so
+hdc shell mv /system/lib64/platformsdk/libappms.z.so.bak /system/lib64/platformsdk/libappms.z.so
+hdc shell mv /system/lib64/platformsdk/libwms.z.so.bak /system/lib64/platformsdk/libwms.z.so
+hdc shell mv /system/lib64/platformsdk/libbms.z.so.bak /system/lib64/platformsdk/libbms.z.so
+
+# 移除适配层新增文件（不影响 OH 原有文件）
+hdc shell rm -f /system/bin/appspawn-x
+hdc shell rm -f /system/lib64/liboh_adapter_bridge.z.so
+hdc shell rm -f /system/lib64/libapk_installer.z.so
+hdc shell rm -f /system/etc/init/appspawn_x.cfg
+hdc shell rm -f /system/etc/appspawn_x_sandbox.json
+hdc shell rm -rf /system/android/
+
+# 清除运行时数据
+hdc shell rm -rf /data/service/el1/public/appspawnx/
+hdc shell rm -rf /data/misc/appspawnx/
+
+# 清除系统属性
+hdc shell param set persist.oh.adapter.enabled false
+
+# 重启恢复
+hdc shell reboot</code></pre>
+</div>
+
+<h2 id="ch3-4">3.4 部署验证</h2>
+
+<div class="card">
+  <h4>check target 检查清单</h4>
+  <p><code>./deploy.sh --target=check</code> 执行以下检查项：</p>
+
+  <table>
+    <tr><th>检查项</th><th>检查方法</th><th>预期结果</th></tr>
+    <tr>
+      <td>设备连接</td>
+      <td><code>hdc list targets</code></td>
+      <td>设备 ID 出现在列表中</td>
+    </tr>
+    <tr>
+      <td>OH 系统服务 .so 存在</td>
+      <td><code>hdc shell ls -la /system/lib64/platformsdk/lib{ability,app,w,b}ms.z.so</code></td>
+      <td>文件存在且大小匹配</td>
+    </tr>
+    <tr>
+      <td>OH 系统服务 .so 备份存在</td>
+      <td><code>hdc shell ls -la /system/lib64/platformsdk/*.bak</code></td>
+      <td>4 个 .bak 文件存在</td>
+    </tr>
+    <tr>
+      <td>Android 框架目录</td>
+      <td><code>hdc shell ls -la /system/android/framework/</code></td>
+      <td>3 个 .jar 文件存在</td>
+    </tr>
+    <tr>
+      <td>ART 运行时 .so</td>
+      <td><code>hdc shell ls -la /system/android/lib64/</code></td>
+      <td>11 个 .so 文件存在</td>
+    </tr>
+    <tr>
+      <td>appspawn-x 可执行</td>
+      <td><code>hdc shell ls -la /system/bin/appspawn-x</code></td>
+      <td>文件存在且可执行 (755)</td>
+    </tr>
+    <tr>
+      <td>配置文件</td>
+      <td><code>hdc shell ls -la /system/etc/init/appspawn_x.cfg</code></td>
+      <td>文件存在</td>
+    </tr>
+    <tr>
+      <td>系统属性</td>
+      <td><code>hdc shell param get persist.oh.adapter.enabled</code></td>
+      <td>返回 <code>true</code></td>
+    </tr>
+    <tr>
+      <td>appspawn-x 进程运行</td>
+      <td><code>hdc shell pidof appspawn-x</code></td>
+      <td>返回进程 PID（重启后）</td>
+    </tr>
+    <tr>
+      <td>数据目录</td>
+      <td><code>hdc shell ls -la /data/service/el1/public/appspawnx/</code></td>
+      <td>目录存在</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ==================== 第4章 ==================== -->
+<h1 id="ch4">4. 系统启动流程</h1>
+
+<h2 id="ch4-1">4.1 OH init 启动 appspawn-x 服务</h2>
+
+<p>部署完成并重启设备后，OH 的 init 进程会解析 <code>/system/etc/init/appspawn_x.cfg</code>，自动拉起 appspawn-x 守护进程。</p>
+
+<h3>appspawn_x.cfg 配置详解</h3>
+
+<div class="card">
+  <pre><code>{
+    "services" : [{
+        "name" : "appspawn_x",
+        "path" : ["/system/bin/appspawn-x"],
+        "importance" : 1,
+        "uid" : "root",
+        "gid" : ["root", "shell"],
+        "caps" : [
+            "CAP_SYS_ADMIN",
+            "CAP_SETUID",
+            "CAP_SETGID",
+            "CAP_KILL",
+            "CAP_SYS_PTRACE",
+            "CAP_DAC_OVERRIDE",
+            "CAP_CHOWN",
+            "CAP_FOWNER",
+            "CAP_SYS_CHROOT",
+            "CAP_NET_BIND_SERVICE"
+        ],
+        "socket" : [{
+            "name" : "appspawn_x",
+            "family" : "AF_UNIX",
+            "type" : "SOCK_STREAM",
+            "protocol" : "default",
+            "permissions" : "0660",
+            "uid" : "root",
+            "gid" : "system"
+        }],
+        "critical" : [0, 5, 60],
+        "on-restart" : "reboot",
+        "env" : [
+            { "name" : "ANDROID_ROOT", "value" : "/system/android" },
+            { "name" : "ANDROID_DATA", "value" : "/data" },
+            { "name" : "ANDROID_ART_ROOT", "value" : "/system/android" },
+            { "name" : "BOOTCLASSPATH", "value" : "/system/android/framework/framework.jar:/system/android/framework/framework-res-package.jar:/system/android/framework/oh-adapter-framework.jar" },
+            { "name" : "DEX2OATBOOTCLASSPATH", "value" : "/system/android/framework/framework.jar:/system/android/framework/oh-adapter-framework.jar" },
+            { "name" : "LD_LIBRARY_PATH", "value" : "/system/android/lib64:/system/lib64" }
+        ],
+        "secon" : "u:r:appspawn_x:s0"
+    }],
+    "jobs" : [{
+        "name" : "post-fs-data",
+        "cmds" : [
+            "mkdir /data/service/el1/public/appspawnx 0711 root root",
+            "mkdir /data/service/el1/public/appspawnx/dalvik-cache 0711 root root",
+            "mkdir /data/misc/appspawnx 0711 root root",
+            "mkdir /data/misc/appspawnx/dalvik-cache 0711 root root",
+            "mkdir /data/misc/appspawnx/dalvik-cache/arm64 0711 root root"
+        ]
+    }]
+}</code></pre>
+</div>
+
+<div class="card">
+  <h4>关键配置项说明</h4>
+  <table>
+    <tr><th>配置项</th><th>值</th><th>说明</th></tr>
+    <tr>
+      <td><code>importance</code></td>
+      <td>1</td>
+      <td>高优先级服务，init 较早启动</td>
+    </tr>
+    <tr>
+      <td><code>uid / gid</code></td>
+      <td>root / root+shell</td>
+      <td>需要 root 权限执行 setuid/setgid（fork 子进程后降权）</td>
+    </tr>
+    <tr>
+      <td><code>caps</code></td>
+      <td>10 项 capabilities</td>
+      <td>SYS_ADMIN（mount namespace）、SETUID/SETGID（进程降权）、KILL（进程管理）等</td>
+    </tr>
+    <tr>
+      <td><code>socket</code></td>
+      <td>AF_UNIX, SOCK_STREAM</td>
+      <td>Foundation 通过此 Unix socket 发送 SpawnMsg 请求 fork 新进程</td>
+    </tr>
+    <tr>
+      <td><code>critical</code></td>
+      <td>[0, 5, 60]</td>
+      <td>5 分钟内崩溃超过 0 次则等待 60 秒后重启</td>
+    </tr>
+    <tr>
+      <td><code>secon</code></td>
+      <td>u:r:appspawn_x:s0</td>
+      <td>SELinux 安全上下文</td>
+    </tr>
+  </table>
+</div>
+
+<h3>数据目录创建</h3>
+
+<div class="card">
+  <p>在 <code>post-fs-data</code> 阶段（文件系统就绪后），init 自动创建以下目录：</p>
+  <table>
+    <tr><th>路径</th><th>权限</th><th>用途</th></tr>
+    <tr>
+      <td><code>/data/service/el1/public/appspawnx/</code></td>
+      <td>0711 root:root</td>
+      <td>appspawn-x 工作目录</td>
+    </tr>
+    <tr>
+      <td><code>/data/service/el1/public/appspawnx/dalvik-cache/</code></td>
+      <td>0711 root:root</td>
+      <td>DEX 优化缓存（dex2oat 输出 OAT 文件）</td>
+    </tr>
+    <tr>
+      <td><code>/data/misc/appspawnx/</code></td>
+      <td>0711 root:root</td>
+      <td>备用工作目录</td>
+    </tr>
+    <tr>
+      <td><code>/data/misc/appspawnx/dalvik-cache/arm64/</code></td>
+      <td>0711 root:root</td>
+      <td>aarch64 编译后的 OAT 文件存储</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch4-2">4.2 appspawn-x 4 阶段初始化</h2>
+
+<p>appspawn-x 启动后执行 4 个阶段的初始化，最终进入事件循环等待 Foundation 的 spawn 请求。</p>
+
+<div class="diagram">                        appspawn-x main()
+                              |
+              ┌───────────────┼───────────────┐
+              |               |               |
+     Phase 1: OH 安全    Phase 2: ART VM   Phase 3: 预加载
+              |               |               |
+              v               v               v
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    | sandbox 配置  |  | JniInvocation |  | preload()    |
+    | SELinux 初始化 |  | dlopen libart |  | ~7000 classes|
+    | AccessToken   |  | CreateJavaVM  |  | resources    |
+    | listen socket |  | registerJNI   |  | shared libs  |
+    └──────────────┘  └──────────────┘  | adapter bridge|
+                                         | GC           |
+                                         └──────────────┘
+                                                |
+                                                v
+                                      Phase 4: 事件循环
+                                      ┌──────────────┐
+                                      | poll() 等待   |
+                                      | Unix socket   |
+                                      | signal ready  |
+                                      └──────────────┘
+                               bootevent.appspawn_x.ready = true</div>
+
+<div class="card">
+  <h4>Phase 1: OH 安全初始化</h4>
+  <ul>
+    <li><strong>读取沙箱配置</strong> &mdash; 解析 <code>/system/etc/appspawn_x_sandbox.json</code>，准备好 mount 规则模板</li>
+    <li><strong>SELinux 初始化</strong> &mdash; 加载 SELinux 策略，确认 appspawn-x 进程运行在 <code>u:r:appspawn_x:s0</code> 域</li>
+    <li><strong>AccessToken 初始化</strong> &mdash; 连接 OH AccessTokenManager 服务，用于后续给子进程分配 TokenID</li>
+    <li><strong>创建 listen socket</strong> &mdash; 从 init 继承或创建 <code>/dev/unix/socket/appspawn_x</code> Unix domain socket</li>
+  </ul>
+
+  <h4>Phase 2: ART VM 初始化</h4>
+  <ul>
+    <li><strong>JniInvocation::Init()</strong> &mdash; 通过 <code>libnativehelper.so</code> 初始化 JNI 调用框架，dlopen <code>libart.so</code></li>
+    <li><strong>JNI_CreateJavaVM()</strong> &mdash; 创建 ART 虚拟机实例，配置堆大小、GC 策略、BOOTCLASSPATH 等</li>
+    <li><strong>RegisterNativeMethods()</strong> &mdash; 注册 ART 核心 JNI 方法（Thread、Runtime、System 等）</li>
+    <li>VM 参数示例：<code>-Xms8m -Xmx512m -XX:HeapGrowthLimit=256m -Xbootclasspath:${BOOTCLASSPATH}</code></li>
+  </ul>
+
+  <h4>Phase 3: 预加载</h4>
+  <ul>
+    <li><strong>AppSpawnXInit.preload()</strong> &mdash; 通过 JNI 调用 Java 侧的预加载入口</li>
+    <li><strong>类预加载</strong> &mdash; 加载约 7000 个常用 Android 框架类到内存，fork 后子进程可通过 COW 共享</li>
+    <li><strong>资源预加载</strong> &mdash; 加载 <code>framework-res-package.jar</code> 中的系统资源</li>
+    <li><strong>共享库加载</strong> &mdash; 预加载 <code>liboh_adapter_bridge.z.so</code>，注册适配层 JNI 方法</li>
+    <li><strong>GC 清理</strong> &mdash; 预加载完成后执行 Full GC，减少 fork 后的 COW 页面数</li>
+  </ul>
+
+  <h4>Phase 4: 事件循环</h4>
+  <ul>
+    <li><strong>poll() 等待</strong> &mdash; 在 Unix socket 上阻塞等待 Foundation 发来的 SpawnMsg</li>
+    <li><strong>信号 bootevent</strong> &mdash; 设置 <code>bootevent.appspawn_x.ready = true</code>，通知 OH init 服务就绪</li>
+    <li>Foundation 的 AbilityManagerService 会等待此 bootevent 后才发送 spawn 请求</li>
+  </ul>
+</div>
+
+<h2 id="ch4-3">4.3 App 启动流程</h2>
+
+<p>从 OH Foundation 发起 StartAbility 到 Android App 的 <code>ActivityThread.main()</code> 开始运行的完整流程。</p>
+
+<div class="diagram">     OH Foundation (AbilityManagerService)
+              |
+     1. 构造 SpawnMsg (bundleName, uid, gid, flags, abilityName...)
+              |
+     2. send(SpawnMsg) via Unix socket
+              |
+     appspawn-x (事件循环收到请求)
+              |
+     3. fork()  ─────────────────────────────────────┐
+              |                                       |
+     父进程: 回到 poll()                          子进程:
+                                                     |
+                                        4. 子进程特化 (child_main)
+                                          ├─ DAC: setuid(uid), setgid(gid)
+                                          ├─ Sandbox: unshare(CLONE_NEWNS)
+                                          │   └─ mount 沙箱规则
+                                          ├─ SELinux: setcon(app_domain)
+                                          └─ AccessToken: SetSelfTokenID(tokenId)
+                                                     |
+                                        5. OHEnvironment.initialize()
+                                          ├─ loadLibrary("oh_adapter_bridge")
+                                          ├─ nativeInit() → 连接 OH 系统服务
+                                          │   ├─ OH AbilityManager IPC proxy
+                                          │   ├─ OH AppMgr IPC proxy
+                                          │   ├─ OH WindowManager IPC proxy
+                                          │   └─ OH BundleManager IPC proxy
+                                          └─ isOHEnvironment() → true
+                                                     |
+                                        6. AppSpawnXInit.initChild(bundleName, abilityName)
+                                          ├─ 设置 classloader
+                                          ├─ 设置 process name
+                                          └─ 调用 ActivityThread.main()
+                                                     |
+                                        7. ActivityThread.main()
+                                          ├─ Looper.prepareMainLooper()
+                                          ├─ new ActivityThread()
+                                          ├─ attach(false) → 通知 AMS 进程启动
+                                          │   └─ ActivityManagerAdapter → OH AppMgr
+                                          └─ Looper.loop() → 进入消息循环</div>
+
+<div class="card">
+  <h4>关键步骤详解</h4>
+
+  <h4>Step 3: fork()</h4>
+  <p>appspawn-x 调用 <code>fork()</code> 创建子进程。由于 Phase 3 已完成预加载，子进程通过 COW（Copy-On-Write）共享父进程已加载的约 7000 个 Java 类和 ART VM 内部数据结构，避免重复初始化的开销。</p>
+
+  <h4>Step 4: 子进程特化</h4>
+  <ul>
+    <li><strong>DAC（自主访问控制）</strong>：<code>setuid()</code> / <code>setgid()</code> 降权到目标 App 的 UID/GID</li>
+    <li><strong>Sandbox（沙箱隔离）</strong>：<code>unshare(CLONE_NEWNS)</code> 创建独立 mount namespace，按 <code>appspawn_x_sandbox.json</code> 规则挂载</li>
+    <li><strong>SELinux</strong>：<code>setcon()</code> 切换到 App 专用的 SELinux 安全域</li>
+    <li><strong>AccessToken</strong>：<code>SetSelfTokenID()</code> 设置 OH AccessToken，App 后续的 IPC 调用权限由此 Token 控制</li>
+  </ul>
+
+  <h4>Step 5: OHEnvironment.initialize()</h4>
+  <p>在 Java 侧初始化 OH 适配环境，加载 JNI 库并通过 <code>nativeInit()</code> 连接所有 OH 系统服务的 IPC 代理。此后所有 Android 系统 API 调用将通过适配层路由到 OH 服务。</p>
+</div>
+
+<h2 id="ch4-4">4.4 App 运行时 IPC 流程</h2>
+
+<p>Android App 启动后，其系统调用通过以下三条主要 IPC 路径与 OH 系统服务交互。</p>
+
+<h3>正向桥接：Android App &rarr; OH 系统服务</h3>
+
+<div class="diagram">  Android App (Java)
+       |
+  ActivityManager.getService()
+       |
+  ActivityManagerAdapter (extends IActivityManager.Stub)
+       |  Java → native
+  JNI: nativeStartAbility(want, options)
+       |
+  oh_ability_manager_client.cpp
+       |  OH IPC (MessageParcel)
+  OH AbilityManagerService
+       |
+  [Start Ability / Service / Content Provider ...]</div>
+
+<h3>反向回调：OH 系统服务 &rarr; Android App</h3>
+
+<div class="diagram">  OH AbilityManagerService
+       |  OH IPC callback
+  IAppScheduler proxy (OH → appspawn-x 子进程)
+       |
+  app_scheduler_adapter.cpp
+       |  C++ → JNI callback
+  AppSchedulerBridge.java
+       |
+  IApplicationThread (Android)
+       |
+  ActivityThread.handleXxx()
+       |
+  [scheduleTransaction / scheduleTrimMemory / ...]</div>
+
+<h3>Surface 桥接：图形渲染</h3>
+
+<div class="diagram">  Android App (Canvas / View)
+       |
+  Android Surface → IGraphicBufferProducer
+       |
+  oh_graphic_buffer_producer.cpp
+       |  buffer 映射
+  OH Surface (producer)
+       |
+  oh_surface_bridge.cpp
+       |  RS API
+  OH RSSurfaceNode → RSUIDirector
+       |  OH IPC
+  OH RenderService (GPU 合成 + 显示)</div>
+
+<!-- ==================== 第5章 ==================== -->
+<h1 id="ch5">5. 环境变量与配置</h1>
+
+<h2 id="ch5-1">5.1 appspawn-x 环境变量</h2>
+
+<div class="card">
+  <table>
+    <tr><th>环境变量</th><th>值</th><th>用途</th></tr>
+    <tr>
+      <td><code>ANDROID_ROOT</code></td>
+      <td><code>/system/android</code></td>
+      <td>Android 运行时根目录，ART 使用此路径查找 framework 和 native 库</td>
+    </tr>
+    <tr>
+      <td><code>ANDROID_DATA</code></td>
+      <td><code>/data</code></td>
+      <td>Android 数据目录，DEX 缓存和 App 数据存储</td>
+    </tr>
+    <tr>
+      <td><code>ANDROID_ART_ROOT</code></td>
+      <td><code>/system/android</code></td>
+      <td>ART 运行时目录（与 ANDROID_ROOT 一致）</td>
+    </tr>
+    <tr>
+      <td><code>BOOTCLASSPATH</code></td>
+      <td><code>/system/android/framework/framework.jar:<br>/system/android/framework/framework-res-package.jar:<br>/system/android/framework/oh-adapter-framework.jar</code></td>
+      <td>ART VM 启动类路径，加载 Android 框架和适配层类</td>
+    </tr>
+    <tr>
+      <td><code>DEX2OATBOOTCLASSPATH</code></td>
+      <td><code>/system/android/framework/framework.jar:<br>/system/android/framework/oh-adapter-framework.jar</code></td>
+      <td>dex2oat 编译时的 boot classpath（不含资源包）</td>
+    </tr>
+    <tr>
+      <td><code>LD_LIBRARY_PATH</code></td>
+      <td><code>/system/android/lib64:<br>/system/lib64</code></td>
+      <td>动态库搜索路径，优先查找 Android 运行时库，再查找 OH 系统库</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch5-2">5.2 OH 系统属性</h2>
+
+<div class="card">
+  <table>
+    <tr><th>属性名</th><th>值</th><th>用途</th></tr>
+    <tr>
+      <td><code>persist.oh.adapter.enabled</code></td>
+      <td><code>true</code></td>
+      <td>适配层总开关。<code>OHEnvironment.isOHEnvironment()</code> 检查此属性，决定是否启用适配层拦截。设为 <code>false</code> 则所有 AOSP 源码回退到原始实现。</td>
+    </tr>
+    <tr>
+      <td><code>bootevent.appspawn_x.ready</code></td>
+      <td><code>true</code>（运行时）</td>
+      <td>appspawn-x 初始化完成后设置，Foundation AMS 等待此事件后才发送 spawn 请求。</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch5-3">5.3 SELinux 上下文</h2>
+
+<div class="card">
+  <table>
+    <tr><th>进程/文件</th><th>SELinux 上下文</th><th>说明</th></tr>
+    <tr>
+      <td>appspawn-x 进程</td>
+      <td><code>u:r:appspawn_x:s0</code></td>
+      <td>独立 SELinux 域，拥有 fork/setuid/socket/mount 等权限</td>
+    </tr>
+    <tr>
+      <td>Android App 子进程</td>
+      <td><code>u:r:android_app:s0:c&lt;uid&gt;</code></td>
+      <td>fork 后通过 setcon 切换到 App 域，UID 作为 MLS category</td>
+    </tr>
+    <tr>
+      <td><code>/system/bin/appspawn-x</code></td>
+      <td><code>u:object_r:appspawn_x_exec:s0</code></td>
+      <td>可执行文件标签</td>
+    </tr>
+    <tr>
+      <td><code>/system/android/**</code></td>
+      <td><code>u:object_r:android_runtime_file:s0</code></td>
+      <td>Android 运行时文件标签</td>
+    </tr>
+    <tr>
+      <td><code>/dev/unix/socket/appspawn_x</code></td>
+      <td><code>u:object_r:appspawn_x_socket:s0</code></td>
+      <td>Unix domain socket 标签，仅允许 Foundation 连接</td>
+    </tr>
+  </table>
+</div>
+
+<div class="note">
+  <strong>注意：</strong>SELinux 策略文件需要在 OH 编译时通过 <code>sepolicy</code> 模块添加。首次部署如遇 SELinux 拒绝，可临时使用 <code>hdc shell setenforce 0</code> 切换到 permissive 模式进行调试，但生产环境必须为 enforcing 模式。
+</div>
+
+<h2 id="ch5-4">5.4 沙箱配置详解</h2>
+
+<p><code>appspawn_x_sandbox.json</code> 定义了 Android App 子进程的 mount namespace 规则，确保 App 只能访问授权的文件系统路径。</p>
+
+<div class="card">
+  <pre><code>{
+    "common": {
+        "mount-paths": [
+            {
+                "src-path": "/system/android/framework",
+                "sandbox-path": "/system/framework",
+                "sandbox-flags": ["bind", "rec", "ro"],
+                "comment": "Android framework JAR 映射到标准路径"
+            },
+            {
+                "src-path": "/system/android/lib64",
+                "sandbox-path": "/system/lib64/android",
+                "sandbox-flags": ["bind", "rec", "ro"],
+                "comment": "ART native 库映射"
+            },
+            {
+                "src-path": "/data/misc/appspawnx/dalvik-cache",
+                "sandbox-path": "/data/dalvik-cache",
+                "sandbox-flags": ["bind", "rec", "rw"],
+                "comment": "DEX 优化缓存"
+            }
+        ],
+        "mount-groups": [
+            {
+                "name": "app-data",
+                "src-path": "/data/app/${bundleName}",
+                "sandbox-path": "/data/data/${packageName}",
+                "sandbox-flags": ["bind", "rec", "rw", "nosuid"],
+                "comment": "App 私有数据目录"
+            },
+            {
+                "name": "app-cache",
+                "src-path": "/data/app/${bundleName}/cache",
+                "sandbox-path": "/data/data/${packageName}/cache",
+                "sandbox-flags": ["bind", "rec", "rw", "nosuid", "nodev"],
+                "comment": "App 缓存目录"
+            }
+        ]
+    },
+    "individual": {
+        "comment": "特定 App 的额外 mount 规则（如需访问外部存储等）"
+    }
+}</code></pre>
+</div>
+
+<div class="card">
+  <h4>沙箱规则说明</h4>
+  <table>
+    <tr><th>规则类别</th><th>说明</th></tr>
+    <tr>
+      <td><code>common/mount-paths</code></td>
+      <td>所有 Android App 共享的 mount 规则，将 OH 设备上的实际路径映射到 Android 标准路径</td>
+    </tr>
+    <tr>
+      <td><code>common/mount-groups</code></td>
+      <td>按 App 实例化的 mount 规则，<code>${bundleName}</code> 和 <code>${packageName}</code> 在 fork 时替换为具体值</td>
+    </tr>
+    <tr>
+      <td><code>individual</code></td>
+      <td>特定 App 的定制化规则（如需要访问 sdcard 等外部存储的 App）</td>
+    </tr>
+    <tr>
+      <td><code>sandbox-flags</code></td>
+      <td><code>bind</code>（绑定挂载）、<code>rec</code>（递归）、<code>ro</code>（只读）、<code>rw</code>（读写）、<code>nosuid</code>（禁止 SUID）、<code>nodev</code>（禁止设备文件）</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ==================== 第6章 ==================== -->
+<h1 id="ch6">6. 部署操作手册</h1>
+
+<h2 id="ch6-1">6.1 首次部署（从零开始）</h2>
+
+<p>以下是从全新 DAYU600 设备到 Android App 可运行的完整部署步骤。</p>
+
+<div class="card">
+  <h4>Step 1: 确认设备连接</h4>
+  <pre><code># 通过 USB 连接 DAYU600，确认 hdc 可用
+hdc list targets
+# 预期: 5bb5b1ae00000000000000000823012c</code></pre>
+
+  <h4>Step 2: Remount 文件系统</h4>
+  <pre><code>hdc shell mount -o rw,remount /</code></pre>
+
+  <h4>Step 3: 备份 OH 原始系统服务</h4>
+  <pre><code>hdc shell "for f in libabilityms.z.so libappms.z.so libwms.z.so libbms.z.so; do \
+  cp /system/lib64/platformsdk/\$f /system/lib64/platformsdk/\$f.bak; \
+done"
+# 验证备份
+hdc shell ls -la /system/lib64/platformsdk/*.bak</code></pre>
+
+  <h4>Step 4: 部署 OH 系统服务（含补丁）</h4>
+  <pre><code>hdc file send out/oh-services/libabilityms.z.so /system/lib64/platformsdk/
+hdc file send out/oh-services/libappms.z.so /system/lib64/platformsdk/
+hdc file send out/oh-services/libwms.z.so /system/lib64/platformsdk/
+hdc file send out/oh-services/libbms.z.so /system/lib64/platformsdk/
+hdc shell "chmod 644 /system/lib64/platformsdk/lib{ability,app,w,b}ms.z.so"</code></pre>
+
+  <h4>Step 5: 创建 Android 运行时目录</h4>
+  <pre><code>hdc shell mkdir -p /system/android/framework
+hdc shell mkdir -p /system/android/lib64</code></pre>
+
+  <h4>Step 6: 部署 Android 框架 JAR</h4>
+  <pre><code>hdc file send out/android-rt/framework.jar /system/android/framework/
+hdc file send out/android-rt/framework-res-package.jar /system/android/framework/
+hdc file send out/android-rt/oh-adapter-framework.jar /system/android/framework/
+hdc shell "chmod 644 /system/android/framework/*.jar"</code></pre>
+
+  <h4>Step 7: 部署 ART 运行时 Native 库</h4>
+  <pre><code>for lib in libart.so libdexfile.so libartbase.so libartpalette.so \
+           libbionic_compat.so liblog.so libbase.so libcutils.so \
+           libutils.so libnativehelper.so libsigchain.so; do
+  hdc file send out/android-rt/$lib /system/android/lib64/
+done
+hdc shell "chmod 755 /system/android/lib64/*.so"</code></pre>
+
+  <h4>Step 8: 部署适配层产物</h4>
+  <pre><code># 可执行文件
+hdc file send out/adapter/appspawn-x /system/bin/
+hdc shell chmod 755 /system/bin/appspawn-x
+
+# JNI 库
+hdc file send out/adapter/liboh_adapter_bridge.z.so /system/lib64/
+hdc file send out/adapter/libapk_installer.z.so /system/lib64/
+hdc shell "chmod 644 /system/lib64/liboh_adapter_bridge.z.so /system/lib64/libapk_installer.z.so"
+
+# 配置文件
+hdc file send out/adapter/appspawn_x.cfg /system/etc/init/
+hdc file send out/adapter/appspawn_x_sandbox.json /system/etc/
+hdc shell "chmod 644 /system/etc/init/appspawn_x.cfg /system/etc/appspawn_x_sandbox.json"</code></pre>
+
+  <h4>Step 9: 创建数据目录与设置属性</h4>
+  <pre><code>hdc shell "mkdir -p /data/service/el1/public/appspawnx/dalvik-cache"
+hdc shell "mkdir -p /data/misc/appspawnx/dalvik-cache/arm64"
+hdc shell "param set persist.oh.adapter.enabled true"</code></pre>
+
+  <h4>Step 10: 重启设备并验证</h4>
+  <pre><code>hdc shell reboot
+
+# 等待设备重启完成（约 30-60 秒）
+hdc wait
+hdc list targets
+
+# 验证 appspawn-x 进程已启动
+hdc shell pidof appspawn-x
+
+# 验证系统属性
+hdc shell param get persist.oh.adapter.enabled
+
+# 查看启动日志
+hdc shell "hilog | grep AppSpawnX"</code></pre>
+</div>
+
+<h2 id="ch6-2">6.2 增量更新（仅更新部分组件）</h2>
+
+<div class="card">
+  <h4>更新适配层 JNI 库（最常见场景）</h4>
+  <pre><code>hdc shell mount -o rw,remount /
+hdc file send out/adapter/liboh_adapter_bridge.z.so /system/lib64/
+hdc shell chmod 644 /system/lib64/liboh_adapter_bridge.z.so
+# 需要重启才能生效（appspawn-x 启动时加载）
+hdc shell reboot</code></pre>
+
+  <h4>更新适配层 Java 代码</h4>
+  <pre><code>hdc shell mount -o rw,remount /
+hdc file send out/android-rt/oh-adapter-framework.jar /system/android/framework/
+hdc shell chmod 644 /system/android/framework/oh-adapter-framework.jar
+# 清除 DEX 缓存，下次启动时重新编译
+hdc shell "rm -rf /data/misc/appspawnx/dalvik-cache/arm64/*"
+hdc shell reboot</code></pre>
+
+  <h4>更新 OH 系统服务 .so</h4>
+  <pre><code>hdc shell mount -o rw,remount /
+# 建议先停止相关服务再替换
+hdc file send out/oh-services/libabilityms.z.so /system/lib64/platformsdk/
+hdc shell chmod 644 /system/lib64/platformsdk/libabilityms.z.so
+hdc shell reboot</code></pre>
+</div>
+
+<h2 id="ch6-3">6.3 回滚操作</h2>
+
+<div class="card">
+  <h4>完全回滚（恢复到部署前状态）</h4>
+  <pre><code>hdc shell mount -o rw,remount /
+
+# 1. 恢复 OH 系统服务原始文件
+hdc shell "for f in libabilityms.z.so libappms.z.so libwms.z.so libbms.z.so; do \
+  [ -f /system/lib64/platformsdk/\$f.bak ] && \
+  mv /system/lib64/platformsdk/\$f.bak /system/lib64/platformsdk/\$f; \
+done"
+
+# 2. 移除适配层新增文件
+hdc shell rm -f /system/bin/appspawn-x
+hdc shell rm -f /system/lib64/liboh_adapter_bridge.z.so
+hdc shell rm -f /system/lib64/libapk_installer.z.so
+hdc shell rm -f /system/etc/init/appspawn_x.cfg
+hdc shell rm -f /system/etc/appspawn_x_sandbox.json
+
+# 3. 移除 Android 运行时目录
+hdc shell rm -rf /system/android/
+
+# 4. 清除运行时数据
+hdc shell rm -rf /data/service/el1/public/appspawnx/
+hdc shell rm -rf /data/misc/appspawnx/
+
+# 5. 关闭适配层开关
+hdc shell param set persist.oh.adapter.enabled false
+
+# 6. 重启
+hdc shell reboot</code></pre>
+</div>
+
+<div class="ok">
+  <strong>回滚安全性：</strong>回滚操作仅恢复被替换的文件和删除新增文件，不会影响 OH 系统的其他部分。回滚后设备将恢复到标准 OpenHarmony 状态。
+</div>
+
+<h2 id="ch6-4">6.4 日志查看与调试</h2>
+
+<div class="card">
+  <h4>核心日志命令</h4>
+  <pre><code># 查看 appspawn-x 启动日志
+hdc shell "hilog | grep AppSpawnX"
+
+# 查看适配层 IPC 桥接日志
+hdc shell "hilog | grep 'OH_AMAdapter\|OH_ATMAdapter\|OH_WMAdapter\|OH_WSAdapter'"
+
+# 查看 OHEnvironment 初始化日志
+hdc shell "hilog | grep OHEnvironment"
+
+# 综合查看所有适配层相关日志
+hdc shell "hilog | grep 'AppSpawnX\|OH_AMAdapter\|OH_ATMAdapter\|OH_WMAdapter\|OH_WSAdapter\|OHEnvironment\|OH_PKGAdapter'"
+
+# 实时查看（持续输出）
+hdc shell "hilog -w start"
+hdc shell "hilog"</code></pre>
+</div>
+
+<div class="card">
+  <h4>关键日志标签说明</h4>
+  <table>
+    <tr><th>日志标签</th><th>来源</th><th>说明</th></tr>
+    <tr>
+      <td><code>AppSpawnX</code></td>
+      <td>appspawn-x (C++)</td>
+      <td>进程孵化器：启动、fork、初始化阶段日志</td>
+    </tr>
+    <tr>
+      <td><code>OHEnvironment</code></td>
+      <td>OHEnvironment.java</td>
+      <td>适配层环境：加载库、连接服务、属性检查</td>
+    </tr>
+    <tr>
+      <td><code>OH_AMAdapter</code></td>
+      <td>ActivityManagerAdapter.java</td>
+      <td>IActivityManager 桥接：startActivity、startService 等</td>
+    </tr>
+    <tr>
+      <td><code>OH_ATMAdapter</code></td>
+      <td>ActivityTaskManagerAdapter.java</td>
+      <td>IActivityTaskManager 桥接：task 管理、recent 等</td>
+    </tr>
+    <tr>
+      <td><code>OH_WMAdapter</code></td>
+      <td>WindowManagerAdapter.java</td>
+      <td>IWindowManager 桥接：窗口策略、显示管理</td>
+    </tr>
+    <tr>
+      <td><code>OH_WSAdapter</code></td>
+      <td>WindowSessionAdapter.java</td>
+      <td>IWindowSession 桥接：窗口操作、输入事件</td>
+    </tr>
+    <tr>
+      <td><code>OH_PKGAdapter</code></td>
+      <td>PackageManagerAdapter.java</td>
+      <td>IPackageManager 桥接：包信息查询、权限检查</td>
+    </tr>
+    <tr>
+      <td><code>OH_Bridge</code></td>
+      <td>adapter_bridge.cpp</td>
+      <td>JNI 桥接层：native 方法注册、OH IPC 调用</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h4>常见调试场景</h4>
+
+  <h4>场景 1: appspawn-x 未启动</h4>
+  <pre><code># 检查 init 是否加载了配置
+hdc shell "hilog | grep appspawn_x"
+# 检查可执行文件是否存在
+hdc shell ls -la /system/bin/appspawn-x
+# 检查 SELinux 是否拒绝
+hdc shell "hilog | grep 'avc.*appspawn'"
+# 临时关闭 SELinux 调试
+hdc shell setenforce 0</code></pre>
+
+  <h4>场景 2: ART VM 初始化失败</h4>
+  <pre><code># 检查 libart.so 是否可加载
+hdc shell "hilog | grep 'dlopen\|libart\|JNI_CreateJavaVM'"
+# 检查 LD_LIBRARY_PATH
+hdc shell "cat /proc/$(pidof appspawn-x)/environ | tr '\0' '\n' | grep LD_LIBRARY"
+# 检查 BOOTCLASSPATH 中的 JAR 是否存在
+hdc shell ls -la /system/android/framework/</code></pre>
+
+  <h4>场景 3: 适配层 IPC 调用失败</h4>
+  <pre><code># 查看 OH 系统服务是否正常运行
+hdc shell "hilog | grep 'AbilityManagerService\|AppMgrService'"
+# 查看 IPC 连接错误
+hdc shell "hilog | grep 'OH_Bridge.*error\|OH_Bridge.*fail'"</code></pre>
+</div>
+
+<!-- ==================== 第7章 ==================== -->
+<h1 id="ch7">7. 当前状态与后续计划</h1>
+
+<h2 id="ch7-1">7.1 产物就绪度矩阵</h2>
+
+<div class="card">
+  <table>
+    <tr><th>组件</th><th>产物</th><th>状态</th><th>依赖</th><th>备注</th></tr>
+    <tr>
+      <td rowspan="4">OH 系统服务</td>
+      <td><code>libabilityms.z.so</code></td>
+      <td class="status-ready">&#x2705; 已完成 (6.2 MB)</td>
+      <td>OH 源码 + 补丁</td>
+      <td>OH dayu210 编译产出</td>
+    </tr>
+    <tr>
+      <td><code>libappms.z.so</code></td>
+      <td class="status-ready">&#x2705; 已完成 (2.4 MB)</td>
+      <td>OH 源码 + 补丁</td>
+      <td>OH dayu210 编译产出</td>
+    </tr>
+    <tr>
+      <td><code>libwms.z.so</code></td>
+      <td class="status-ready">&#x2705; 已完成 (1.5 MB)</td>
+      <td>OH 源码 + 补丁</td>
+      <td>OH dayu210 编译产出</td>
+    </tr>
+    <tr>
+      <td><code>libbms.z.so</code></td>
+      <td class="status-ready">&#x2705; 已完成 (6.8 MB)</td>
+      <td>OH 源码 + 补丁</td>
+      <td>OH dayu210 编译产出</td>
+    </tr>
+    <tr>
+      <td rowspan="4">AOSP Java/DEX</td>
+      <td><code>framework.jar</code></td>
+      <td class="status-ready">&#x2705; 已完成 (39 MB)</td>
+      <td>AOSP 14 源码 + 补丁</td>
+      <td>AOSP lunch + make 完成</td>
+    </tr>
+    <tr>
+      <td><code>framework-classes.dex.jar</code></td>
+      <td class="status-ready">&#x2705; 已完成 (38 MB)</td>
+      <td>AOSP 14 源码</td>
+      <td>Framework DEX 字节码</td>
+    </tr>
+    <tr>
+      <td><code>framework-res-package.jar</code></td>
+      <td class="status-ready">&#x2705; 已完成 (33 MB)</td>
+      <td>AOSP 14 源码</td>
+      <td>AOSP 框架资源包</td>
+    </tr>
+    <tr>
+      <td><code>oh-adapter-framework.jar</code></td>
+      <td class="status-todo">&#x274C; 未编译</td>
+      <td>适配层 Java 源码</td>
+      <td>依赖 AOSP 构建系统</td>
+    </tr>
+    <tr>
+      <td rowspan="4">ART 运行时<br>(交叉编译 musl)</td>
+      <td><code>libart.so</code></td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 基本完成 (14 MB)</td>
+      <td>AOSP ART 源码</td>
+      <td>asm stubs 待完善</td>
+    </tr>
+    <tr>
+      <td><code>libdexfile.so</code> / <code>libartbase.so</code> / <code>libart-compiler.so</code></td>
+      <td class="status-todo">&#x274C; 未编译</td>
+      <td>AOSP ART 源码</td>
+      <td>Layer 3 待完成</td>
+    </tr>
+    <tr>
+      <td><code>libbionic_compat.so</code> + 基础库 (8个)</td>
+      <td class="status-ready">&#x2705; 全部完成</td>
+      <td>自建兼容层 + AOSP system/</td>
+      <td>libbionic_compat (17KB), liblog (70KB), libbase (140KB), libcutils (39KB), libutils (169KB), libnativehelper (28KB), libsigchain (23KB), libartpalette (22KB)</td>
+    </tr>
+    <tr>
+      <td><code>libandroid_runtime.so</code> / <code>dex2oat</code></td>
+      <td class="status-todo">&#x274C; 未编译</td>
+      <td>AOSP 源码</td>
+      <td>Layer 4 待完成</td>
+    </tr>
+    <tr>
+      <td rowspan="5">适配层</td>
+      <td><code>appspawn-x</code></td>
+      <td class="status-todo">&#x274C; 未编译</td>
+      <td>适配层 C++ 源码</td>
+      <td>依赖 Layer 4 libandroid_runtime.so</td>
+    </tr>
+    <tr>
+      <td><code>liboh_adapter_bridge.so</code></td>
+      <td class="status-ready">&#x2705; 已完成 (92 KB)</td>
+      <td>适配层 JNI 源码</td>
+      <td>OH 工具链交叉编译完成</td>
+    </tr>
+    <tr>
+      <td><code>libapk_installer.z.so</code></td>
+      <td class="status-todo">&#x274C; 未编译</td>
+      <td>适配层 C++ 源码</td>
+      <td>OH GN 编译</td>
+    </tr>
+    <tr>
+      <td><code>appspawn_x.cfg</code></td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 部分完成</td>
+      <td>配置文件</td>
+      <td>设计完成，需最终确认参数</td>
+    </tr>
+    <tr>
+      <td><code>appspawn_x_sandbox.json</code></td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 部分完成</td>
+      <td>配置文件</td>
+      <td>设计完成，需在设备上验证</td>
+    </tr>
+    <tr>
+      <td>测试 App</td>
+      <td>Hello World APK</td>
+      <td class="status-partial">&#x26A0;&#xFE0F; 部分完成</td>
+      <td>Java 源码就绪</td>
+      <td>需 AOSP 构建打包签名</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch7-2">7.2 最小可运行集（MVP）</h2>
+
+<p>让 Hello World App 在 DAYU600 上运行所需的最小组件集：</p>
+
+<div class="card">
+  <h4>MVP 必需组件</h4>
+  <table>
+    <tr><th>优先级</th><th>组件</th><th>理由</th></tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>appspawn-x</code> + <code>appspawn_x.cfg</code></td>
+      <td>进程孵化器是一切的起点，没有它无法创建 Android 进程</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>libart.so</code> + ART 依赖库 (11个)</td>
+      <td>ART VM 是运行 Java 代码的基础 <span class="status-partial">&#x26A0;&#xFE0F; libart 基本完成，基础库 8 个已就绪，Layer 3 待完成</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>framework.jar</code></td>
+      <td>Android 核心框架类（Activity、View、Context 等）<span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>oh-adapter-framework.jar</code></td>
+      <td>适配层 Java 代码，拦截系统服务调用</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>liboh_adapter_bridge.so</code></td>
+      <td>适配层 JNI 库，实际执行 OH IPC 调用 <span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>libabilityms.z.so</code>（含补丁）</td>
+      <td>AMS 需识别 Android App 并管理其生命周期 <span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-fix">P0</span></td>
+      <td><code>libappms.z.so</code>（含补丁）</td>
+      <td>AppMgr 需识别通过 appspawn-x 启动的 Android 进程 <span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-stub">P1</span></td>
+      <td><code>framework-res-package.jar</code></td>
+      <td>Android 系统资源，UI 渲染需要 <span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-stub">P1</span></td>
+      <td><code>libwms.z.so</code>（含补丁）</td>
+      <td>窗口管理，显示 UI 需要 <span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-partial">P2</span></td>
+      <td><code>libbms.z.so</code>（含补丁）</td>
+      <td>BMS 集成，APK 安装注册（MVP 阶段可手动注册）<span class="status-ready">&#x2705;</span></td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-partial">P2</span></td>
+      <td><code>libapk_installer.z.so</code></td>
+      <td>APK 安装（MVP 阶段可手动部署 APK）</td>
+    </tr>
+  </table>
+</div>
+
+<div class="info">
+  <strong>MVP 目标：</strong>Hello World App 能够启动，在屏幕上显示 "Hello World" 文字，并正确响应 Activity 生命周期（onCreate &rarr; onResume &rarr; 显示 &rarr; onPause &rarr; onStop）。不要求支持 Service、BroadcastReceiver、ContentProvider 等高级组件。
+</div>
+
+<div class="note">
+  <strong>MVP 当前进展（2026-03-20 更新）：</strong>MVP 所需 11 个组件中，已有较大进展：
+  <ul>
+    <li><strong>已就绪 (5/11)：</strong><code>framework.jar</code>、<code>framework-res-package.jar</code>、<code>libabilityms.z.so</code>、<code>libappms.z.so</code>、<code>liboh_adapter_bridge.so</code></li>
+    <li><strong>基本完成 (1/11)：</strong><code>libart.so</code>（14MB，asm stubs 待完善）；基础依赖库 8 个全部交叉编译完成</li>
+    <li><strong>待完成 (5/11)：</strong><code>appspawn-x</code>（依赖 Layer 4）、<code>oh-adapter-framework.jar</code>（依赖 AOSP 构建）、<code>libwms.z.so</code>（P1 优先级，已编译就绪）、<code>libbms.z.so</code>（P2 优先级，已编译就绪）、ART 依赖库 Layer 3（libdexfile/libartbase/libart-compiler）</li>
+  </ul>
+  <strong>关键瓶颈：</strong>Layer 3 ART 库（libdexfile、libartbase、libart-compiler）和 Layer 4（libandroid_runtime、dex2oat）的交叉编译，是 appspawn-x 启动的前置条件。
+</div>
+
+<h2 id="ch7-3">7.3 分阶段部署计划</h2>
+
+<h3>Phase 1: 部署 OH 系统服务（验证补丁兼容性）</h3>
+
+<div class="card">
+  <table>
+    <tr><th>项目</th><th>内容</th></tr>
+    <tr><td><strong>目标</strong></td><td>验证 OH 系统服务补丁不影响 OH 原生功能</td></tr>
+    <tr><td><strong>部署内容</strong></td><td>替换 4 个 .so 文件：libabilityms / libappms / libwms / libbms</td></tr>
+    <tr><td><strong>前置条件</strong></td><td>OH 源码首次完整编译成功（<code>./build.sh --product-name dayu210 --ccache</code>）</td></tr>
+    <tr><td><strong>验证方法</strong></td><td>
+      <ul>
+        <li>设备正常启动，桌面正常显示</li>
+        <li>OH 原生 App 正常运行（设置、文件管理器等）</li>
+        <li>系统服务无 crash（<code>hilog | grep "FAULT\|CRASH"</code>）</li>
+        <li>如有异常，立即回滚 .bak 文件</li>
+      </ul>
+    </td></tr>
+    <tr><td><strong>风险</strong></td><td class="impact-high">高 — 补丁可能与当前 OH 6.1.0.19 版本不兼容</td></tr>
+    <tr><td><strong>回滚</strong></td><td><code>mv *.bak *.z.so</code> + reboot</td></tr>
+  </table>
+</div>
+
+<h3>Phase 2: 部署 Android 运行时 + 适配层（验证 appspawn-x 启动）</h3>
+
+<div class="card">
+  <table>
+    <tr><th>项目</th><th>内容</th></tr>
+    <tr><td><strong>目标</strong></td><td>appspawn-x 成功启动，完成 4 阶段初始化，ART VM 可创建</td></tr>
+    <tr><td><strong>部署内容</strong></td><td>全部 Android 运行时文件 + 适配层二进制 + 配置文件</td></tr>
+    <tr><td><strong>前置条件</strong></td><td>
+      <ul>
+        <li>Phase 1 验证通过</li>
+        <li>AOSP framework.jar 编译完成 <span class="status-ready">&#x2705;</span></li>
+        <li>ART 运行时交叉编译完成（基础库已完成，Layer 3/4 待完成）</li>
+        <li>适配层 JNI 库编译完成 <span class="status-ready">&#x2705; liboh_adapter_bridge.so (92KB)</span></li>
+      </ul>
+    </td></tr>
+    <tr><td><strong>验证方法</strong></td><td>
+      <ul>
+        <li><code>pidof appspawn-x</code> 返回 PID</li>
+        <li><code>hilog | grep "AppSpawnX.*Phase"</code> 显示 4 个阶段均完成</li>
+        <li><code>param get bootevent.appspawn_x.ready</code> 返回 true</li>
+        <li>OH 原生功能不受影响</li>
+      </ul>
+    </td></tr>
+    <tr><td><strong>风险</strong></td><td class="impact-medium">中 — ART VM 初始化可能因 musl 兼容性问题失败</td></tr>
+    <tr><td><strong>回滚</strong></td><td>删除新增文件 + 设置 <code>persist.oh.adapter.enabled=false</code> + reboot</td></tr>
+  </table>
+</div>
+
+<h3>Phase 3: 部署测试 App（验证 Hello World 完整运行链路）</h3>
+
+<div class="card">
+  <table>
+    <tr><th>项目</th><th>内容</th></tr>
+    <tr><td><strong>目标</strong></td><td>Hello World App 在 DAYU600 上完整运行，显示 UI</td></tr>
+    <tr><td><strong>部署内容</strong></td><td>Hello World APK 通过 APK installer 或手动注册部署</td></tr>
+    <tr><td><strong>前置条件</strong></td><td>
+      <ul>
+        <li>Phase 2 验证通过（appspawn-x + ART 正常运行）</li>
+        <li>Hello World APK 打包完成</li>
+      </ul>
+    </td></tr>
+    <tr><td><strong>验证方法</strong></td><td>
+      <ul>
+        <li>通过 OH AA 工具启动 App：<code>aa start -a MainActivity -b com.example.helloworld</code></li>
+        <li>屏幕上显示 "Hello World"</li>
+        <li>Activity 生命周期日志完整</li>
+        <li>App 窗口在 OH 最近任务列表中显示</li>
+        <li>返回键可正常退出 App</li>
+      </ul>
+    </td></tr>
+    <tr><td><strong>风险</strong></td><td class="impact-medium">中 — 可能在 Surface 桥接或生命周期映射处遇到问题</td></tr>
+    <tr><td><strong>回滚</strong></td><td>删除 App 数据即可，不影响系统</td></tr>
+  </table>
+</div>
+
+<div class="diagram">  时间线
+  ─────────────────────────────────────────────────────────────────────────
+
+  Phase 1                    Phase 2                     Phase 3
+  OH 系统服务验证             Android RT + 适配层          Hello World App
+  ┌────────────────┐         ┌────────────────┐          ┌────────────────┐
+  | 编译 OH 源码    |         | 编译 AOSP       |          | 打包 APK       |
+  | 应用补丁        |  ──→   | 交叉编译 ART    |   ──→   | 部署 + 注册     |
+  | 部署 4个 .so    |         | 编译适配层       |          | 启动 + 验证     |
+  | 验证 OH 功能    |         | 部署 + 验证      |          | UI 显示验证     |
+  └────────────────┘         └────────────────┘          └────────────────┘
+
+  里程碑:                     里程碑:                      里程碑:
+  OH 正常运行 ✓               appspawn-x ready ✓          Hello World 运行 ✓</div>
+
+<!-- ==================== 附录 A ==================== -->
+<h1 id="appA">附录 A. 开发环境搭建</h1>
+
+<p>本附录整理自 <code>doc/env_setup/oh_dev_environment_setup_guide.html</code>，涵盖从零搭建 OH 系统开发环境的完整步骤。采用<strong>"华为云远程编译 + 本地 PC 调试"</strong>的分离架构。</p>
+
+<div class="diagram">┌─────────────────────────────────────────────────────────────────────────────┐
+│                          整体环境架构                                        │
+│                                                                             │
+│  ┌──────────────────────┐      SSH/rsync      ┌────────────────────────┐   │
+│  │   本地 PC (Windows)   │ ◄═══════════════► │  华为云 ECS (Ubuntu)     │   │
+│  │                      │      互联网          │                        │   │
+│  │  · 源码编辑            │                    │  · OH 全量源码           │   │
+│  │  · adapter 开发        │   ① 上传 patch     │  · 编译工具链            │   │
+│  │  · hdc 设备调试        │   ─────────────►   │  · 增量/全量编译         │   │
+│  │  · 日志查看            │                    │                        │   │
+│  │                      │   ② 下载 .so 产物   │  编译产出:              │   │
+│  │  WSL2 Ubuntu         │   ◄─────────────   │  · libabilityms.z.so   │   │
+│  │  · rsync 同步         │                    │  · libwms.z.so         │   │
+│  │  · 自动化脚本          │                    │  · 系统镜像             │   │
+│  └──────────┬───────────┘                    └────────────────────────┘   │
+│             │ USB                                                         │
+│             │ hdc                                                          │
+│  ┌──────────▼───────────┐                                                 │
+│  │  DAYU600 开发板       │   ③ hdc file send .so                          │
+│  │  (OpenHarmony 系统)   │   ④ kill foundation → 自动重启                  │
+│  │  Unisoc UMS9620      │   ⑤ hdc hilog 查看日志                           │
+│  │  · foundation 进程    │                                                 │
+│  │    (AMS/WMS/...)     │                                                 │
+│  └──────────────────────┘                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘</div>
+
+<table>
+  <tr><th>节点</th><th>职责</th><th>关键操作</th></tr>
+  <tr><td>本地 PC</td><td>代码编辑 + 设备调试</td><td>编辑 adapter 源码 / ohos_patches，通过 hdc 连接开发板</td></tr>
+  <tr><td>华为云 ECS</td><td>源码托管 + 编译构建</td><td>存放 OH 全量源码，执行增量/全量编译</td></tr>
+  <tr><td>DAYU600 开发板</td><td>运行 OH 系统 + 验证</td><td>运行修改后的系统服务，输出调试日志</td></tr>
+</table>
+
+<!-- A.1 硬件准备 -->
+<h2 id="appA-1">A.1 硬件准备（DAYU600 开发板、USB 连接线）</h2>
+
+<div class="ok">
+<strong>当前使用设备：DAYU600 (润开鸿 HH-SCDAYU600) 开发板</strong><br>
+基于 Unisoc UMS9620 芯片（6&times;Cortex-A55 + 2&times;Cortex-A76），OpenHarmony 标准系统开发平台，默认支持 root。
+</div>
+
+<table>
+  <tr><th>设备</th><th>芯片</th><th>CPU 架构</th><th>是否支持 Root</th><th>参考价格</th></tr>
+  <tr><td><strong>DAYU600</strong><br>HH-SCDAYU600<br><span class="status-ready">★ 当前使用</span></td><td>Unisoc UMS9620</td><td>6&times;A55 + 2&times;A76<br>8核</td><td>默认 root (userdebug/eng)</td><td>1500-2500 元</td></tr>
+  <tr><td>DAYU200 (RK3568)</td><td>Rockchip RK3568</td><td>4&times;A55, 4核</td><td>默认 root</td><td>500-800 元</td></tr>
+</table>
+
+<h4>USB 连接线</h4>
+<ul>
+  <li><strong>类型：</strong>USB Type-A to Type-C 数据线（DAYU600 使用 Type-C 接口）</li>
+  <li><strong>注意：</strong>必须是<strong>数据线</strong>，非纯充电线（纯充电线无数据通信引脚）</li>
+  <li>建议购买带屏蔽层的优质数据线，避免通信不稳定</li>
+</ul>
+
+<div class="warn">
+<strong>不推荐华为手机：</strong>HarmonyOS NEXT 虽基于 OpenHarmony 内核，但华为做了大量闭源定制，系统分区受 AVB 验证保护，目前没有公开的 root / 解锁 bootloader 方案。不适合系统服务级开发。
+</div>
+
+<!-- A.2 华为云服务器搭建 -->
+<h2 id="appA-2">A.2 华为云服务器搭建（ECS 创建、SSH 配置、安全组）</h2>
+
+<h3>A.2.1 账号注册</h3>
+<ol>
+  <li>访问华为云官网：<code>https://www.huaweicloud.com</code></li>
+  <li>使用手机号注册，完成实名认证</li>
+  <li>充值一定金额（建议 100 元起，按量付费从余额扣款）</li>
+</ol>
+
+<h3>A.2.2 ECS 规格选择与创建</h3>
+
+<div class="ok">
+<strong>推荐规格：通用计算增强型 C7 — 16核32G + 500G SSD</strong>
+</div>
+
+<table>
+  <tr><th>配置项</th><th>推荐值</th><th>说明</th></tr>
+  <tr><td><strong>区域</strong></td><td>华北-北京四 或就近区域</td><td>选择离你物理位置近的区域，减少 SSH 延迟</td></tr>
+  <tr><td><strong>规格</strong></td><td>通用计算增强型 c7.4xlarge.2</td><td>16 vCPU + 32 GB 内存</td></tr>
+  <tr><td><strong>镜像</strong></td><td>Ubuntu 22.04 LTS 64bit</td><td>或在市场镜像中搜索 "OpenHarmony" 使用预装镜像</td></tr>
+  <tr><td><strong>系统盘</strong></td><td>超高IO SSD, <strong>500 GB</strong></td><td>OH 源码 ~50G + 编译产物 ~150G + 工具链 ~30G + 余量</td></tr>
+  <tr><td><strong>网络</strong></td><td>按流量计费, 带宽 100 Mbps</td><td>rsync 传 .so 文件仅几 MB，带宽不是瓶颈</td></tr>
+  <tr><td><strong>计费模式</strong></td><td><strong>按量计费（按秒）</strong></td><td>用完关机，大幅节省成本</td></tr>
+  <tr><td><strong>登录凭证</strong></td><td>密钥对（非密码）</td><td>更安全且适合自动化脚本</td></tr>
+</table>
+
+<p><strong>费用估算：</strong></p>
+<table>
+  <tr><th>场景</th><th>时长</th><th>ECS 费用</th><th>磁盘费用</th><th>合计</th></tr>
+  <tr><td>首次全量编译</td><td>~2小时</td><td>~6 元</td><td>—</td><td>~6 元</td></tr>
+  <tr><td>日常增量编译（每次）</td><td>~15分钟</td><td>~0.8 元</td><td>—</td><td>~0.8 元</td></tr>
+  <tr><td>磁盘长期保留（关机状态）</td><td>每天</td><td>0 元</td><td>~2.5 元</td><td>~2.5 元/天</td></tr>
+</table>
+
+<p><strong>创建步骤：</strong></p>
+<ol>
+  <li>登录华为云控制台 &rarr; "弹性云服务器 ECS" &rarr; "购买弹性云服务器"</li>
+  <li>计费模式：<strong>按需计费</strong>；区域：就近选择</li>
+  <li>规格：搜索 <code>c7.4xlarge.2</code>（16核32G）</li>
+  <li>镜像：<strong>公共镜像</strong> &rarr; Ubuntu &rarr; 22.04 LTS 64bit</li>
+  <li>系统盘：超高IO &rarr; <strong>500 GB</strong></li>
+  <li>网络：弹性公网 IP &rarr; 按流量计费 &rarr; 100 Mbps</li>
+  <li>登录凭证：<strong>密钥对</strong></li>
+  <li>确认配置 &rarr; 提交</li>
+</ol>
+
+<h3>A.2.3 安全组配置</h3>
+
+<p>控制台 &rarr; ECS &rarr; 点击实例名 &rarr; "安全组" 标签 &rarr; "入方向规则" &rarr; 添加：</p>
+<table>
+  <tr><th>优先级</th><th>协议</th><th>端口</th><th>源地址</th><th>说明</th></tr>
+  <tr><td>1</td><td>TCP</td><td>22</td><td>你的公网 IP/32</td><td>SSH 登录（限定 IP 更安全）</td></tr>
+</table>
+
+<div class="note">
+<strong>安全提醒：</strong>源地址建议填写你家/公司的公网 IP（访问 <code>https://ip.cn</code> 查看），不要设置为 <code>0.0.0.0/0</code>。如果 IP 是动态的，可设为所在城市的 IP 段。
+</div>
+
+<h3>A.2.4 SSH 密钥对配置</h3>
+
+<p><strong>方式 A：在华为云控制台创建（推荐新手）：</strong></p>
+<ol>
+  <li>控制台 &rarr; ECS &rarr; "密钥对" &rarr; "创建密钥对"</li>
+  <li>输入名称（如 <code>oh-dev-key</code>），点击创建</li>
+  <li>浏览器自动下载 .pem 私钥文件，保存到 <code>C:\Users\iceberg\.ssh\oh-dev-key.pem</code></li>
+</ol>
+
+<p><strong>方式 B：使用本地已有密钥：</strong></p>
+<pre>
+<code># 在 Git Bash 或 WSL2 中生成密钥对
+ssh-keygen -t ed25519 -C "oh-dev" -f ~/.ssh/oh-dev-key
+
+# 将公钥内容复制到华为云控制台 → 密钥对 → 导入密钥对
+cat ~/.ssh/oh-dev-key.pub</code>
+</pre>
+
+<h3>A.2.5 首次登录验证</h3>
+
+<pre>
+<code># 设置私钥文件权限（必须，否则 SSH 拒绝使用）
+chmod 600 ~/.ssh/oh-dev-key.pem
+
+# 连接服务器（替换为你的 ECS 公网 IP）
+ssh -i ~/.ssh/oh-dev-key.pem root@&lt;ECS公网IP&gt;</code>
+</pre>
+
+<p>在 <code>~/.ssh/config</code> 中添加以下配置，后续可直接 <code>ssh oh-build</code> 登录：</p>
+
+<pre>
+<code>Host oh-build
+    HostName &lt;ECS公网IP&gt;
+    User root
+    Port 22
+    IdentityFile ~/.ssh/oh-dev-key.pem
+    ServerAliveInterval 30
+    ServerAliveCountMax 10</code>
+</pre>
+
+<div class="warn">
+<strong>SSH 连接频繁断开问题：</strong>华为云 ECS 的安全组或中间网络设备会关闭空闲的 TCP 连接。<code>ServerAliveInterval</code> 必须配置，否则 SSH 会话在空闲几分钟后被强制断开。如果仍有断连问题，检查安全组入方向规则是否放通了当前公网 IP。
+</div>
+
+<!-- A.3 OH 编译环境搭建 -->
+<h2 id="appA-3">A.3 OH 编译环境搭建（依赖安装、工具链验证）</h2>
+
+<div class="info">
+<strong>以下所有操作均在华为云 ECS (Ubuntu) 上通过 SSH 执行。</strong>以 root 身份登录，命令无需加 <code>sudo</code>。
+</div>
+
+<h3>A.3.1 安装编译依赖</h3>
+
+<pre>
+<code># 更新系统包
+apt-get update &amp;&amp; apt-get upgrade -y
+
+# 安装 OH 编译所需全部依赖
+apt-get install -y \
+    binutils git git-lfs gnupg flex bison gperf \
+    build-essential zip curl zlib1g-dev \
+    gcc-multilib g++-multilib libc6-dev-i386 \
+    lib32ncurses-dev x11proto-core-dev libx11-dev lib32z1-dev \
+    ccache libgl1-mesa-dev libxml2-utils xsltproc unzip m4 bc tar \
+    python3 python3-pip ruby genext2fs device-tree-compiler \
+    libffi-dev e2fsprogs pkg-config perl openssl libssl-dev \
+    scons mtd-utils default-jre default-jdk \
+    rsync dosfstools mtools
+
+# Ubuntu 24.04 需解除 Python 包管理限制
+rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED
+
+# 配置 Python
+update-alternatives --install /usr/bin/python python /usr/bin/python3 100
+
+# 安装 Node.js（OH 编译需要）
+curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+apt-get install -y nodejs
+
+# 验证关键工具版本
+python --version     # 应为 3.8+
+node --version       # 应为 v14.x 或 v16.x
+java -version        # 应为 JDK 8 或 11
+
+# 配置 ccache 加速编译
+ccache -M 50G
+echo 'export CCACHE_DIR=/root/.ccache' &gt;&gt; ~/.bashrc
+echo 'export USE_CCACHE=1' &gt;&gt; ~/.bashrc
+source ~/.bashrc</code>
+</pre>
+
+<h3>A.3.2 安装 repo 并下载 OH 源码</h3>
+
+<pre>
+<code># 下载 repo 工具
+curl -s https://gitee.com/oschina/repo/raw/fork_flow/repo-py3 &gt; /usr/local/bin/repo
+chmod a+x /usr/local/bin/repo
+
+# 配置 git
+git config --global user.name "oh-builder"
+git config --global user.email "builder@example.com"
+git config --global color.ui false</code>
+</pre>
+
+<div class="note">
+<strong>耗时提醒：</strong>OH 全量源码约 30-50 GB，在华为云服务器上下载预计 1-2 小时。建议使用 <code>screen</code> 防止 SSH 断连导致中断。
+</div>
+
+<pre>
+<code># 安装 screen
+apt-get install -y screen
+screen -S oh-build
+
+# 必须先创建并进入目标目录
+mkdir -p ~/openharmony &amp;&amp; cd ~/openharmony
+
+# 初始化 repo（OH 源码主托管已切换至 gitcode.com）
+repo init -u https://gitcode.com/openharmony/manifest \
+    -b OpenHarmony-6.1-Release --no-repo-verify
+
+# 开始同步源码（使用 8 线程加速）
+repo sync -c -j8 --force-sync</code>
+</pre>
+
+<h3>A.3.3 下载预编译工具链</h3>
+
+<pre>
+<code>cd ~/openharmony
+bash build/prebuilts_download.sh
+
+# 验证关键工具
+ls prebuilts/clang/ohos/linux-x86_64/
+ls prebuilts/build-tools/linux-x86/bin/gn
+ls prebuilts/build-tools/linux-x86/bin/ninja</code>
+</pre>
+
+<h3>A.3.4 首次全量编译</h3>
+
+<div class="warn">
+<strong>首次全量编译耗时约 1.5-3 小时（16核），请确保服务器不会被意外关机。</strong>建议使用 <code>screen</code> 在后台执行。
+</div>
+
+<div class="note">
+<strong>Ubuntu 24.04 兼容性修复：</strong>OH 6.1 编译系统默认仅支持 Ubuntu 18.04/20.04/22.04，需手动添加 24.04 支持：
+<pre><code>sed -i "s/('18.04', '20.04', '22.04')/('18.04', '20.04', '22.04', '24.04')/" \
+    ~/openharmony/build/scripts/tools_checker.py</code></pre>
+</div>
+
+<div class="note">
+<strong>产品名称说明：</strong>DAYU600 在 OH 6.1 源码中对应的产品名称为 <code>dayu210</code>（位于 <code>vendor/hihope/dayu210/</code>），使用错误产品名会报 <code>"product rk3588@None not found"</code>。
+</div>
+
+<div class="note">
+<strong>SDK 组件预编译：</strong>OH 6.1 全量编译前需先构建 SDK 组件，否则 GN 阶段报错。
+</div>
+
+<pre>
+<code>cd ~/openharmony
+
+# 第一步：构建 SDK 组件（首次编译必须）
+./build.sh --product-name dayu210 --ccache --build-target ohos_sdk 2&gt;&amp;1 | tee build_sdk.log
+
+# 第二步：全量编译
+./build.sh --product-name dayu210 --ccache 2&gt;&amp;1 | tee build_full.log
+
+# 查看编译产物
+ls -lh out/rk3588/packages/phone/images/</code>
+</pre>
+
+<p>编译成功后 <code>out/rk3588/packages/phone/images/</code> 目录下应有：</p>
+<table>
+  <tr><th>文件名</th><th>说明</th></tr>
+  <tr><td>boot.img</td><td>内核镜像</td></tr>
+  <tr><td>system.img</td><td>系统分区（包含系统服务 .so）</td></tr>
+  <tr><td>vendor.img</td><td>厂商分区</td></tr>
+  <tr><td>userdata.img</td><td>用户数据分区</td></tr>
+  <tr><td>updater.img</td><td>升级分区</td></tr>
+</table>
+
+<h3>A.3.5 核心系统服务源码位置</h3>
+
+<table>
+  <tr><th>系统服务</th><th>源码路径（相对于 ~/openharmony/）</th><th>编译产物</th></tr>
+  <tr><td><strong>AMS</strong></td><td><code>foundation/ability/ability_runtime/services/abilitymgr/</code></td><td>libabilityms.z.so</td></tr>
+  <tr><td><strong>AppMgr</strong></td><td><code>foundation/ability/ability_runtime/services/appmgr/</code></td><td>libappms.z.so</td></tr>
+  <tr><td><strong>WMS</strong></td><td><code>foundation/window/window_manager/wmserver/</code></td><td>libwms.z.so</td></tr>
+  <tr><td><strong>SceneSession</strong></td><td><code>foundation/window/window_manager/window_scene/session_manager/</code></td><td>libscene_session_manager.z.so</td></tr>
+  <tr><td><strong>RenderService</strong></td><td><code>foundation/graphic/graphic_2d/rosen/modules/render_service/</code></td><td>librender_service.z.so</td></tr>
+  <tr><td><strong>CommonEvent</strong></td><td><code>base/notification/common_event_service/</code></td><td>libcesfwk_services.z.so</td></tr>
+</table>
+
+<!-- A.4 本地 PC hdc 调试环境 -->
+<h2 id="appA-4">A.4 本地 PC hdc 调试环境</h2>
+
+<div class="info">
+<strong>以下操作在本地 Windows PC 上执行。</strong>OpenHarmony 使用 <strong>hdc</strong>（HarmonyOS Device Connector）而非 Android 的 adb 进行设备调试。
+</div>
+
+<h3>A.4.1 安装 hdc 工具</h3>
+
+<p><strong>方式 A：从 DevEco Studio 获取（推荐）</strong></p>
+<ol>
+  <li>下载安装 DevEco Studio：<code>https://developer.huawei.com/consumer/cn/deveco-studio/</code></li>
+  <li>hdc 位于：<code>{DevEco安装目录}\sdk\{版本}\openharmony\toolchains\hdc.exe</code></li>
+  <li>将该目录添加到系统环境变量 PATH</li>
+</ol>
+
+<p><strong>方式 B：从 OpenHarmony SDK 单独获取</strong></p>
+<ol>
+  <li>从 OpenHarmony 版本发布页面下载 SDK</li>
+  <li>解压后在 <code>toolchains/</code> 目录下找到 <code>hdc.exe</code></li>
+  <li>将该目录添加到系统环境变量 PATH</li>
+</ol>
+
+<pre>
+<code># 验证 hdc 安装
+hdc version
+# 应输出版本号，如：Ver: 2.0.0a</code>
+</pre>
+
+<h3>A.4.2 USB 连接开发板</h3>
+
+<ol>
+  <li>用 USB 数据线连接 PC 和 DAYU600 的 Type-C 接口</li>
+  <li>开发板上电启动</li>
+  <li>Windows 应自动识别 USB 设备（可能需安装驱动）</li>
+  <li>若 Windows 未自动安装驱动，安装 <code>doc/env_setup/Rockchip_DriverAssitant_v5.1.1.zip</code> 中的 USB 驱动</li>
+</ol>
+
+<div class="warn">
+<strong>注意：DAYU600 出厂预装 Android 系统，此时无法使用 hdc。</strong>必须先刷写为 OpenHarmony 系统（参见 A.5 节），才能使用 hdc 调试。设备管理器中显示 "ADB Interface" 说明仍为 Android 系统，刷 OH 后会切换为 "HDC Interface"。
+</div>
+
+<pre>
+<code># 查看已连接设备（仅 OH 系统可用）
+hdc list targets
+
+# 如果输出 "[Empty]"，排查顺序：
+# 1. 确认开发板运行 OH 系统（非 Android）
+# 2. 设备管理器应显示 "HDC Interface"
+# 3. USB 线是否为数据线（非纯充电线）
+# 4. 尝试重启 hdc 服务：hdc kill && hdc start</code>
+</pre>
+
+<h3>A.4.3 验证 root 权限</h3>
+
+<pre>
+<code>hdc shell
+
+# 检查当前用户
+id
+# 期望输出: uid=0(root) gid=0(root)
+
+# 查看系统版本
+param get const.ohos.fullname
+
+# 查看 foundation 进程
+ps -ef | grep foundation
+
+# 验证文件系统可写
+mount -o remount,rw /
+touch /system/test_write &amp;&amp; rm /system/test_write &amp;&amp; echo "OK"</code>
+</pre>
+
+<h3>A.4.4 hdc 常用命令速查</h3>
+
+<table>
+  <tr><th>功能</th><th>adb (Android)</th><th>hdc (OpenHarmony)</th></tr>
+  <tr><td>查看设备</td><td><code>adb devices</code></td><td><code>hdc list targets</code></td></tr>
+  <tr><td>进入 shell</td><td><code>adb shell</code></td><td><code>hdc shell</code></td></tr>
+  <tr><td>推送文件到设备</td><td><code>adb push local remote</code></td><td><code>hdc file send local remote</code></td></tr>
+  <tr><td>从设备拉取文件</td><td><code>adb pull remote local</code></td><td><code>hdc file recv remote local</code></td></tr>
+  <tr><td>安装应用</td><td><code>adb install xxx.apk</code></td><td><code>hdc install xxx.hap</code></td></tr>
+  <tr><td>实时日志</td><td><code>adb logcat</code></td><td><code>hdc hilog</code></td></tr>
+  <tr><td>重启设备</td><td><code>adb reboot</code></td><td><code>hdc shell reboot</code></td></tr>
+  <tr><td>端口转发</td><td><code>adb forward</code></td><td><code>hdc fport</code></td></tr>
+</table>
+
+<!-- A.5 OH 系统镜像烧录 -->
+<h2 id="appA-5">A.5 OH 系统镜像烧录</h2>
+
+<div class="info">
+<strong>两种镜像来源：</strong>
+<ul>
+  <li><strong>预编译镜像</strong> — 从 OpenHarmony 版本发布页下载，用于快速验证（不含你的修改）</li>
+  <li><strong>自编译镜像</strong> — 从华为云服务器编译产出（A.3 节），包含你的源码修改</li>
+</ul>
+首次建议先用预编译镜像烧录，确认设备正常后再切换到自编译镜像。
+</div>
+
+<h3>A.5.1 烧录工具安装</h3>
+
+<p>DAYU600 使用 Rockchip 烧录工具：</p>
+
+<table>
+  <tr><th>平台</th><th>工具</th><th>说明</th></tr>
+  <tr><td><strong>Windows</strong></td><td>RKDevTool</td><td>图形界面，操作简单，推荐</td></tr>
+  <tr><td>Linux</td><td>upgrade_tool</td><td>命令行工具</td></tr>
+</table>
+
+<p>工具和驱动已存放在 <code>doc/env_setup/</code> 目录下：</p>
+<table>
+  <tr><th>文件</th><th>用途</th></tr>
+  <tr><td><code>Rockchip_DriverAssitant_v5.1.1.zip</code></td><td>Rockchip USB 驱动安装工具</td></tr>
+  <tr><td><code>RKDevTool_Release_v2.96_zh.zip</code></td><td>瑞芯微烧录工具（中文版）</td></tr>
+</table>
+
+<ol>
+  <li><strong>安装 USB 驱动：</strong>解压驱动包，运行 <code>DriverInstall.exe</code> &rarr; 点击"驱动安装"</li>
+  <li><strong>解压烧录工具：</strong>解压 RKDevTool 到本地目录（无需安装），运行 <code>RKDevTool.exe</code></li>
+</ol>
+
+<h3>A.5.2 进入烧录模式</h3>
+
+<table>
+  <tr><th>模式</th><th>适用场景</th><th>RKDevTool 显示</th></tr>
+  <tr><td><strong>Loader 模式</strong></td><td>系统可正常启动，增量更新分区</td><td>"发现一个 LOADER 设备"</td></tr>
+  <tr><td><strong>MaskROM 模式</strong></td><td>首次烧录 / 系统损坏 / 跨系统切换（推荐）</td><td>"发现一个 MASKROM 设备"</td></tr>
+</table>
+
+<p><strong>进入 Loader 模式（系统可正常运行时）：</strong></p>
+<ol>
+  <li>断开电源</li>
+  <li>用 Type-C 数据线连接开发板 <strong>OTG 口</strong>到 PC</li>
+  <li><strong>按住 Recovery 按键</strong>，接通电源</li>
+  <li>RKDevTool 显示 "发现一个 LOADER 设备" 后，松开按键</li>
+</ol>
+
+<p><strong>进入 MaskROM 模式（首次刷 OH，推荐）：</strong></p>
+<ol>
+  <li>断开电源</li>
+  <li>用 Type-C 数据线连接开发板 <strong>OTG 口</strong>到 PC</li>
+  <li><strong>按住 MaskROM 按键</strong>，接通电源</li>
+  <li>RKDevTool 显示 "发现一个 MASKROM 设备" 后，松开按键</li>
+</ol>
+
+<h3>A.5.3 方式 A：整包烧录（推荐，首次刷机必选）</h3>
+
+<ol>
+  <li>打开 RKDevTool &rarr; 切换到 <strong>"升级固件"</strong> 页签</li>
+  <li>点击 <strong>"固件"</strong> &rarr; 选择 <code>update.img</code> 文件</li>
+  <li>等待固件加载完成</li>
+  <li>点击 <strong>"升级"</strong> &rarr; 等待进度条完成</li>
+  <li>烧录完成后设备自动重启</li>
+</ol>
+
+<div class="ok">
+<strong>整包烧录优势：</strong>自动处理分区表和全部镜像，无需逐个配置分区，适合首次刷机或跨系统切换（Android &rarr; OpenHarmony）。
+</div>
+
+<h3>A.5.4 方式 B：分区烧录（增量更新特定分区）</h3>
+
+<p>切换到 <strong>"下载镜像"</strong> 页签，配置分区与镜像文件的对应关系：</p>
+
+<table>
+  <tr><th>分区名</th><th>镜像文件</th><th>说明</th></tr>
+  <tr><td>MiniLoaderAll</td><td>MiniLoaderAll.bin</td><td>引导加载程序（MaskROM 模式必须）</td></tr>
+  <tr><td>parameter</td><td>parameter.txt</td><td>分区表定义</td></tr>
+  <tr><td>uboot</td><td>uboot.img</td><td>U-Boot 引导</td></tr>
+  <tr><td>boot</td><td>boot.img</td><td>内核</td></tr>
+  <tr><td>system</td><td>system.img</td><td>系统分区</td></tr>
+  <tr><td>vendor</td><td>vendor.img</td><td>外设驱动</td></tr>
+  <tr><td>userdata</td><td>userdata.img</td><td>用户数据</td></tr>
+  <tr><td>updater</td><td>updater.img</td><td>升级镜像</td></tr>
+</table>
+
+<p>勾选需要烧录的分区 &rarr; 点击 <strong>"执行"</strong>，等待进度条完成。</p>
+
+<h3>A.5.5 首次启动验证</h3>
+
+<pre>
+<code># 设备重启后等待 OH 系统启动完成（约 1-2 分钟）
+
+# 验证设备连接
+hdc list targets
+
+# 进入 shell 验证系统
+hdc shell
+
+# 查看 OH 版本
+param get const.ohos.fullname
+
+# 查看核心系统服务进程
+ps -ef | grep foundation
+
+# 查看已注册的系统服务
+hidumper -ls</code>
+</pre>
+
+<!-- ==================== 附录 B ==================== -->
+<h1 id="appB">附录 B. 日常开发与调试</h1>
+
+<!-- B.1 PC ↔ 华为云文件同步 -->
+<h2 id="appB-1">B.1 PC &harr; 华为云文件同步</h2>
+
+<p>本项目需要在 PC 和华为云之间频繁同步两类文件：</p>
+<table>
+  <tr><th>方向</th><th>内容</th><th>大小</th><th>频率</th></tr>
+  <tr><td><strong>上传</strong> (PC &rarr; 云)</td><td>ohos_patches/ 目录下的 patch 和源文件</td><td>几十 KB ~ 几 MB</td><td>每次修改后</td></tr>
+  <tr><td><strong>下载</strong> (云 &rarr; PC)</td><td>编译产物（.so 文件）</td><td>几 MB ~ 几十 MB</td><td>每次编译后</td></tr>
+</table>
+
+<p><strong>推荐工具：rsync over SSH</strong> — 只传输变化部分，速度最快。</p>
+
+<h3>B.1.1 WSL2 rsync 环境准备</h3>
+
+<p>由于 Windows Git Bash 默认不带 rsync，使用 WSL2 Ubuntu 执行同步脚本：</p>
+
+<pre>
+<code># 启动 WSL2 Ubuntu
+wsl
+
+# 安装 rsync
+sudo apt-get update &amp;&amp; sudo apt-get install -y rsync
+
+# WSL2 中可直接访问 Windows 文件系统：
+# D:\code\adapter  →  /mnt/d/code/adapter
+
+# 确保 SSH 密钥可用
+cp /mnt/c/Users/iceberg/.ssh/oh-dev-key.pem ~/.ssh/
+chmod 600 ~/.ssh/oh-dev-key.pem
+
+# 测试 SSH 连接
+ssh -i ~/.ssh/oh-dev-key.pem root@&lt;ECS公网IP&gt; "echo OK"</code>
+</pre>
+
+<h3>B.1.2 自动化脚本</h3>
+
+<p>在 <code>D:\code\adapter\scripts\</code> 目录下有以下脚本：</p>
+
+<table>
+  <tr><th>脚本</th><th>功能</th></tr>
+  <tr><td><code>remote_config.sh</code></td><td>配置文件：远程服务器 IP、SSH 密钥路径、本地/远程路径</td></tr>
+  <tr><td><code>sync_upload.sh</code></td><td>上传 ohos_patches 到远程服务器并自动 apply</td></tr>
+  <tr><td><code>remote_build.sh</code></td><td>远程增量编译指定模块</td></tr>
+  <tr><td><code>sync_download.sh</code></td><td>下载编译产物（.so 文件）到本地</td></tr>
+  <tr><td><code>deploy_device.sh</code></td><td>通过 hdc 推送产物到开发板并重启 foundation</td></tr>
+  <tr><td><code>full_cycle.sh</code></td><td>一键全流程：上传 &rarr; 编译 &rarr; 下载 &rarr; 部署</td></tr>
+</table>
+
+<p><strong>配置示例 (<code>remote_config.sh</code>)：</strong></p>
+<pre>
+<code>REMOTE_HOST="xxx.xxx.xxx.xxx"      # 华为云 ECS 公网 IP
+REMOTE_USER="root"
+SSH_KEY="~/.ssh/oh-dev-key.pem"
+REMOTE_OH_ROOT="~/openharmony"
+LOCAL_ADAPTER_DIR="/mnt/d/code/adapter"
+LOCAL_BUILD_CACHE="/mnt/d/code/adapter/build/remote_artifacts"
+BUILD_PRODUCT="rk3588"</code>
+</pre>
+
+<!-- B.2 增量编译与部署流程 -->
+<h2 id="appB-2">B.2 增量编译与部署流程</h2>
+
+<p>修改源码后，只需编译受影响的模块（几分钟），无需全量编译：</p>
+
+<table>
+  <tr><th>修改内容</th><th>编译命令 / 脚本参数</th><th>预计耗时</th></tr>
+  <tr><td>AMS</td><td><code>bash scripts/remote_build.sh ability_manager_service</code></td><td>3-5 分钟</td></tr>
+  <tr><td>WMS</td><td><code>bash scripts/remote_build.sh window_manager_service</code></td><td>3-5 分钟</td></tr>
+  <tr><td>SceneSession</td><td><code>bash scripts/remote_build.sh scene_session_manager</code></td><td>2-4 分钟</td></tr>
+  <tr><td>全量系统镜像</td><td><code>ssh oh-build "cd ~/openharmony &amp;&amp; ./build.sh --product-name dayu210 --ccache"</code></td><td>1.5-3 小时</td></tr>
+</table>
+
+<p><strong>推送与重启：</strong>OH 的 <code>foundation</code> 进程类似 Android 的 <code>system_server</code>，承载了 AMS、WMS 等所有核心系统服务。修改系统服务 .so 后，只需重启 foundation 进程（无需完全重启设备）：</p>
+
+<pre>
+<code># 手动推送单个文件
+hdc file send libabilityms.z.so /system/lib64/libabilityms.z.so
+
+# 重启 foundation（init 会自动拉起）
+hdc shell kill -9 $(hdc shell pidof foundation)
+
+# 如果 foundation 未自动拉起，完全重启
+hdc shell reboot</code>
+</pre>
+
+<p><strong>一键全流程：</strong></p>
+
+<div class="diagram">日常开发循环（在 WSL2 终端中执行）
+
+  ┌─────────────────────────────────────────────┐
+  │ 1. 在 PC 上编辑源码 (VS Code / IDE)          │
+  │    D:\code\adapter\ohos_patches\...          │
+  │                  ▼                           │
+  │ 2. 一键执行全流程                              │
+  │    bash /mnt/d/code/adapter/scripts/         │
+  │         full_cycle.sh ability_manager_service │
+  │                  │                           │
+  │    ┌─────────────┼─────────────┐             │
+  │    │  ① 上传 patch (rsync)     │  ~10秒      │
+  │    │  ② 远程编译 (SSH)          │  ~3-5分钟   │
+  │    │  ③ 下载 .so (rsync)       │  ~10秒      │
+  │    │  ④ 推送到设备 (hdc)        │  ~10秒      │
+  │    └─────────────┼─────────────┘             │
+  │                  ▼                           │
+  │ 3. 查看日志验证                                │
+  │    hdc hilog | grep AbilityManager           │
+  │                  ▼                           │
+  │ 4. 回到步骤 1                                 │
+  └─────────────────────────────────────────────┘</div>
+
+<!-- B.3 高级调试技巧 -->
+<h2 id="appB-3">B.3 高级调试技巧（GDB 远程调试、系统服务 dump、性能 trace）</h2>
+
+<h3>B.3.1 HiLog 日志</h3>
+
+<p>OH 使用 HiLog（类似 Android Logcat）输出系统日志：</p>
+
+<pre>
+<code># 实时查看全部日志
+hdc hilog
+
+# 过滤 AMS 相关日志
+hdc hilog | grep -iE "AbilityManager|AbilityMs|ABILITY"
+
+# 过滤 WMS 相关日志
+hdc hilog | grep -iE "WindowManager|WMS|SceneSession"
+
+# 按日志级别过滤（E=Error, W=Warn, I=Info, D=Debug）
+hdc hilog | grep " E "
+
+# 保存日志到文件
+hdc hilog &gt; oh_debug_$(date +%Y%m%d_%H%M%S).log
+
+# 清空日志缓冲区
+hdc shell hilog -r</code>
+</pre>
+
+<p><strong>在修改的 C++ 代码中添加日志：</strong></p>
+<pre>
+<code>// 引入 HiLog 头文件
+#include "hilog/log.h"
+
+// 定义模块标识
+#undef LOG_TAG
+#define LOG_TAG "AdapterAMS"
+#undef LOG_DOMAIN
+#define LOG_DOMAIN 0xD001300
+
+// 使用示例
+HILOG_INFO(LOG_CORE, "StartAbility called, bundleName=%{public}s, abilityName=%{public}s",
+    want.GetElement().GetBundleName().c_str(),
+    want.GetElement().GetAbilityName().c_str());
+
+HILOG_ERROR(LOG_CORE, "StartAbility failed, errCode=%{public}d", errCode);</code>
+</pre>
+
+<h3>B.3.2 GDB 远程调试</h3>
+
+<pre>
+<code># === 设备端 ===
+# 启动 gdbserver 并 attach 到 foundation 进程
+hdc shell gdbserver :5555 --attach $(hdc shell pidof foundation)
+
+# === PC 端 ===
+# 转发调试端口
+hdc fport tcp:5555 tcp:5555
+
+# 启动 LLDB（使用 OH SDK 中的调试器）
+lldb
+(lldb) process connect connect://localhost:5555
+(lldb) bt                  # 查看调用栈
+(lldb) breakpoint set -n AbilityManagerService::StartAbility
+(lldb) continue</code>
+</pre>
+
+<h3>B.3.3 系统服务 dump</h3>
+
+<pre>
+<code># 查看所有已注册的系统 Ability (SA)
+hdc shell hidumper -ls
+
+# dump AMS 状态（Ability 列表、Mission 列表等）
+hdc shell dumpsys ability
+
+# dump WMS 状态（窗口列表、层级等）
+hdc shell dumpsys window
+
+# dump 指定 SA ID 的详细信息
+hdc shell hidumper -s &lt;SA_ID&gt;
+
+# 查看内存使用
+hdc shell hidumper --mem $(hdc shell pidof foundation)
+
+# 查看 CPU 使用
+hdc shell hidumper --cpuusage</code>
+</pre>
+
+<h3>B.3.4 性能 trace 抓取</h3>
+
+<pre>
+<code># 开始抓取 trace
+hdc shell hitrace --trace_begin app ability window
+
+# ... 在设备上执行操作 ...
+
+# 停止并导出 trace
+hdc shell hitrace --trace_dump &gt; trace.ftrace
+
+# 可使用 Perfetto UI 或 Chrome tracing 查看：
+# 打开 chrome://tracing 加载 trace.ftrace</code>
+</pre>
+
+<!-- B.4 常见问题与解决方案 -->
+<h2 id="appB-4">B.4 常见问题与解决方案</h2>
+
+<h3>B.4.1 版本一致性</h3>
+
+<div class="warn">
+<strong>最关键的一点：</strong>设备镜像版本、OH 源码版本、SDK 版本三者必须严格匹配。版本不一致会导致 .so 文件因 ABI 不兼容而 crash。
+</div>
+
+<table>
+  <tr><th>组件</th><th>版本要求</th><th>如何确认</th></tr>
+  <tr><td>设备烧录镜像</td><td rowspan="3">必须完全相同<br>如 OpenHarmony-6.1-Release</td><td><code>hdc shell param get const.ohos.fullname</code></td></tr>
+  <tr><td>源码分支</td><td><code>cd ~/openharmony &amp;&amp; repo info</code></td></tr>
+  <tr><td>SDK 版本</td><td>DevEco Studio 中查看</td></tr>
+</table>
+
+<h3>B.4.2 SELinux / 访问控制</h3>
+
+<pre>
+<code># 查看 SELinux 状态
+hdc shell getenforce
+
+# 临时关闭 SELinux（调试用，重启后恢复）
+hdc shell setenforce 0
+
+# 如果推送的 .so 无法加载，检查文件权限
+hdc shell ls -lZ /system/lib64/libabilityms.z.so
+hdc shell chmod 644 /system/lib64/libabilityms.z.so</code>
+</pre>
+
+<h3>B.4.3 常见问题排查表</h3>
+
+<table>
+  <tr><th>问题</th><th>可能原因</th><th>解决方案</th></tr>
+  <tr>
+    <td>hdc list targets 显示 [Empty]</td>
+    <td>开发板仍运行 Android 系统</td>
+    <td>设备管理器显示 "ADB Interface" 则仍为 Android，需先刷 OH 固件（A.5 节）</td>
+  </tr>
+  <tr>
+    <td>hdc list targets 显示 [Empty]</td>
+    <td>USB 驱动不正确</td>
+    <td>安装 <code>doc/env_setup/Rockchip_DriverAssitant_v5.1.1.zip</code></td>
+  </tr>
+  <tr>
+    <td>hdc list targets 显示 [Empty]</td>
+    <td>hdc 服务异常 / 数据线问题</td>
+    <td><code>hdc kill &amp;&amp; hdc start</code> 重启服务；更换数据线</td>
+  </tr>
+  <tr>
+    <td>推送 .so 后 foundation crash</td>
+    <td>版本不匹配 / ABI 不兼容</td>
+    <td>确认源码版本与设备镜像版本一致</td>
+  </tr>
+  <tr>
+    <td>mount: remount failed</td>
+    <td>非 root 或 AVB 验证</td>
+    <td>DAYU600 eng 版本应默认可 remount；检查 <code>id</code></td>
+  </tr>
+  <tr>
+    <td>编译报错 missing dependency</td>
+    <td>依赖包未安装</td>
+    <td>确认 A.3.1 节全部执行</td>
+  </tr>
+  <tr>
+    <td>repo sync 失败</td>
+    <td>网络中断 / gitee 限流</td>
+    <td>重新执行 <code>repo sync -c -j4 --force-sync</code>（降低并发）</td>
+  </tr>
+  <tr>
+    <td>rsync 连接超时</td>
+    <td>安全组未放通 / IP 变化</td>
+    <td>检查安全组 22 端口规则；确认 ECS 公网 IP</td>
+  </tr>
+  <tr>
+    <td>SSH 密钥被拒绝</td>
+    <td>权限过宽</td>
+    <td><code>chmod 600 ~/.ssh/oh-dev-key.pem</code></td>
+  </tr>
+  <tr>
+    <td>SSH 连接频繁断开</td>
+    <td>空闲连接被安全组关闭</td>
+    <td>配置 <code>ServerAliveInterval 30</code> 和 <code>ServerAliveCountMax 10</code></td>
+  </tr>
+  <tr>
+    <td>lib32ncurses5-dev 找不到</td>
+    <td>Ubuntu 24.04 包名变更</td>
+    <td>改用 <code>lib32ncurses-dev</code>（去掉版本号 5）</td>
+  </tr>
+  <tr>
+    <td>pip install 报 externally-managed-environment</td>
+    <td>Ubuntu 24.04 的 PEP 668 限制</td>
+    <td><code>rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED</code></td>
+  </tr>
+  <tr>
+    <td>product rk3588@None not found</td>
+    <td>OH 6.1 中产品名称不是 rk3588</td>
+    <td>使用 <code>--product-name dayu210</code></td>
+  </tr>
+  <tr>
+    <td>OS version 24.04 is not supported</td>
+    <td>OH 6.1 编译系统仅支持 18.04/20.04/22.04</td>
+    <td>修改 <code>build/scripts/tools_checker.py</code> 添加 <code>'24.04'</code></td>
+  </tr>
+  <tr>
+    <td>OHOS component : (sdk) not found</td>
+    <td>SDK 组件未预编译</td>
+    <td>先执行 <code>./build.sh --product-name dayu210 --ccache --build-target ohos_sdk</code></td>
+  </tr>
+  <tr>
+    <td>repo sync 后源码散落在 /root/ 下</td>
+    <td>在 /root/ 下执行了 repo init</td>
+    <td>将 <code>.repo/</code> 和源码目录移到 <code>/root/openharmony/</code></td>
+  </tr>
+</table>
+
+<h3>B.4.4 华为云服务器省钱技巧</h3>
+
+<ul>
+  <li><strong>不用时关机：</strong>按量付费关机后 CPU/内存不计费，仅磁盘计费</li>
+  <li><strong>不要释放实例：</strong>关机 &ne; 释放。释放会删除所有数据</li>
+  <li><strong>编译完立即关机：</strong>增量编译通常 5-10 分钟完成</li>
+  <li><strong>善用 ccache：</strong>首次全量编译后，后续增量编译时间大幅缩短</li>
+  <li><strong>按需升降配：</strong>日常可用 8核16G，全量编译时临时升级到 16核32G</li>
+</ul>
+
+<!-- B.5 操作检查清单 -->
+<h2 id="appB-5">B.5 操作检查清单</h2>
+
+<p>按顺序完成以下检查项，确认环境搭建完毕：</p>
+
+<h3>阶段一：硬件准备</h3>
+<div class="card">
+<ul>
+  <li>&#9744; 购买 DAYU600 开发板（HH-SCDAYU600）</li>
+  <li>&#9744; 准备 USB Type-A to Type-C 数据线（数据线，非纯充电线）</li>
+</ul>
+</div>
+
+<h3>阶段二：华为云服务器</h3>
+<div class="card">
+<ul>
+  <li>&#9744; 注册华为云账号并完成实名认证</li>
+  <li>&#9744; 创建 ECS 实例（16核32G + 500G SSD，按量付费）</li>
+  <li>&#9744; 配置安全组（放通 22 端口）</li>
+  <li>&#9744; 创建 SSH 密钥对并下载私钥</li>
+  <li>&#9744; 从 PC 通过 SSH 成功登录服务器</li>
+  <li>&#9744; 配置 <code>~/.ssh/config</code> 简化登录</li>
+</ul>
+</div>
+
+<h3>阶段三：远程编译环境</h3>
+<div class="card">
+<ul>
+  <li>&#9744; 安装全部编译依赖（A.3.1 节）</li>
+  <li>&#9744; 安装 repo 工具（A.3.2 节）</li>
+  <li>&#9744; 下载 OH 源码（repo sync 完成）</li>
+  <li>&#9744; 下载预编译工具链（prebuilts_download.sh）</li>
+  <li>&#9744; 首次全量编译成功</li>
+  <li>&#9744; 确认编译产物存在（out/rk3588/packages/phone/images/）</li>
+</ul>
+</div>
+
+<h3>阶段四：本地调试环境</h3>
+<div class="card">
+<ul>
+  <li>&#9744; 安装 hdc 工具并添加到 PATH</li>
+  <li>&#9744; USB 连接开发板</li>
+  <li>&#9744; <code>hdc list targets</code> 显示设备</li>
+  <li>&#9744; <code>hdc shell id</code> 确认 root 权限</li>
+</ul>
+</div>
+
+<h3>阶段五：镜像烧录</h3>
+<div class="card">
+<ul>
+  <li>&#9744; 安装 Rockchip USB 驱动</li>
+  <li>&#9744; 安装 RKDevTool 烧录工具</li>
+  <li>&#9744; 设备进入 Loader 或 MaskROM 模式</li>
+  <li>&#9744; 烧录 OH 镜像完成</li>
+  <li>&#9744; 设备管理器显示 "HDC Interface"</li>
+  <li>&#9744; 设备正常启动，hdc 可访问</li>
+  <li>&#9744; OH 版本与源码版本一致</li>
+</ul>
+</div>
+
+<h3>阶段六：文件同步与自动化</h3>
+<div class="card">
+<ul>
+  <li>&#9744; WSL2 Ubuntu 中安装 rsync</li>
+  <li>&#9744; 配置 <code>scripts/remote_config.sh</code></li>
+  <li>&#9744; <code>sync_upload.sh</code> 上传成功</li>
+  <li>&#9744; <code>remote_build.sh</code> 增量编译成功</li>
+  <li>&#9744; <code>sync_download.sh</code> 下载产物成功</li>
+  <li>&#9744; <code>deploy_device.sh</code> 部署成功</li>
+  <li>&#9744; <code>full_cycle.sh</code> 全流程一键执行成功</li>
+</ul>
+</div>
+
+<h3>阶段七：端到端验证</h3>
+<div class="card">
+<ul>
+  <li>&#9744; 修改 OH AMS 源码（添加一行日志）</li>
+  <li>&#9744; 执行 full_cycle.sh 全流程</li>
+  <li>&#9744; <code>hdc hilog</code> 中看到新增的日志输出</li>
+  <li>&#9744; 确认端到端开发流程通畅</li>
+</ul>
+</div>
+
+<div class="ok" style="margin-top: 20px;">
+<strong>所有检查项完成后，OH 系统开发环境搭建完毕。</strong>可以开始对 AMS、WMS 等系统服务进行修改、编译、部署和调试。
+</div>
+
+<footer>
+  <p>Android-OH 适配层部署设计方案 v1.1 | 2026年3月20日</p>
+  <p>适用于 DAYU600 (Unisoc UMS9620) 开发板 | OpenHarmony 6.1.0.19</p>
+</footer>
+
+</div>
+</body>
+</html>
