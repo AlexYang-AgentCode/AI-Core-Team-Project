@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android (AOSP 16) 开发编译环境搭建操作指导书</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); padding: 14px 18px; border-radius: 6px 6px 0 0; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #e8eaf6, transparent); padding: 8px 12px; border-radius: 0 4px 4px 0; }
+  h3 { color: var(--text); font-size: 1.15em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #0d47a1, #1b5e20); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: #1e1e1e; color: #d4d4d4; border-radius: 6px; padding: 16px; overflow-x: auto; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.85em; line-height: 1.5; margin: 12px 0; }
+  pre .comment { color: #6a9955; }
+  pre .keyword { color: #569cd6; }
+  pre .string { color: #ce9178; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .toc .sub2 { padding-left: 48px; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--low); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .step-box { background: #e8eaf6; border-left: 5px solid #3f51b5; padding: 12px 18px; margin: 15px 0; border-radius: 0 5px 5px 0; }
+  .step-box h4 { color: #3f51b5; margin: 0 0 8px 0; }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li { padding: 5px 0; }
+  .checklist li::before { content: "\2610 "; font-size: 14pt; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Android (AOSP 16) 开发编译环境搭建操作指导书</h1>
+  <p>最小化构建策略 &mdash; 仅编译适配层所需的 AOSP 组件</p>
+  <p>版本 2.0 | 2026年3月18日 | Adapter Team</p>
+</div>
+
+<!-- ==================== 目录 ==================== -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 需求分析与组件规划</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 项目运行时全景图</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 需要从 AOSP 构建的四大组件</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 组件依赖关系</a></li>
+    <li class="sub"><a href="#ch1-4">1.4 与 OH 编译环境的关系</a></li>
+    <li><a href="#ch2">2. 服务器与编译依赖</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 服务器准备</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 编译依赖安装</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 repo 工具（Google 版）</a></li>
+    <li><a href="#ch3">3. AOSP 16 源码部分下载</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 部分同步策略</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 需要同步的 AOSP 项目清单</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 执行部分同步</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 磁盘占用估算</a></li>
+    <li><a href="#ch4">4. 组件 A：AIDL Stub 一次性生成</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 目标与原理</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 需要生成的 AIDL 接口清单</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 方法一：使用 AOSP 构建系统生成</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 方法二：独立运行 AIDL 编译器</a></li>
+    <li class="sub"><a href="#ch4-5">4.5 保存生成结果到适配层项目</a></li>
+    <li class="sub"><a href="#ch4-6">4.6 后续维护策略</a></li>
+    <li><a href="#ch5">5. 组件 B：ART 虚拟机编译</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 ART 在本项目中的角色</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 ART 构建目标与产物</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 编译 ART</a></li>
+    <li class="sub"><a href="#ch5-4">5.4 ART 运行时依赖链</a></li>
+    <li class="sub"><a href="#ch5-5">5.5 部署到设备</a></li>
+    <li><a href="#ch6">6. 组件 C：dex2oat 编译</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 dex2oat 在本项目中的角色</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 编译 dex2oat</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 部署到设备</a></li>
+    <li><a href="#ch7">7. 组件 D：Framework Boot Classpath</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 Boot Classpath 的作用</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 Boot Classpath JAR 清单</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 编译 framework.jar（含 AOSP patch）</a></li>
+    <li class="sub"><a href="#ch7-4">7.4 生成 Boot Image（boot.art + boot.oat）</a></li>
+    <li class="sub"><a href="#ch7-5">7.5 部署到设备</a></li>
+    <li><a href="#ch8">8. 适配层自身编译</a></li>
+    <li class="sub"><a href="#ch8-1">8.1 oh-adapter-framework.jar</a></li>
+    <li class="sub"><a href="#ch8-2">8.2 liboh_adapter_bridge.so</a></li>
+    <li class="sub"><a href="#ch8-3">8.3 OHAdapterHelloWorld.apk</a></li>
+    <li><a href="#ch9">9. appspawn-x 与 Zygote</a></li>
+    <li class="sub"><a href="#ch9-1">9.1 appspawn-x 替代 Zygote</a></li>
+    <li class="sub"><a href="#ch9-2">9.2 appspawn-x 对 ART 的依赖</a></li>
+    <li class="sub"><a href="#ch9-3">9.3 appspawn-x 编译（OH GN 构建系统）</a></li>
+    <li><a href="#ch10">10. 全量部署与验证</a></li>
+    <li class="sub"><a href="#ch10-1">10.1 DAYU600 上的完整文件布局</a></li>
+    <li class="sub"><a href="#ch10-2">10.2 一键部署脚本</a></li>
+    <li class="sub"><a href="#ch10-3">10.3 端到端验证</a></li>
+    <li><a href="#ch11">11. 日常开发流程</a></li>
+    <li><a href="#ch12">12. 注意事项与常见问题</a></li>
+    <li><a href="#ch13">13. 操作检查清单</a></li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch1">1. 需求分析与组件规划</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch1-1">1.1 项目运行时全景图</h2>
+
+<p>本项目的目标是在 OpenHarmony 系统上运行 Android App。运行时的完整栈如下：</p>
+
+<div class="diagram">┌─────────────────────────────────────────────────────────────────┐
+│                   DAYU600 开发板 (OpenHarmony 系统)               │
+│                                                                 │
+│  ┌─ Android App 层 ──────────────────────────────────────────┐  │
+│  │  HelloWorld.apk (DEX bytecode)                            │  │
+│  │  ↓ 调用 Android Framework API                             │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                          ↓                                      │
+│  ┌─ Android Framework 层 ────────────────────────────────────┐  │
+│  │  framework.jar (含 AOSP patch)    ← 需要编译 [组件D]       │  │
+│  │  oh-adapter-framework.jar         ← 适配层 Java 代码       │  │
+│  │  ↓ IActivityManager.Stub 等      ← AIDL 生成 [组件A]      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                          ↓                                      │
+│  ┌─ JNI 桥接层 ─────────────────────────────────────────────┐  │
+│  │  liboh_adapter_bridge.so          ← 适配层 JNI 代码       │  │
+│  │  ↓ OH IPC (ipc_core, samgr_proxy)                        │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                          ↓                                      │
+│  ┌─ OH 系统服务层 ──────────────────────────────────────────┐  │
+│  │  libabilityms.z.so  (含 patch)    ← OH 编译环境产物       │  │
+│  │  libwms.z.so        (含 patch)    ← OH 编译环境产物       │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─ 运行时基础设施 ─────────────────────────────────────────┐  │
+│  │  libart.so + libart-compiler.so   ← ART VM [组件B]        │  │
+│  │  dex2oat                          ← DEX→OAT [组件C]       │  │
+│  │  appspawn-x                       ← 进程孵化器 (OH GN)     │  │
+│  │  core-libart.jar + boot.art       ← Boot Classpath [组件D]│  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘</div>
+
+<h2 id="ch1-2">1.2 需要从 AOSP 构建的四大组件</h2>
+
+<div class="card">
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="number">A</div>
+    <div class="label"><strong>AIDL Stub 生成</strong><br>一次性，生成后手动维护</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">B</div>
+    <div class="label"><strong>ART 虚拟机</strong><br>libart.so + 依赖库</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">C</div>
+    <div class="label"><strong>dex2oat</strong><br>APK 安装时的 DEX 编译器</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">D</div>
+    <div class="label"><strong>Framework Boot Classpath</strong><br>framework.jar + boot image</div>
+  </div>
+</div>
+</div>
+
+<table>
+  <tr><th>组件</th><th>构建产物</th><th>用途</th><th>构建频率</th><th>预计耗时</th></tr>
+  <tr>
+    <td><strong>A. AIDL Stub</strong></td>
+    <td>IActivityManager.java<br>IWindowManager.java<br>等 30+ 个 Java 文件</td>
+    <td>适配层 Adapter 类继承 IXxx.Stub</td>
+    <td><strong>一次性</strong>，后续手动维护</td>
+    <td>~10 分钟</td>
+  </tr>
+  <tr>
+    <td><strong>B. ART VM</strong></td>
+    <td>libart.so<br>libart-compiler.so<br>libdexfile.so<br>+ 依赖库</td>
+    <td>执行 Android DEX 字节码</td>
+    <td>版本更新时重新编译</td>
+    <td>~30 分钟</td>
+  </tr>
+  <tr>
+    <td><strong>C. dex2oat</strong></td>
+    <td>dex2oat (二进制)</td>
+    <td>APK 安装时 AOT 编译 DEX→OAT</td>
+    <td>随 ART 一起编译</td>
+    <td>含在 ART 编译中</td>
+  </tr>
+  <tr>
+    <td><strong>D. Boot Classpath</strong></td>
+    <td>framework.jar<br>core-libart.jar<br>boot.art + boot.oat</td>
+    <td>Android App 运行时的类库 +<br>预编译 boot image</td>
+    <td>修改 AOSP patch 时</td>
+    <td>~20 分钟</td>
+  </tr>
+</table>
+
+<div class="ok">
+<strong>关键区别：不编译完整 AOSP 系统镜像。</strong>我们只构建上述四个组件，然后部署到运行 OH 的 DAYU600 开发板上。无需 system.img、无需完整 lunch target。
+</div>
+
+<h2 id="ch1-3">1.3 组件依赖关系</h2>
+
+<div class="diagram">组件构建顺序与依赖关系
+
+  ┌────────────────────────┐
+  │ A. AIDL Stub 生成       │ ← 独立，最先完成
+  │   (一次性)              │
+  └────────────────────────┘
+                              不依赖其他组件，可最先执行
+
+  ┌────────────────────────┐     ┌────────────────────────┐
+  │ B. ART VM              │ ──► │ C. dex2oat             │
+  │   libart.so            │     │   (ART 的一部分)        │
+  │   libart-compiler.so   │     └────────────────────────┘
+  │   libdexfile.so        │
+  └───────────┬────────────┘
+              │
+              ▼ ART 编译完成后
+  ┌────────────────────────┐
+  │ D. Framework Boot CP   │ ← 依赖 ART (需要 dex2oat 生成 boot image)
+  │   framework.jar        │
+  │   core-libart.jar      │
+  │   boot.art + boot.oat  │
+  └────────────────────────┘
+
+  ┌────────────────────────┐
+  │ appspawn-x             │ ← 依赖 ART 头文件和库 (OH GN 构建)
+  │   (OH 编译环境中构建)   │
+  └────────────────────────┘</div>
+
+<h2 id="ch1-4">1.4 与 OH 编译环境的关系</h2>
+
+<table>
+  <tr><th>编译环境</th><th>编译内容</th><th>构建系统</th><th>产物</th></tr>
+  <tr>
+    <td><strong>AOSP 编译环境</strong><br>（本文档）</td>
+    <td>ART VM + dex2oat<br>Framework Boot Classpath<br>适配层 Java/JNI<br>AIDL Stub（一次性）</td>
+    <td>Soong (Android.bp)<br>+ AIDL compiler</td>
+    <td>libart.so, dex2oat<br>framework.jar, boot.art<br>oh-adapter-framework.jar<br>liboh_adapter_bridge.so</td>
+  </tr>
+  <tr>
+    <td><strong>OH 编译环境</strong><br>（已搭建）</td>
+    <td>OH 系统服务 patch<br>appspawn-x<br>APK 安装器</td>
+    <td>GN + Ninja</td>
+    <td>libabilityms.z.so<br>libwms.z.so<br>appspawn-x, apk_installer</td>
+  </tr>
+</table>
+
+<div class="note">
+<strong>appspawn-x 的特殊性：</strong>appspawn-x 是 OH 侧构建（BUILD.gn），但它依赖 ART 的头文件和预编译库（<code>//third_party/android/art:libart</code>）。因此需要先在 AOSP 环境编译 ART，然后将产物复制到 OH 源码树的 <code>third_party/android/</code> 下作为预编译库。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch2">2. 服务器与编译依赖</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch2-1">2.1 服务器准备</h2>
+
+<div class="ok">
+<strong>推荐：复用已有 OH 编译服务器。</strong>部分 AOSP 构建比全量编译占用小得多（预计源码 ~30-50 GB + 编译产物 ~20-50 GB），无需另开服务器。
+</div>
+
+<table>
+  <tr><th>项目</th><th>全量 AOSP 编译</th><th>本项目最小化编译</th></tr>
+  <tr><td>源码大小</td><td>~100 GB</td><td><strong>~30-50 GB</strong>（部分同步）</td></tr>
+  <tr><td>编译产物</td><td>~200 GB</td><td><strong>~20-50 GB</strong>（仅目标组件）</td></tr>
+  <tr><td>总磁盘需求</td><td>~350 GB</td><td><strong>~80-100 GB</strong></td></tr>
+  <tr><td>内存需求</td><td>64 GB</td><td><strong>32 GB 足够</strong></td></tr>
+  <tr><td>编译耗时</td><td>3-5 小时</td><td><strong>~1 小时</strong>（首次）</td></tr>
+</table>
+
+<p>如果 OH 服务器磁盘已满（500 GB 原配），需扩容：</p>
+<pre>
+<span class="comment"># 华为云控制台扩容系统盘到 700 GB（+200 GB 足够）</span>
+<span class="comment"># 扩容后在服务器内执行：</span>
+growpart /dev/vda 1
+resize2fs /dev/vda1
+df -h /
+</pre>
+
+<h2 id="ch2-2">2.2 编译依赖安装</h2>
+
+<pre>
+<span class="comment"># 如果 OH 编译环境已配置，大部分依赖已安装，补充以下包：</span>
+apt-get update
+apt-get install -y \
+    fontconfig libfontconfig1-dev \
+    python-is-python3 \
+    openjdk-17-jdk
+
+<span class="comment"># 验证关键工具</span>
+java -version        <span class="comment"># OpenJDK 17+</span>
+python3 --version    <span class="comment"># Python 3.10+</span>
+ccache -s            <span class="comment"># ccache 已配置</span>
+</pre>
+
+<h2 id="ch2-3">2.3 repo 工具（Google 版）</h2>
+
+<pre>
+<span class="comment"># OH 使用 gitee 的 repo-py3，AOSP 需要 Google 官方 repo</span>
+<span class="comment"># 安装到不同路径避免冲突</span>
+curl -o /usr/local/bin/repo-google https://storage.googleapis.com/git-repo-downloads/repo
+chmod a+x /usr/local/bin/repo-google
+
+<span class="comment"># 验证</span>
+/usr/local/bin/repo-google version
+
+<span class="comment"># 两个 repo 共存：</span>
+<span class="comment">#   OH:   /usr/local/bin/repo         (gitee 版)</span>
+<span class="comment">#   AOSP: /usr/local/bin/repo-google  (Google 版)</span>
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch3">3. AOSP 16 源码部分下载</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch3-1">3.1 部分同步策略</h2>
+
+<p>AOSP 完整源码包含 600+ 个 Git 仓库，我们只需要其中约 30-40 个。策略：</p>
+<ol>
+  <li>使用 <code>repo init</code> 获取完整 manifest（仅 manifest，不下载代码）</li>
+  <li>使用 <code>repo sync</code> 指定项目名，只下载需要的仓库</li>
+  <li>对于缺少的依赖，按需追加同步</li>
+</ol>
+
+<h2 id="ch3-2">3.2 需要同步的 AOSP 项目清单</h2>
+
+<div class="card">
+<h3>第一层：构建系统（必须）</h3>
+<table>
+  <tr><th>AOSP 项目</th><th>用途</th></tr>
+  <tr><td><code>build/make</code></td><td>核心构建系统（Makefile）</td></tr>
+  <tr><td><code>build/soong</code></td><td>Soong 构建系统（解析 Android.bp）</td></tr>
+  <tr><td><code>build/blueprint</code></td><td>Blueprint 构建定义解析器</td></tr>
+  <tr><td><code>build/bazel</code></td><td>Bazel 构建集成（AOSP 16 可能需要）</td></tr>
+  <tr><td><code>prebuilts/build-tools</code></td><td>预编译构建工具（gn, ninja 等）</td></tr>
+  <tr><td><code>prebuilts/clang/host/linux-x86</code></td><td>Clang/LLVM 编译器</td></tr>
+  <tr><td><code>prebuilts/jdk/jdk17</code></td><td>JDK 17（AOSP 编译使用）</td></tr>
+  <tr><td><code>prebuilts/sdk</code></td><td>SDK 工具和平台定义</td></tr>
+  <tr><td><code>prebuilts/misc</code></td><td>杂项预编译工具</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>第二层：Framework + AIDL（组件 A + D）</h3>
+<table>
+  <tr><th>AOSP 项目</th><th>用途</th></tr>
+  <tr><td><code>frameworks/base</code></td><td><strong>核心</strong>：AIDL 文件 + Framework Java 源码 + AOSP patch 目标</td></tr>
+  <tr><td><code>frameworks/native</code></td><td>Native 框架（Surface、IGraphicBufferProducer 等 AIDL 依赖）</td></tr>
+  <tr><td><code>frameworks/proto_logging</code></td><td>Proto 日志定义（framework 编译依赖）</td></tr>
+  <tr><td><code>system/tools/aidl</code></td><td>AIDL 编译器源码</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>第三层：ART + dex2oat（组件 B + C）</h3>
+<table>
+  <tr><th>AOSP 项目</th><th>用途</th></tr>
+  <tr><td><code>art</code></td><td><strong>核心</strong>：ART 运行时 + dex2oat + 编译器</td></tr>
+  <tr><td><code>libcore</code></td><td>Java 核心库（java.lang, java.util 等）</td></tr>
+  <tr><td><code>libnativehelper</code></td><td>JNI 辅助库（JniInvocation, appspawn-x 依赖）</td></tr>
+  <tr><td><code>bionic</code></td><td>Android C 库（libc, libm, libdl）</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>第四层：ART/Framework 依赖库</h3>
+<table>
+  <tr><th>AOSP 项目</th><th>用途</th></tr>
+  <tr><td><code>system/core</code></td><td>libutils, libcutils, liblog（JNI 共享库依赖）</td></tr>
+  <tr><td><code>system/logging</code></td><td>liblog 实现</td></tr>
+  <tr><td><code>system/libbase</code></td><td>基础库（ART 依赖）</td></tr>
+  <tr><td><code>system/unwinding</code></td><td>libunwindstack（ART 崩溃栈回溯）</td></tr>
+  <tr><td><code>external/conscrypt</code></td><td>TLS/SSL 加密（Boot Classpath 组成）</td></tr>
+  <tr><td><code>external/boringssl</code></td><td>BoringSSL（conscrypt 依赖）</td></tr>
+  <tr><td><code>external/icu</code></td><td>ICU 国际化库（libcore 依赖）</td></tr>
+  <tr><td><code>external/zlib</code></td><td>压缩库（ART 依赖）</td></tr>
+  <tr><td><code>external/lz4</code></td><td>快速压缩（ART 依赖）</td></tr>
+  <tr><td><code>external/libcxx</code></td><td>C++ 标准库</td></tr>
+  <tr><td><code>external/libcxxabi</code></td><td>C++ ABI 支持</td></tr>
+  <tr><td><code>external/compiler-rt</code></td><td>编译器运行时支持</td></tr>
+  <tr><td><code>external/vixl</code></td><td>ARM 汇编器/反汇编器（ART JIT 依赖）</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>第五层：按需追加</h3>
+<p>以下项目可能在编译过程中被依赖，遇到缺失时追加同步：</p>
+<table>
+  <tr><th>AOSP 项目</th><th>可能的触发条件</th></tr>
+  <tr><td><code>tools/metalava</code></td><td>API 检查（可通过 SKIP_API_CHECK 跳过）</td></tr>
+  <tr><td><code>external/protobuf</code></td><td>Proto 文件编译</td></tr>
+  <tr><td><code>external/kotlinc</code></td><td>Kotlin 编译器（如果 framework 含 Kotlin 代码）</td></tr>
+  <tr><td><code>packages/modules/common</code></td><td>模块化相关定义</td></tr>
+  <tr><td><code>hardware/interfaces</code></td><td>HAL AIDL 接口（部分 framework AIDL 引用）</td></tr>
+</table>
+</div>
+
+<h2 id="ch3-3">3.3 执行部分同步</h2>
+
+<pre>
+<span class="comment"># 在 screen 中操作</span>
+screen -S aosp-build
+
+<span class="comment"># 创建 AOSP 目录</span>
+mkdir -p ~/aosp16 && cd ~/aosp16
+
+<span class="comment"># 配置 git</span>
+git config --global user.name "aosp-builder"
+git config --global user.email "builder@example.com"
+
+<span class="comment"># 步骤 1：初始化 repo（只获取 manifest，不下载代码）</span>
+/usr/local/bin/repo-google init \
+    -u https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/platform/manifest \
+    -b android-16.0.0_r1 \
+    --depth=1
+
+<span class="comment"># 步骤 2：部分同步 —— 只下载需要的项目</span>
+<span class="comment"># 构建系统</span>
+/usr/local/bin/repo-google sync -c --depth=1 -j8 \
+    build/make \
+    build/soong \
+    build/blueprint \
+    build/bazel \
+    prebuilts/build-tools \
+    prebuilts/clang/host/linux-x86 \
+    prebuilts/jdk/jdk17 \
+    prebuilts/sdk \
+    prebuilts/misc
+
+<span class="comment"># Framework + AIDL</span>
+/usr/local/bin/repo-google sync -c --depth=1 -j8 \
+    frameworks/base \
+    frameworks/native \
+    frameworks/proto_logging \
+    system/tools/aidl
+
+<span class="comment"># ART + 核心库</span>
+/usr/local/bin/repo-google sync -c --depth=1 -j8 \
+    art \
+    libcore \
+    libnativehelper \
+    bionic
+
+<span class="comment"># 系统库</span>
+/usr/local/bin/repo-google sync -c --depth=1 -j8 \
+    system/core \
+    system/logging \
+    system/libbase \
+    system/unwinding
+
+<span class="comment"># 外部依赖</span>
+/usr/local/bin/repo-google sync -c --depth=1 -j8 \
+    external/conscrypt \
+    external/boringssl \
+    external/icu \
+    external/zlib \
+    external/lz4 \
+    external/libcxx \
+    external/libcxxabi \
+    external/compiler-rt \
+    external/vixl
+
+<span class="comment"># 查看已同步的项目数和总大小</span>
+/usr/local/bin/repo-google list | wc -l
+du -sh ~/aosp16/
+</pre>
+
+<div class="note">
+<strong>按需追加同步：</strong>编译过程中如果报错缺少某个模块，使用以下命令追加：
+<pre style="background:#2d2d2d; color:#d4d4d4; margin:10px 0;">
+<span class="comment"># 例如缺少 external/protobuf：</span>
+cd ~/aosp16
+/usr/local/bin/repo-google sync -c --depth=1 external/protobuf
+</pre>
+</div>
+
+<h2 id="ch3-4">3.4 磁盘占用估算</h2>
+
+<table>
+  <tr><th>部分</th><th>预估大小</th><th>说明</th></tr>
+  <tr><td>.repo/ (manifest + 部分 Git 对象)</td><td>~5 GB</td><td>depth=1 浅克隆</td></tr>
+  <tr><td>frameworks/base/</td><td>~8 GB</td><td>最大的仓库</td></tr>
+  <tr><td>prebuilts/ (clang + jdk + tools)</td><td>~15 GB</td><td>预编译工具链</td></tr>
+  <tr><td>art/ + libcore/ + bionic/</td><td>~3 GB</td><td>运行时源码</td></tr>
+  <tr><td>其他仓库</td><td>~5 GB</td><td>system/, external/ 等</td></tr>
+  <tr><td><strong>源码总计</strong></td><td><strong>~36 GB</strong></td><td>vs 全量 ~100 GB</td></tr>
+  <tr><td>编译产物 (out/)</td><td>~20-50 GB</td><td>vs 全量 ~200 GB</td></tr>
+  <tr><td><strong>总计</strong></td><td><strong>~60-90 GB</strong></td><td>vs 全量 ~350 GB</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch4">4. 组件 A：AIDL Stub 一次性生成</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch4-1">4.1 目标与原理</h2>
+
+<p>适配层的核心模式是 <strong>class inheritance</strong>：每个 Adapter 类继承 AIDL 自动生成的 <code>IXxx.Stub</code> 类。例如：</p>
+
+<pre>
+<span class="comment">// ActivityManagerAdapter.java</span>
+<span class="keyword">public class</span> ActivityManagerAdapter <span class="keyword">extends</span> IActivityManager.Stub {
+    <span class="comment">// 必须覆写 IActivityManager.aidl 中定义的所有 249 个方法</span>
+    @Override
+    <span class="keyword">public int</span> startActivity(...) { ... }
+    ...
+}
+</pre>
+
+<p><code>IActivityManager.Stub</code> 是 AIDL 编译器从 <code>IActivityManager.aidl</code> 自动生成的抽象类。我们需要：</p>
+<ol>
+  <li>用 AOSP 16 的 AIDL 编译器处理所有 .aidl 文件</li>
+  <li>生成 Java 源文件（IActivityManager.java 等）</li>
+  <li>将生成结果保存到适配层项目中</li>
+  <li><strong>后续手动维护</strong>，不再依赖 AIDL 编译器自动生成</li>
+</ol>
+
+<h2 id="ch4-2">4.2 需要生成的 AIDL 接口清单</h2>
+
+<h3>主要接口（适配层直接继承）</h3>
+<table>
+  <tr><th>AIDL 文件</th><th>AOSP 路径</th><th>适配层用法</th></tr>
+  <tr><td>IActivityManager.aidl</td><td>core/java/android/app/</td><td>ActivityManagerAdapter extends Stub</td></tr>
+  <tr><td>IActivityTaskManager.aidl</td><td>core/java/android/app/</td><td>ActivityTaskManagerAdapter extends Stub</td></tr>
+  <tr><td>IWindowManager.aidl</td><td>core/java/android/view/</td><td>WindowManagerAdapter extends Stub</td></tr>
+  <tr><td>IWindowSession.aidl</td><td>core/java/android/view/</td><td>WindowSessionAdapter extends Stub</td></tr>
+  <tr><td>IPackageManager.aidl</td><td>core/java/android/content/pm/</td><td>PackageManagerAdapter extends Stub</td></tr>
+</table>
+
+<h3>依赖接口（被主接口引用，需同时生成）</h3>
+<table>
+  <tr><th>类别</th><th>接口</th></tr>
+  <tr><td>回调接口</td><td>IApplicationThread, IServiceConnection, IIntentReceiver,<br>IWindow, IProcessObserver, ITaskStackListener, IUidObserver 等</td></tr>
+  <tr><td>数据类型</td><td>WaitResult, ProfilerInfo, ContentProviderHolder,<br>ClientTransaction, ApplicationExitInfo 等</td></tr>
+  <tr><td>Window 相关</td><td>InsetsState, InsetsSourceControl, ClientWindowFrames,<br>TaskSnapshot, MagnificationSpec 等</td></tr>
+</table>
+
+<div class="info">
+<strong>AIDL 的级联依赖：</strong>一个 AIDL 文件 import 其他 AIDL 和 Parcelable，因此不能只编译单个文件。需要编译整个 <code>frameworks/base</code> 的 AIDL 集合，AOSP 构建系统会自动处理依赖。
+</div>
+
+<h2 id="ch4-3">4.3 方法一：使用 AOSP 构建系统生成（推荐）</h2>
+
+<pre>
+cd ~/aosp16
+
+<span class="comment"># 初始化编译环境</span>
+source build/envsetup.sh
+lunch aosp_arm64-userdebug
+
+<span class="comment"># 只编译 framework 模块的 AIDL → Java（不编译完整 framework）</span>
+<span class="comment"># 触发 AIDL 生成的最小编译目标：</span>
+m framework-minus-apex-headers -j$(nproc) 2>&1 | tee build_aidl.log
+
+<span class="comment"># 或直接编译 framework 模块（会生成所有 AIDL Stub）</span>
+m framework -j$(nproc) 2>&1 | tee build_framework.log
+</pre>
+
+<div class="step-box">
+<h4>查找生成的 AIDL Java 文件</h4>
+</div>
+
+<pre>
+<span class="comment"># AIDL 生成的 Java 文件位于 Soong 中间产物目录</span>
+AIDL_OUT="out/soong/.intermediates/frameworks/base"
+
+<span class="comment"># 查找 IActivityManager.java</span>
+find ${AIDL_OUT} -name "IActivityManager.java" 2>/dev/null
+
+<span class="comment"># 查找所有生成的 AIDL Java 文件</span>
+find ${AIDL_OUT} -name "*.java" -path "*/aidl/*" 2>/dev/null | head -30
+
+<span class="comment"># 典型路径示例：</span>
+<span class="comment"># out/soong/.intermediates/frameworks/base/framework/android_common/</span>
+<span class="comment">#   gen/aidl/frameworks/base/core/java/android/app/IActivityManager.java</span>
+</pre>
+
+<h2 id="ch4-4">4.4 方法二：独立运行 AIDL 编译器</h2>
+
+<p>如果不想触发完整的 Soong 编译流程，可以直接使用 AIDL 编译器二进制：</p>
+
+<pre>
+<span class="comment"># AIDL 编译器位于 prebuilts 中</span>
+AIDL_BIN=$(find ~/aosp16/prebuilts -name "aidl" -type f -executable 2>/dev/null | head -1)
+echo "AIDL compiler: ${AIDL_BIN}"
+
+<span class="comment"># AIDL 源文件根目录</span>
+FRAMEWORK_AIDL="~/aosp16/frameworks/base/core/java"
+
+<span class="comment"># 输出目录</span>
+AIDL_GEN_OUT="/tmp/aidl_gen"
+mkdir -p ${AIDL_GEN_OUT}
+
+<span class="comment"># 生成 IActivityManager.java</span>
+${AIDL_BIN} \
+    --lang=java \
+    -I ${FRAMEWORK_AIDL} \
+    -I ~/aosp16/frameworks/base/media/java \
+    -I ~/aosp16/frameworks/base/location/java \
+    -I ~/aosp16/frameworks/base/telephony/java \
+    -I ~/aosp16/frameworks/native/aidl/binder \
+    -I ~/aosp16/frameworks/native/aidl/gui \
+    -o ${AIDL_GEN_OUT} \
+    ${FRAMEWORK_AIDL}/android/app/IActivityManager.aidl
+
+<span class="comment"># 对其他 AIDL 文件重复执行</span>
+<span class="comment"># 注意：-I 参数需要包含所有被 import 的 AIDL 路径</span>
+</pre>
+
+<div class="warn">
+<strong>方法二的缺点：</strong>需要手动解决 import 路径（<code>-I</code> 参数），比较繁琐。方法一（AOSP 构建系统）自动处理所有依赖关系，推荐优先使用。
+</div>
+
+<h2 id="ch4-5">4.5 保存生成结果到适配层项目</h2>
+
+<pre>
+<span class="comment"># 在远程服务器上：将生成的 AIDL Java 文件打包</span>
+cd ~/aosp16
+AIDL_OUT=$(find out/soong/.intermediates/frameworks/base -type d -name "aidl" | head -1)
+
+<span class="comment"># 创建归档</span>
+tar czf /tmp/aidl_generated_aosp16.tar.gz \
+    -C "${AIDL_OUT}/.." aidl/
+
+<span class="comment"># 下载到本地 PC（使用 rsync/scp）</span>
+</pre>
+
+<div class="step-box">
+<h4>在本地适配层项目中保存</h4>
+</div>
+
+<pre>
+<span class="comment"># 建议的目录结构：</span>
+D:\code\adapter\
+├── framework/
+│   └── aidl-generated/              <span class="comment"># ← 新建：保存 AIDL 生成的 Java 文件</span>
+│       └── android/
+│           ├── app/
+│           │   ├── IActivityManager.java
+│           │   ├── IActivityTaskManager.java
+│           │   ├── IApplicationThread.java
+│           │   └── ...
+│           ├── view/
+│           │   ├── IWindowManager.java
+│           │   ├── IWindowSession.java
+│           │   ├── IWindow.java
+│           │   └── ...
+│           ├── content/
+│           │   ├── pm/IPackageManager.java
+│           │   ├── IContentProvider.java
+│           │   ├── IIntentReceiver.java
+│           │   └── ...
+│           └── window/
+│               └── ...
+</pre>
+
+<h2 id="ch4-6">4.6 后续维护策略</h2>
+
+<div class="card">
+<h3>AIDL 生成文件的维护规则</h3>
+<ol>
+  <li><strong>一次性生成</strong>：从 AOSP 16 的 AIDL 编译器生成完整的 Stub Java 文件</li>
+  <li><strong>纳入版本管理</strong>：将生成的文件提交到 adapter Git 仓库</li>
+  <li><strong>手动维护</strong>：后续如需修改方法签名、增减方法，直接编辑 Java 文件</li>
+  <li><strong>不再自动生成</strong>：Android.bp 中 adapter 的 Java 编译直接引用这些文件，而非 .aidl</li>
+  <li><strong>标注来源版本</strong>：在文件头部注释中标注 <code>Generated from AOSP 16 (android-16.0.0_r1)</code></li>
+</ol>
+</div>
+
+<div class="note">
+<strong>何时需要重新生成：</strong>仅当升级 AOSP 基准版本时（如从 AOSP 16 → 17），需要重新生成 AIDL Stub 并 diff 对比变化，合并到手动修改版本中。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch5">5. 组件 B：ART 虚拟机编译</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch5-1">5.1 ART 在本项目中的角色</h2>
+
+<p>ART（Android Runtime）是运行 Android App 的核心引擎。在 DAYU600 (OH) 上运行 Android App <strong>必须</strong>部署 ART：</p>
+
+<ul>
+  <li><strong>DEX 解释执行</strong>：ART 解释器执行 APK 中的 DEX 字节码</li>
+  <li><strong>JIT 编译</strong>：运行时将热点代码编译为 ARM64 本地代码</li>
+  <li><strong>GC 管理</strong>：管理 Android App 的 Java 堆内存</li>
+  <li><strong>JNI 桥接</strong>：支持 Java ↔ Native 方法调用</li>
+  <li><strong>appspawn-x 依赖</strong>：appspawn-x 通过 <code>JniInvocation</code> 加载 <code>libart.so</code> 创建 VM 实例</li>
+</ul>
+
+<h2 id="ch5-2">5.2 ART 构建目标与产物</h2>
+
+<table>
+  <tr><th>构建目标</th><th>产物</th><th>说明</th></tr>
+  <tr><td><code>libart</code></td><td>libart.so</td><td>ART 运行时核心（解释器、GC、JNI）</td></tr>
+  <tr><td><code>libart-compiler</code></td><td>libart-compiler.so</td><td>JIT/AOT 编译器后端</td></tr>
+  <tr><td><code>libdexfile</code></td><td>libdexfile.so</td><td>DEX 文件解析</td></tr>
+  <tr><td><code>libartbase</code></td><td>libartbase.so</td><td>ART 基础工具库</td></tr>
+  <tr><td><code>libprofile</code></td><td>libprofile.so</td><td>Profile 引导优化</td></tr>
+  <tr><td><code>dalvikvm</code></td><td>dalvikvm (binary)</td><td>VM 启动入口（可选，appspawn-x 替代）</td></tr>
+  <tr><td><code>dex2oat</code></td><td>dex2oat (binary)</td><td>AOT 编译器（组件 C）</td></tr>
+</table>
+
+<h2 id="ch5-3">5.3 编译 ART</h2>
+
+<pre>
+cd ~/aosp16
+source build/envsetup.sh
+lunch aosp_arm64-userdebug
+
+<span class="comment"># 编译 ART 运行时核心</span>
+m libart libart-compiler libdexfile libartbase libprofile -j$(nproc) 2>&1 | tee build_art.log
+
+<span class="comment"># 编译 dex2oat（同时编译）</span>
+m dex2oat -j$(nproc) 2>&1 | tee -a build_art.log
+
+<span class="comment"># 编译 libnativehelper（appspawn-x 需要的 JniInvocation）</span>
+m libnativehelper -j$(nproc) 2>&1 | tee -a build_art.log
+
+<span class="comment"># 查看产物</span>
+find out/target/product/generic_arm64/system/lib64/ -name "libart*" -o -name "libdex*" 2>/dev/null
+find out/target/product/generic_arm64/system/bin/ -name "dex2oat*" 2>/dev/null
+</pre>
+
+<h2 id="ch5-4">5.4 ART 运行时依赖链</h2>
+
+<p>libart.so 运行时依赖以下共享库，需要一并编译和部署：</p>
+
+<div class="diagram">libart.so 依赖树（主要依赖）
+
+libart.so
+├── libdexfile.so          (DEX 文件操作)
+├── libartbase.so          (ART 基础)
+├── libprofile.so          (Profile)
+├── libbase.so             (Android base)
+├── liblog.so              (日志)
+├── libz.so                (zlib 压缩)
+├── liblz4.so              (lz4 压缩)
+├── libunwindstack.so      (栈回溯)
+├── libc++.so              (C++ 标准库)
+├── libdl.so               (动态链接)
+├── libc.so                (Bionic C 库)
+└── libm.so                (数学库)
+
+libart-compiler.so
+├── libart.so
+├── libvixl.so             (ARM 汇编器)
+└── ...
+
+dex2oat
+├── libart-compiler.so
+├── libart.so
+└── ...</div>
+
+<div class="warn">
+<strong>Bionic 兼容性问题：</strong>ART 依赖 Android Bionic (libc.so)，而 OH 系统使用 musl libc。两者 ABI 不兼容。解决方案：
+<ol>
+  <li><strong>方案 A：将 Bionic libc/libdl/libm 一同部署</strong>，放在独立路径（如 <code>/system/android/lib64/</code>），通过 <code>LD_LIBRARY_PATH</code> 或 linker namespace 隔离</li>
+  <li><strong>方案 B：将 ART 静态链接 Bionic</strong>（工程量大，不推荐）</li>
+  <li><strong>方案 C：使用 linker namespace</strong>（Android 的 linker 本身就支持命名空间隔离）</li>
+</ol>
+推荐方案 A，最简单可行。
+</div>
+
+<h2 id="ch5-5">5.5 部署到设备</h2>
+
+<pre>
+<span class="comment"># ART 相关产物部署路径（在 DAYU600 上）</span>
+<span class="comment"># 使用独立目录，避免与 OH 系统库冲突</span>
+
+/system/android/
+├── lib64/
+│   ├── libart.so
+│   ├── libart-compiler.so
+│   ├── libdexfile.so
+│   ├── libartbase.so
+│   ├── libprofile.so
+│   ├── libnativehelper.so
+│   ├── libbase.so
+│   ├── liblog.so               <span class="comment"># Android 版 liblog</span>
+│   ├── libutils.so
+│   ├── libcutils.so
+│   ├── libz.so
+│   ├── liblz4.so
+│   ├── libc++.so
+│   ├── libunwindstack.so
+│   ├── libvixl.so
+│   ├── libc.so                 <span class="comment"># Bionic libc</span>
+│   ├── libdl.so                <span class="comment"># Bionic libdl</span>
+│   └── libm.so                 <span class="comment"># Bionic libm</span>
+├── bin/
+│   ├── dex2oat
+│   ├── dex2oat32               <span class="comment"># 如需 32 位支持</span>
+│   └── dalvikvm                <span class="comment"># 可选，调试用</span>
+└── framework/
+    └── (boot classpath JARs, 见组件 D)
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch6">6. 组件 C：dex2oat 编译</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch6-1">6.1 dex2oat 在本项目中的角色</h2>
+
+<p>dex2oat 是 ART 的 AOT（Ahead-Of-Time）编译器，在 <strong>APK 安装时</strong>将 DEX 字节码编译为本地机器码：</p>
+
+<div class="diagram">APK 安装流程中 dex2oat 的位置
+
+  APK 文件 (classes.dex)
+       ↓
+  apk_installer（OH 编译产物）
+       ↓ 调用
+  dex2oat --dex-file=classes.dex \
+          --oat-file=base.odex \
+          --instruction-set=arm64 \
+          --boot-image=/system/android/framework/boot.art
+       ↓
+  base.odex + base.vdex（优化后的本地代码）
+       ↓
+  App 启动时 ART 直接加载 .odex（无需再解释执行 DEX）</div>
+
+<p>参见 <code>framework/package-manager/jni/apk_installer.h</code> 第 63 行：dex2oat 路径为 <code>/system/android/bin/dex2oat</code></p>
+
+<h2 id="ch6-2">6.2 编译 dex2oat</h2>
+
+<p>dex2oat 是 ART 的一部分，在组件 B 的编译中已包含：</p>
+
+<pre>
+<span class="comment"># 已在组件 B 步骤中编译，确认产物存在：</span>
+ls -la out/target/product/generic_arm64/system/bin/dex2oat*
+
+<span class="comment"># 如果需要单独编译：</span>
+cd ~/aosp16
+source build/envsetup.sh && lunch aosp_arm64-userdebug
+m dex2oat -j$(nproc)
+</pre>
+
+<h2 id="ch6-3">6.3 部署到设备</h2>
+
+<pre>
+<span class="comment"># dex2oat 部署到 /system/android/bin/</span>
+hdc shell mount -o remount,rw /
+hdc shell mkdir -p /system/android/bin
+hdc file send dex2oat /system/android/bin/dex2oat
+hdc shell chmod 755 /system/android/bin/dex2oat
+
+<span class="comment"># 验证</span>
+hdc shell /system/android/bin/dex2oat --version
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch7">7. 组件 D：Framework Boot Classpath</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch7-1">7.1 Boot Classpath 的作用</h2>
+
+<p>Android App 运行前，ART VM 需要加载 <strong>Boot Classpath</strong>——一组核心 JAR 文件，提供 <code>java.lang.*</code>、<code>android.app.*</code>、<code>android.view.*</code> 等基础类。这些 JAR 对应 appspawn-x 中的 <code>BOOTCLASSPATH</code> 环境变量。</p>
+
+<p>Boot Classpath 中的类被预编译为 <strong>Boot Image</strong>（boot.art + boot.oat），ART 启动时直接映射到内存，大幅加速启动速度。</p>
+
+<h2 id="ch7-2">7.2 Boot Classpath JAR 清单</h2>
+
+<table>
+  <tr><th>JAR 文件</th><th>AOSP 来源</th><th>内容</th></tr>
+  <tr><td><code>core-oj.jar</code></td><td>libcore/ojluni/</td><td>OpenJDK 核心类（java.lang, java.util, java.io 等）</td></tr>
+  <tr><td><code>core-libart.jar</code></td><td>libcore/libart/</td><td>ART 专有核心类（dalvik.system 等）</td></tr>
+  <tr><td><code>conscrypt.jar</code></td><td>external/conscrypt/</td><td>TLS/SSL 加密 provider</td></tr>
+  <tr><td><code>okhttp.jar</code></td><td>external/okhttp/</td><td>HTTP 客户端</td></tr>
+  <tr><td><code>bouncycastle.jar</code></td><td>external/bouncycastle/</td><td>加密算法实现</td></tr>
+  <tr><td><code>apache-xml.jar</code></td><td>external/apache-xml/</td><td>XML 解析</td></tr>
+  <tr><td><code><strong>framework.jar</strong></code></td><td>frameworks/base/</td><td><strong>Android Framework 核心</strong>（含 AOSP patch + AIDL Stub）</td></tr>
+  <tr><td><code>ext.jar</code></td><td>frameworks/base/</td><td>Framework 扩展</td></tr>
+  <tr><td><code>icu4j.jar</code></td><td>external/icu/</td><td>国际化支持</td></tr>
+</table>
+
+<div class="info">
+<strong>framework.jar 是关键：</strong>它包含了 <code>IActivityManager.Stub</code> 等 AIDL 生成类，以及 <code>ActivityManager</code>、<code>WindowManagerGlobal</code> 等被 AOSP patch 修改的类。修改 AOSP patch 后需要重新编译 framework.jar。
+</div>
+
+<h2 id="ch7-3">7.3 编译 framework.jar（含 AOSP patch）</h2>
+
+<div class="step-box">
+<h4>步骤 1：应用 AOSP Patch</h4>
+</div>
+
+<pre>
+cd ~/aosp16
+
+<span class="comment"># 从 PC 同步 adapter 代码（包括 aosp_patches/）</span>
+<span class="comment"># rsync 操作见第 11 章脚本</span>
+
+<span class="comment"># 应用 4 个 AOSP 补丁</span>
+cd frameworks/base
+for patch in ~/aosp16/vendor/adapter/aosp_patches/frameworks/core/java/android/**/*.patch; do
+    echo "Apply: $patch"
+    git apply "$patch" 2>&1 && echo "  OK" || echo "  已应用或冲突"
+done
+
+<span class="comment"># 验证修改</span>
+git diff --stat
+</pre>
+
+<div class="step-box">
+<h4>步骤 2：编译 Boot Classpath</h4>
+</div>
+
+<pre>
+cd ~/aosp16
+source build/envsetup.sh
+lunch aosp_arm64-userdebug
+
+<span class="comment"># 编译 framework.jar（包含 AIDL Stub + AOSP patch）</span>
+m framework -j$(nproc) 2>&1 | tee build_framework.log
+
+<span class="comment"># 编译其他 Boot Classpath JAR</span>
+m core-oj core-libart conscrypt okhttp bouncycastle ext -j$(nproc) 2>&1 | tee build_bootcp.log
+
+<span class="comment"># 查看产物</span>
+ls -lh out/target/product/generic_arm64/system/framework/*.jar
+</pre>
+
+<h2 id="ch7-4">7.4 生成 Boot Image（boot.art + boot.oat）</h2>
+
+<pre>
+<span class="comment"># Boot Image 由 dex2oat 从 Boot Classpath JAR 生成</span>
+<span class="comment"># AOSP 编译系统会自动生成，如需手动生成：</span>
+
+BOOT_JARS="core-oj.jar:core-libart.jar:conscrypt.jar:okhttp.jar:bouncycastle.jar:apache-xml.jar:framework.jar:ext.jar"
+
+out/host/linux-x86/bin/dex2oatd \
+    --runtime-arg -Xms64m \
+    --runtime-arg -Xmx512m \
+    --instruction-set=arm64 \
+    --dex-file=out/target/product/generic_arm64/system/framework/framework.jar \
+    --oat-file=/tmp/boot-framework.oat \
+    --image=/tmp/boot-framework.art
+
+<span class="comment"># 通常不需要手动执行，AOSP 编译 framework 时会自动生成 boot image</span>
+</pre>
+
+<h2 id="ch7-5">7.5 部署到设备</h2>
+
+<pre>
+<span class="comment"># Boot Classpath 部署到 /system/android/framework/</span>
+hdc shell mount -o remount,rw /
+hdc shell mkdir -p /system/android/framework
+
+<span class="comment"># 推送所有 Boot Classpath JAR</span>
+for jar in core-oj.jar core-libart.jar conscrypt.jar framework.jar ext.jar; do
+    hdc file send "${jar}" "/system/android/framework/${jar}"
+done
+
+<span class="comment"># 推送 Boot Image</span>
+hdc file send boot.art /system/android/framework/boot.art
+hdc file send boot.oat /system/android/framework/boot.oat
+
+<span class="comment"># 设置权限</span>
+hdc shell chmod 644 /system/android/framework/*
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch8">8. 适配层自身编译</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch8-1">8.1 oh-adapter-framework.jar</h2>
+
+<pre>
+cd ~/aosp16
+source build/envsetup.sh && lunch aosp_arm64-userdebug
+
+<span class="comment"># adapter 代码已同步到 vendor/adapter/</span>
+m oh-adapter-framework -j$(nproc) 2>&1 | tee build_adapter.log
+
+<span class="comment"># 产物</span>
+find out/ -name "oh-adapter-framework*" 2>/dev/null | head -5
+</pre>
+
+<h2 id="ch8-2">8.2 liboh_adapter_bridge.so</h2>
+
+<pre>
+<span class="comment"># JNI 共享库编译</span>
+m liboh_adapter_bridge -j$(nproc) 2>&1 | tee build_jni.log
+
+<span class="comment"># 注意：Android.bp 中 OH IPC 库（libipc_core 等）目前被注释</span>
+<span class="comment"># Phase 1 仅做日志输出，Phase 2 需要 OH 预编译库</span>
+</pre>
+
+<h2 id="ch8-3">8.3 OHAdapterHelloWorld.apk</h2>
+
+<pre>
+<span class="comment"># 编译测试 APK（platform 签名）</span>
+m OHAdapterHelloWorld -j$(nproc) 2>&1 | tee build_app.log
+
+<span class="comment"># 产物</span>
+find out/ -name "OHAdapterHelloWorld.apk" 2>/dev/null
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch9">9. appspawn-x 与 Zygote</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch9-1">9.1 appspawn-x 替代 Zygote</h2>
+
+<p>标准 Android 使用 Zygote 进程孵化 App 进程（<code>frameworks/base/cmds/app_process/</code>）。本项目使用 <strong>appspawn-x</strong>——一个混合 OH appspawn + Android Zygote 的进程孵化器，替代标准 Zygote：</p>
+
+<table>
+  <tr><th>功能</th><th>标准 Android Zygote</th><th>appspawn-x</th></tr>
+  <tr><td>进程管理</td><td>Zygote fork</td><td>OH appspawn fork</td></tr>
+  <tr><td>安全策略</td><td>Android SELinux</td><td>OH 沙箱 + Android 兼容</td></tr>
+  <tr><td>VM 创建</td><td>AndroidRuntime::start()</td><td>AppSpawnXRuntime (libart.so)</td></tr>
+  <tr><td>JNI 注册</td><td>register_jni_procs()</td><td>相同（通过 libandroid_runtime）</td></tr>
+  <tr><td>类预加载</td><td>ZygoteInit.preload()</td><td>AppSpawnXInit.preload()</td></tr>
+</table>
+
+<h2 id="ch9-2">9.2 appspawn-x 对 ART 的依赖</h2>
+
+<p>appspawn-x 的 BUILD.gn 引用以下 ART/Android 预编译库：</p>
+
+<pre>
+<span class="comment"># 来自 framework/appspawn-x/BUILD.gn</span>
+deps = [
+    "//third_party/android/runtime:libandroid_runtime",  <span class="comment"># AndroidRuntime, JNI 注册</span>
+    "//third_party/android/runtime:libnativehelper",      <span class="comment"># JniInvocation</span>
+    "//third_party/android/art:libart",                   <span class="comment"># ART VM</span>
+    "//third_party/android/art:libdexfile",               <span class="comment"># DEX 文件处理</span>
+]
+</pre>
+
+<p>这意味着：AOSP 编译 ART 后，需要将产物复制到 OH 源码树的 <code>third_party/android/</code> 目录下，作为预编译库供 appspawn-x 链接。</p>
+
+<h2 id="ch9-3">9.3 appspawn-x 编译（OH GN 构建系统）</h2>
+
+<pre>
+<span class="comment"># 在 OH 编译服务器上（不是 AOSP 编译环境）</span>
+cd ~/openharmony
+
+<span class="comment"># 步骤 1：准备 ART 预编译库</span>
+<span class="comment"># 将 AOSP 编译的 ART 产物复制到 OH 源码树</span>
+mkdir -p third_party/android/art/prebuilt/arm64
+mkdir -p third_party/android/runtime/prebuilt/arm64
+
+<span class="comment"># 从 AOSP 产物目录复制（或通过 rsync 从远程下载）</span>
+cp libart.so libart-compiler.so libdexfile.so libartbase.so \
+    third_party/android/art/prebuilt/arm64/
+cp libnativehelper.so libandroid_runtime.so \
+    third_party/android/runtime/prebuilt/arm64/
+
+<span class="comment"># 步骤 2：编译 appspawn-x</span>
+./build.sh --product-name dayu210 --ccache \
+    --build-target appspawn_x 2>&1 | tee build_appspawnx.log
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch10">10. 全量部署与验证</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch10-1">10.1 DAYU600 上的完整文件布局</h2>
+
+<div class="diagram">DAYU600 设备上 Android 运行时完整部署
+
+/system/
+├── android/                              ← Android 运行时独立目录
+│   ├── lib64/                            ← ART + 依赖库 [AOSP 编译]
+│   │   ├── libart.so                        ART 核心
+│   │   ├── libart-compiler.so               JIT/AOT 编译器
+│   │   ├── libdexfile.so                    DEX 文件处理
+│   │   ├── libartbase.so                    ART 基础
+│   │   ├── libnativehelper.so               JNI 辅助
+│   │   ├── libandroid_runtime.so            Android Runtime 绑定
+│   │   ├── libbase.so                       基础库
+│   │   ├── liblog.so                        Android 日志
+│   │   ├── libutils.so / libcutils.so       工具库
+│   │   ├── libc.so / libm.so / libdl.so    Bionic C 库
+│   │   ├── libc++.so                        C++ 标准库
+│   │   ├── libz.so / liblz4.so             压缩库
+│   │   └── libunwindstack.so               栈回溯
+│   │
+│   ├── bin/                              ← 工具 [AOSP 编译]
+│   │   └── dex2oat                          DEX→OAT 编译器
+│   │
+│   └── framework/                        ← Boot Classpath [AOSP 编译]
+│       ├── core-oj.jar
+│       ├── core-libart.jar
+│       ├── conscrypt.jar
+│       ├── framework.jar                    ← 含 AOSP patch
+│       ├── ext.jar
+│       ├── oh-adapter-framework.jar         ← 适配层 Java [AOSP 编译]
+│       ├── boot.art                         预编译 boot image
+│       └── boot.oat
+│
+├── lib64/
+│   ├── liboh_adapter_bridge.so           ← 适配层 JNI [AOSP 编译]
+│   ├── libabilityms.z.so                 ← OH AMS (含 patch) [OH 编译]
+│   ├── libwms.z.so                       ← OH WMS (含 patch) [OH 编译]
+│   └── ...
+│
+├── bin/
+│   └── appspawn-x                        ← 混合孵化器 [OH 编译]
+│
+└── app/android/
+    └── OHAdapterHelloWorld/
+        └── OHAdapterHelloWorld.apk       ← 测试 App [AOSP 编译]</div>
+
+<h2 id="ch10-2">10.2 一键部署脚本</h2>
+
+<pre>
+<span class="comment">#!/bin/bash</span>
+<span class="comment"># deploy_all.sh — 部署所有 AOSP 编译产物到 DAYU600</span>
+AOSP_ARTIFACTS="/mnt/d/code/adapter/build/aosp_artifacts"
+
+<span class="comment"># 检查设备</span>
+DEVICE=$(hdc list targets 2>/dev/null | head -1)
+[ -z "$DEVICE" ] || [ "$DEVICE" = "[Empty]" ] && echo "未检测到设备" && exit 1
+echo "设备: $DEVICE"
+
+<span class="comment"># 挂载可写</span>
+hdc shell mount -o remount,rw /
+
+<span class="comment"># 创建目录结构</span>
+hdc shell mkdir -p /system/android/lib64
+hdc shell mkdir -p /system/android/bin
+hdc shell mkdir -p /system/android/framework
+hdc shell mkdir -p /system/app/android/OHAdapterHelloWorld
+
+echo "===== 推送 ART 库 ====="
+for so in libart.so libart-compiler.so libdexfile.so libartbase.so \
+          libnativehelper.so libbase.so liblog.so libutils.so libcutils.so \
+          libc++.so libz.so liblz4.so libunwindstack.so libvixl.so \
+          libc.so libm.so libdl.so; do
+    [ -f "${AOSP_ARTIFACTS}/${so}" ] && \
+        hdc file send "${AOSP_ARTIFACTS}/${so}" "/system/android/lib64/${so}" && \
+        echo "  ${so}"
+done
+
+echo "===== 推送 dex2oat ====="
+hdc file send "${AOSP_ARTIFACTS}/dex2oat" /system/android/bin/dex2oat
+hdc shell chmod 755 /system/android/bin/dex2oat
+
+echo "===== 推送 Boot Classpath ====="
+for jar in core-oj.jar core-libart.jar conscrypt.jar framework.jar ext.jar \
+           oh-adapter-framework.jar; do
+    [ -f "${AOSP_ARTIFACTS}/${jar}" ] && \
+        hdc file send "${AOSP_ARTIFACTS}/${jar}" "/system/android/framework/${jar}" && \
+        echo "  ${jar}"
+done
+
+echo "===== 推送 Boot Image ====="
+[ -f "${AOSP_ARTIFACTS}/boot.art" ] && \
+    hdc file send "${AOSP_ARTIFACTS}/boot.art" /system/android/framework/boot.art
+[ -f "${AOSP_ARTIFACTS}/boot.oat" ] && \
+    hdc file send "${AOSP_ARTIFACTS}/boot.oat" /system/android/framework/boot.oat
+
+echo "===== 推送适配层 JNI ====="
+[ -f "${AOSP_ARTIFACTS}/liboh_adapter_bridge.so" ] && \
+    hdc file send "${AOSP_ARTIFACTS}/liboh_adapter_bridge.so" /system/lib64/liboh_adapter_bridge.so
+
+echo "===== 推送测试 APK ====="
+[ -f "${AOSP_ARTIFACTS}/OHAdapterHelloWorld.apk" ] && \
+    hdc file send "${AOSP_ARTIFACTS}/OHAdapterHelloWorld.apk" \
+        /system/app/android/OHAdapterHelloWorld/OHAdapterHelloWorld.apk
+
+echo ""
+echo "===== 部署完成，重启设备 ====="
+hdc shell reboot
+</pre>
+
+<h2 id="ch10-3">10.3 端到端验证</h2>
+
+<pre>
+<span class="comment"># 等待设备重启完成</span>
+hdc list targets
+
+<span class="comment"># 验证 ART 库已部署</span>
+hdc shell ls /system/android/lib64/libart.so
+
+<span class="comment"># 验证 dex2oat 可执行</span>
+hdc shell /system/android/bin/dex2oat --version
+
+<span class="comment"># 验证 Boot Classpath</span>
+hdc shell ls /system/android/framework/framework.jar
+
+<span class="comment"># 验证 appspawn-x 进程</span>
+hdc shell ps -ef | grep appspawn
+
+<span class="comment"># 查看适配层日志</span>
+hdc hilog | grep -E "OH_AMAdapter|OHEnvironment|oh_adapter"
+</pre>
+
+<!-- ================================================================ -->
+<h1 id="ch11">11. 日常开发流程</h1>
+<!-- ================================================================ -->
+
+<table>
+  <tr><th>修改内容</th><th>需要重新编译的组件</th><th>命令</th><th>耗时</th></tr>
+  <tr>
+    <td>适配层 Java 代码<br>（framework/*/java/）</td>
+    <td>oh-adapter-framework.jar</td>
+    <td><code>m oh-adapter-framework</code></td>
+    <td>~1 分钟</td>
+  </tr>
+  <tr>
+    <td>适配层 JNI 代码<br>（framework/*/jni/）</td>
+    <td>liboh_adapter_bridge.so</td>
+    <td><code>m liboh_adapter_bridge</code></td>
+    <td>~1 分钟</td>
+  </tr>
+  <tr>
+    <td>测试 App 代码<br>（app/）</td>
+    <td>OHAdapterHelloWorld.apk</td>
+    <td><code>m OHAdapterHelloWorld</code></td>
+    <td>~1 分钟</td>
+  </tr>
+  <tr>
+    <td>AOSP Patch<br>（aosp_patches/）</td>
+    <td>framework.jar + boot image</td>
+    <td><code>m framework</code></td>
+    <td>~5-15 分钟</td>
+  </tr>
+  <tr>
+    <td>ART 修改（极少）</td>
+    <td>libart.so + dex2oat</td>
+    <td><code>m libart dex2oat</code></td>
+    <td>~10-30 分钟</td>
+  </tr>
+</table>
+
+<div class="diagram">日常开发循环（最常见场景：修改适配层 Java/JNI）
+
+  PC: 编辑 adapter 源码
+        ↓ rsync (~10秒)
+  华为云: m oh-adapter-framework liboh_adapter_bridge (~2分钟)
+        ↓ rsync (~10秒)
+  PC: hdc file send → 设备 (~10秒)
+        ↓
+  设备: hdc shell reboot 或 kill appspawn-x
+        ↓
+  PC: hdc hilog | grep OH_AMAdapter (验证)</div>
+
+<!-- ================================================================ -->
+<h1 id="ch12">12. 注意事项与常见问题</h1>
+<!-- ================================================================ -->
+
+<table>
+  <tr><th>问题</th><th>原因</th><th>解决方案</th></tr>
+  <tr>
+    <td>部分 sync 后编译报缺少模块</td>
+    <td>有依赖的 AOSP 项目未同步</td>
+    <td>根据报错信息追加同步：<code>repo-google sync -c --depth=1 &lt;project&gt;</code></td>
+  </tr>
+  <tr>
+    <td>lunch 找不到 target</td>
+    <td>device/ 目录未同步</td>
+    <td>追加同步 <code>device/generic/common</code> 和 <code>device/generic/arm64</code></td>
+  </tr>
+  <tr>
+    <td>ART .so 在设备上加载失败</td>
+    <td>Bionic libc 未部署 / 路径不对</td>
+    <td>确保 Bionic libc.so 部署到 <code>/system/android/lib64/</code>，配置 LD_LIBRARY_PATH</td>
+  </tr>
+  <tr>
+    <td>dex2oat 运行报 boot image 缺失</td>
+    <td>boot.art/boot.oat 未部署</td>
+    <td>确保 boot image 部署到 <code>/system/android/framework/</code></td>
+  </tr>
+  <tr>
+    <td>OH repo 和 AOSP repo 冲突</td>
+    <td>使用了错误的 repo 工具</td>
+    <td>OH: <code>/usr/local/bin/repo</code><br>AOSP: <code>/usr/local/bin/repo-google</code></td>
+  </tr>
+  <tr>
+    <td>ccache 缓存冲突</td>
+    <td>OH 和 AOSP 共用 ccache</td>
+    <td>分开：<code>CCACHE_DIR=/root/.ccache-aosp</code></td>
+  </tr>
+  <tr>
+    <td>AIDL 生成的方法数量与文档不同</td>
+    <td>AOSP 16 vs AOSP 14 接口有变更</td>
+    <td>以 AOSP 16 生成结果为准，更新适配层 Adapter 类和 CLAUDE.md 中的统计</td>
+  </tr>
+  <tr>
+    <td>framework.jar 编译拉取大量依赖</td>
+    <td>framework 模块依赖链较深</td>
+    <td>按报错追加同步缺失项目；首次可能需要多轮</td>
+  </tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch13">13. 操作检查清单</h1>
+<!-- ================================================================ -->
+
+<h3>阶段一：环境准备</h3>
+<ul class="checklist">
+  <li>服务器磁盘空间 ≥ 100 GB 可用</li>
+  <li>编译依赖安装完成（fontconfig, JDK 17）</li>
+  <li>Google repo 工具安装到 <code>/usr/local/bin/repo-google</code></li>
+</ul>
+
+<h3>阶段二：AOSP 源码部分同步</h3>
+<ul class="checklist">
+  <li><code>repo-google init</code> 成功（android-16.0.0_r1，清华镜像）</li>
+  <li>第一层（构建系统）同步完成</li>
+  <li>第二层（Framework + AIDL）同步完成</li>
+  <li>第三层（ART + 核心库）同步完成</li>
+  <li>第四层（依赖库）同步完成</li>
+  <li><code>source build/envsetup.sh && lunch aosp_arm64-userdebug</code> 成功</li>
+</ul>
+
+<h3>阶段三：组件 A — AIDL Stub 生成</h3>
+<ul class="checklist">
+  <li>AIDL 编译成功（<code>m framework</code> 或独立 aidl 命令）</li>
+  <li>找到生成的 IActivityManager.java 等文件</li>
+  <li>文件保存到适配层项目 <code>framework/aidl-generated/</code></li>
+  <li>核对 AOSP 16 的 AIDL 方法数量（与 AOSP 14 对比）</li>
+</ul>
+
+<h3>阶段四：组件 B+C — ART + dex2oat</h3>
+<ul class="checklist">
+  <li>libart.so 编译成功</li>
+  <li>libart-compiler.so 编译成功</li>
+  <li>dex2oat 编译成功</li>
+  <li>libnativehelper.so 编译成功</li>
+  <li>Bionic libc.so 等产物已收集</li>
+</ul>
+
+<h3>阶段五：组件 D — Boot Classpath</h3>
+<ul class="checklist">
+  <li>AOSP patch 应用成功（4 个文件）</li>
+  <li>framework.jar 编译成功</li>
+  <li>core-oj.jar, core-libart.jar 等编译成功</li>
+  <li>boot.art + boot.oat 生成成功</li>
+</ul>
+
+<h3>阶段六：适配层编译</h3>
+<ul class="checklist">
+  <li>oh-adapter-framework.jar 编译成功</li>
+  <li>liboh_adapter_bridge.so 编译成功</li>
+  <li>OHAdapterHelloWorld.apk 编译成功</li>
+</ul>
+
+<h3>阶段七：部署与验证</h3>
+<ul class="checklist">
+  <li>所有产物部署到 DAYU600</li>
+  <li>ART 库可正常加载</li>
+  <li>dex2oat 可执行</li>
+  <li>appspawn-x 进程正常运行</li>
+  <li>适配层日志可见</li>
+  <li>Hello World App 启动成功</li>
+</ul>
+
+<div class="ok" style="margin-top: 30px;">
+<strong>所有检查项完成后，Android 最小化编译环境搭建完毕。</strong>通过部分同步 + 定向编译策略，磁盘占用从 ~350 GB 降至 ~80 GB，编译时间从 3-5 小时降至 ~1 小时，同时覆盖了项目运行所需的全部 AOSP 组件。
+</div>
+
+<footer>
+  <p>文档版本：v2.0 | 创建日期：2026年3月18日 | 适用于 AOSP 16 (android-16.0.0_r1 及更高)</p>
+  <p>关联项目：Android-OpenHarmony 适配层（D:\code\adapter\）</p>
+  <p>关联文档：<a href="oh_dev_environment_setup_guide.html">OH 系统开发环境搭建操作指导书</a></p>
+</footer>
+
+</div>
+</body>
+</html>

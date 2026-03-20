@@ -1,0 +1,2406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android Zygote / OH AppSpawn 对比分析与 appspawn-x 设计方案</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --h1-bg: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #1976d2 100%);
+    --h2-bg: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    --h3-bg: #e8eaf6;
+    --android-color: #3ddc84;
+    --oh-color: #0097a7;
+    --hybrid-color: #ff6f00;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1240px; margin: 0 auto; padding: 20px 30px; }
+
+  /* Header */
+  .header { background: var(--h1-bg); color: #fff; padding: 40px 30px; border-radius: 12px; margin-bottom: 30px; }
+  .header h1 { font-size: 2em; margin-bottom: 8px; text-shadow: 1px 1px 3px rgba(0,0,0,0.3); }
+  .header .subtitle { font-size: 1.1em; opacity: 0.9; }
+  .header .meta { margin-top: 12px; font-size: 0.9em; opacity: 0.75; }
+
+  /* TOC */
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 24px 30px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .toc h2 { font-size: 1.3em; color: var(--primary-dark); margin-bottom: 14px; background: var(--h2-bg); padding: 8px 14px; border-radius: 6px; }
+  .toc ol { padding-left: 22px; }
+  .toc ol li { margin: 5px 0; }
+  .toc ol li a { color: var(--primary); text-decoration: none; font-weight: 500; }
+  .toc ol li a:hover { text-decoration: underline; color: var(--primary-dark); }
+  .toc ol ol { margin-top: 3px; }
+  .toc ol ol li { font-size: 0.95em; font-weight: 400; }
+  .toc ol ol li a { font-weight: 400; }
+
+  /* Headings */
+  h1 { font-size: 1.7em; color: #fff; padding: 14px 20px; border-radius: 8px; margin: 35px 0 18px; background: var(--h1-bg); }
+  h2 { font-size: 1.35em; color: var(--primary-dark); padding: 10px 16px; border-radius: 6px; margin: 28px 0 14px; background: var(--h2-bg); }
+  h3 { font-size: 1.15em; color: #333; padding: 6px 12px; border-radius: 4px; margin: 20px 0 10px; background: var(--h3-bg); }
+  h4 { font-size: 1.05em; color: var(--primary); margin: 16px 0 8px; border-left: 4px solid var(--primary); padding-left: 10px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 0.92em; background: var(--card-bg); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  th { background: linear-gradient(135deg, #e3f2fd, #bbdefb); color: var(--primary-dark); padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--primary); }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:hover td { background: #f8f9ff; }
+
+  /* Code */
+  pre { background: #263238; color: #eeffff; padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 0.88em; line-height: 1.6; margin: 12px 0 18px; }
+  code { font-family: 'Cascadia Code', 'Consolas', monospace; }
+  p code, li code, td code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; color: #c62828; }
+
+  /* Cards */
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+  /* Tags */
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; margin: 0 3px; }
+  .tag-android { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+  .tag-oh { background: #e0f7fa; color: #006064; border: 1px solid #80deea; }
+  .tag-hybrid { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  .tag-new { background: #fce4ec; color: #c62828; border: 1px solid #ef9a9a; }
+  .tag-share { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; }
+
+  /* Flow diagram */
+  .flow { background: #263238; color: #eeffff; padding: 20px; border-radius: 8px; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 0.85em; white-space: pre; overflow-x: auto; line-height: 1.5; margin: 12px 0 18px; }
+
+  /* Stat grid */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 16px 0; }
+  .stat-item { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-item .num { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-item .label { font-size: 0.85em; color: var(--text-light); margin-top: 4px; }
+
+  /* Comparison columns */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+  .compare > div { background: var(--card-bg); border-radius: 8px; padding: 16px; border: 1px solid var(--border); }
+  .compare h4 { margin-top: 0; }
+  @media (max-width: 800px) { .compare { grid-template-columns: 1fr; } }
+
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .note { background: #fff8e1; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 0.93em; }
+  .important { background: #fce4ec; border-left: 4px solid #e53935; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+  <h1 style="background:none;margin:0;padding:0;color:#fff;">Android Zygote / OH AppSpawn 对比分析与 appspawn-x 设计方案</h1>
+  <div class="subtitle">进程孵化器架构分析 &middot; init 进程对比 &middot; 混合孵化器 appspawn-x 设计</div>
+  <div class="meta">版本 1.0 &middot; 2026-03-16 &middot; Android AOSP 14 / OpenHarmony 5.0</div>
+</div>
+
+<!-- TOC -->
+<div class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#ch0">Android 与 OH 系统进程对比概览</a>
+      <ol>
+        <li><a href="#ch0-1">init 进程对比</a></li>
+        <li><a href="#ch0-2">进程孵化器对比</a></li>
+        <li><a href="#ch0-3">核心系统服务进程对比</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch1">Android Zygote 进程架构分析</a>
+      <ol>
+        <li><a href="#ch1-1">软件模块（开发单元）</a></li>
+        <li><a href="#ch1-2">软件模块（运行单元）</a></li>
+        <li><a href="#ch1-3">Zygote 启动流程</a></li>
+        <li><a href="#ch1-4">App/Service 进程孵化流程</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch2">OH AppSpawn 进程架构分析</a>
+      <ol>
+        <li><a href="#ch2-1">软件模块（开发单元）</a></li>
+        <li><a href="#ch2-2">软件模块（运行单元）</a></li>
+        <li><a href="#ch2-3">AppSpawn 启动流程</a></li>
+        <li><a href="#ch2-4">App 进程孵化流程</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch3">appspawn-x 混合孵化器设计</a>
+      <ol>
+        <li><a href="#ch3-1">设计目标与约束</a></li>
+        <li><a href="#ch3-2">模块组合方案</a></li>
+        <li><a href="#ch3-3">appspawn-x 启动流程</a></li>
+        <li><a href="#ch3-4">Android App 进程孵化流程</a></li>
+        <li><a href="#ch3-5">与 appspawn 的共享与差异</a></li>
+        <li><a href="#ch3-6">进程内运行时架构</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch4">appspawn-x 详细实现设计</a>
+      <ol>
+        <li><a href="#ch4-1">源码目录结构与文件说明</a></li>
+        <li><a href="#ch4-2">核心类设计</a></li>
+        <li><a href="#ch4-3">主程序启动流程（详细）</a></li>
+        <li><a href="#ch4-4">消息处理与 Fork 流程（详细）</a></li>
+        <li><a href="#ch4-5">子进程特化流程（详细）</a></li>
+        <li><a href="#ch4-6">Java 侧预加载与子进程初始化</a>
+          <ol>
+            <li><a href="#ch4-6-1">preload()（父进程）</a></li>
+            <li><a href="#ch4-6-2">预加载框架类分类分析与裁剪策略</a></li>
+            <li><a href="#ch4-6-3">initChild()（子进程）</a></li>
+          </ol>
+        </li>
+        <li><a href="#ch4-7">foundation 侧集成</a></li>
+        <li><a href="#ch4-8">配置文件设计</a></li>
+      </ol>
+    </li>
+    <li><a href="#ch5">编译构建环境搭建</a>
+      <ol>
+        <li><a href="#ch5-1">开发环境要求</a></li>
+        <li><a href="#ch5-2">源码目录布局</a></li>
+        <li><a href="#ch5-3">BUILD.gn 构建配置</a></li>
+        <li><a href="#ch5-4">依赖库说明</a></li>
+        <li><a href="#ch5-5">Android 运行时库交叉编译</a></li>
+        <li><a href="#ch5-6">编译与部署步骤</a></li>
+        <li><a href="#ch5-7">验证与调试</a></li>
+      </ol>
+    </li>
+  </ol>
+</div>
+
+<!-- ================================================================ -->
+<!-- Chapter 0: Comparison Overview -->
+<!-- ================================================================ -->
+<h1 id="ch0">1. Android 与 OH 系统进程对比概览</h1>
+
+<h2 id="ch0-1">1.1 init 进程对比</h2>
+
+<table>
+  <tr>
+    <th>对比维度</th>
+    <th><span class="tag tag-android">Android init</span></th>
+    <th><span class="tag tag-oh">OH init</span></th>
+  </tr>
+  <tr><td>配置格式</td><td><code>.rc</code> 文件（自定义行式语法）</td><td><code>.cfg</code> 文件（JSON 格式）</td></tr>
+  <tr><td>配置路径</td><td><code>/system/etc/init/</code>, <code>/vendor/etc/init/</code></td><td><code>/system/etc/init/</code></td></tr>
+  <tr><td>触发机制</td><td><code>on init</code>, <code>on boot</code>, <code>on property:X=Y</code></td><td><code>"name": "init"</code>, <code>"post-fs-data"</code>, <code>"services:X"</code></td></tr>
+  <tr><td>命令集</td><td>mkdir, chmod, chown, write, start, stop, setprop, mount, symlink</td><td>mkdir, chmod, chown, start, stop, reset, unset_bootevent, restorecon</td></tr>
+  <tr><td>属性服务</td><td>property_service (<code>setprop</code>/<code>getprop</code>)</td><td>sysparam (<code>SetParameter</code>/<code>GetParameter</code>)</td></tr>
+  <tr><td>属性文件</td><td><code>*.prop</code></td><td><code>*.para</code> + <code>*.para.dac</code>（含 DAC 权限控制）</td></tr>
+  <tr><td>属性命名</td><td><code>ro.*</code>, <code>persist.*</code>, <code>sys.*</code></td><td><code>const.*</code>, <code>persist.*</code>, <code>bootevent.*</code>, <code>component.*</code></td></tr>
+  <tr><td>服务重启</td><td><code>oneshot</code> 标志 + <code>restart_period</code></td><td><code>once: 1</code> + <code>critical: [enabled, max, window]</code></td></tr>
+  <tr><td>服务托管模型</td><td>每个服务独立二进制 或 system_server (Java)</td><td><code>sa_main</code> 通用宿主加载 <code>.z.so</code> 插件 (C++)</td></tr>
+  <tr><td>按需启动</td><td><code>disabled</code> + <code>class_start</code></td><td><code>ondemand: true</code>, <code>start-mode: "condition"</code></td></tr>
+  <tr><td>安全模型</td><td>SELinux (<code>seclabel</code>)</td><td>SELinux (<code>secon</code>) + 权限 ACL</td></tr>
+  <tr><td>启动完成标识</td><td><code>sys.boot_completed=1</code>（单一标志）</td><td><code>bootevent.*</code>（多粒度事件：appfwk.ready, wms.ready, launcher.ready）</td></tr>
+  <tr><td>崩溃处理</td><td><code>critical</code> 标志 → 崩溃后重启</td><td><code>critical: [1, N, T]</code> → N次崩溃/T秒内 → 重启设备</td></tr>
+  <tr><td>源码路径</td><td><code>system/core/init/</code></td><td><code>base/startup/init/</code></td></tr>
+</table>
+
+<h4>Android init.rc 示例</h4>
+<pre><code>service zygote /system/bin/app_process64 -Xzygote /system/bin \
+    --zygote --start-system-server --socket-name=zygote
+    class main
+    priority -20
+    socket zygote stream 660 root system
+    onrestart restart audioserver
+    onrestart restart cameraserver
+    writepid /dev/cpuset/foreground/tasks</code></pre>
+
+<h4>OH init .cfg 示例（foundation.cfg）</h4>
+<pre><code>{
+    "services": [{
+        "name": "foundation",
+        "path": ["/system/bin/sa_main", "/system/profile/foundation.json"],
+        "uid": "foundation",
+        "gid": ["system", "appspawn", "shell", "bms_service_group", "userauth"],
+        "critical": [1, 4, 240],
+        "importance": -20,
+        "secon": "u:r:foundation:s0",
+        "bootevents": ["bootevent.appfwk.ready", "bootevent.wms.ready"]
+    }]
+}</code></pre>
+
+<h2 id="ch0-2">1.2 进程孵化器对比</h2>
+
+<table>
+  <tr>
+    <th>对比维度</th>
+    <th><span class="tag tag-android">Android Zygote</span></th>
+    <th><span class="tag tag-oh">OH AppSpawn</span></th>
+  </tr>
+  <tr><td>孵化器数量</td><td>1~2 个（zygote + zygote_secondary）</td><td>5 个（appspawn, nwebspawn, cjappspawn, nativespawn, hybridspawn）</td></tr>
+  <tr><td>实现语言</td><td>C++（app_process）+ Java（ZygoteInit）</td><td>C（appspawn daemon）</td></tr>
+  <tr><td>运行时预加载</td><td><strong>是</strong> — ART VM + ~7000个类 + 资源 + 共享库 + GPU 驱动</td><td><strong>否</strong> — 运行时在子进程 fork 后创建</td></tr>
+  <tr><td>通信方式</td><td>Unix domain socket（<code>/dev/socket/zygote</code>）</td><td>Unix domain socket（<code>/dev/unix/socket/AppSpawn</code>）</td></tr>
+  <tr><td>Fork 模型</td><td>fork + specialize（共享预加载内存 COW）</td><td>fork + 沙箱配置（无运行时共享）</td></tr>
+  <tr><td>USAP 池</td><td>支持（预 fork 未特化进程池）</td><td>不支持</td></tr>
+  <tr><td>子进程入口</td><td><code>ActivityThread.main()</code></td><td><code>MainThread::Start()</code></td></tr>
+  <tr><td>向系统注册</td><td><code>AMS.attachApplication()</code></td><td><code>AppMgr.AttachApplication()</code></td></tr>
+  <tr><td>事件循环</td><td>Looper / Handler / MessageQueue</td><td>EventRunner / EventHandler</td></tr>
+  <tr><td>IPC 框架</td><td>Binder (<code>/dev/binder</code>)</td><td>IPC Core (类 Binder)</td></tr>
+  <tr><td>源码路径</td><td><code>frameworks/base/core/java/com/android/internal/os/</code><br><code>frameworks/base/cmds/app_process/</code></td><td><code>base/startup/appspawn/</code>（daemon）<br><code>ability_rt/services/appmgr/</code>（client）</td></tr>
+</table>
+
+<h2 id="ch0-3">1.3 核心系统服务进程对比</h2>
+
+<table>
+  <tr><th>Android 进程</th><th>OH 对应进程</th><th>作用</th></tr>
+  <tr><td>init (PID 1)</td><td>init (PID 1)</td><td>第一个用户态进程，启动所有系统服务</td></tr>
+  <tr><td>zygote</td><td>appspawn</td><td>预加载运行时，fork 产生应用进程</td></tr>
+  <tr><td>system_server</td><td>foundation</td><td>承载核心系统服务（AMS、WMS、BMS 等）</td></tr>
+  <tr><td>servicemanager</td><td>samgr</td><td>系统服务注册与查找</td></tr>
+  <tr><td>surfaceflinger</td><td>render_service</td><td>图形合成与显示</td></tr>
+  <tr><td>installd</td><td>bms (BundleManagerService)</td><td>包安装管理</td></tr>
+  <tr><td>logd</td><td>hilogd</td><td>日志服务</td></tr>
+  <tr><td>vold</td><td>storage_manager</td><td>存储卷管理</td></tr>
+  <tr><td>webview_zygote</td><td>nwebspawn</td><td>Web 渲染进程孵化器</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!-- Chapter 1: Android Zygote -->
+<!-- ================================================================ -->
+<h1 id="ch1">2. Android Zygote 进程架构分析</h1>
+
+<h2 id="ch1-1">2.1 软件模块（开发单元）</h2>
+
+<h3>2.1.1 Native 层</h3>
+
+<table>
+  <tr><th>模块/文件</th><th>路径</th><th>职责</th></tr>
+  <tr><td><code>app_main.cpp</code></td><td><code>frameworks/base/cmds/app_process/</code></td><td>Zygote 可执行文件入口（<code>app_process64</code>），创建 AppRuntime，调用 <code>AndroidRuntime::start()</code></td></tr>
+  <tr><td><code>AndroidRuntime.cpp</code></td><td><code>frameworks/base/core/jni/</code></td><td>创建 ART VM（<code>startVm</code>），注册所有框架层 JNI 方法（<code>startReg</code>），反射调用 <code>ZygoteInit.main()</code></td></tr>
+  <tr><td><code>com_android_internal_os_Zygote.cpp</code></td><td><code>frameworks/base/core/jni/</code></td><td>fork 核心实现：<code>ForkCommon()</code>（调用 <code>fork()</code>）+ <code>SpecializeCommon()</code>（设置 UID/GID/SELinux/沙箱）</td></tr>
+  <tr><td><code>com_android_internal_os_ZygoteCommandBuffer.cpp</code></td><td><code>frameworks/base/core/jni/</code></td><td>批量 fork 优化（<code>forkRepeatedly</code>），USAP 池支持</td></tr>
+  <tr><td><code>com_android_internal_os_ZygoteInit.cpp</code></td><td><code>frameworks/base/core/jni/</code></td><td>HAL 预加载、GPU 驱动预加载的 JNI 实现</td></tr>
+</table>
+
+<h3>2.1.2 Java 层</h3>
+
+<table>
+  <tr><th>模块/文件</th><th>路径（<code>com.android.internal.os</code> 包下）</th><th>职责</th></tr>
+  <tr><td><code>ZygoteInit.java</code></td><td><code>frameworks/base/core/java/.../os/</code></td><td>Zygote 主入口：预加载类/资源/库 → fork system_server → 进入 select loop</td></tr>
+  <tr><td><code>ZygoteServer.java</code></td><td>同上</td><td>Unix domain socket 服务端：select/poll 循环，接受连接，管理 USAP 池</td></tr>
+  <tr><td><code>ZygoteConnection.java</code></td><td>同上</td><td>处理单个 fork 请求：解析参数 → 调用 <code>Zygote.forkAndSpecialize()</code> → 子进程分派</td></tr>
+  <tr><td><code>Zygote.java</code></td><td>同上</td><td>核心 fork 方法：<code>forkAndSpecialize()</code>、<code>forkSystemServer()</code>、<code>forkSimpleApps()</code>、<code>childMain()</code>；声明所有 native 方法</td></tr>
+  <tr><td><code>ZygoteArguments.java</code></td><td>同上</td><td>解析 socket 传入的 fork 请求参数</td></tr>
+  <tr><td><code>ZygoteCommandBuffer.java</code></td><td>同上</td><td>优化 I/O 缓冲，用于批量 fork 场景</td></tr>
+  <tr><td><code>RuntimeInit.java</code></td><td>同上</td><td>子进程通用初始化：异常处理器、日志重定向、<code>findStaticMain()</code> 反射查找入口方法</td></tr>
+</table>
+
+<h3>2.1.3 客户端（system_server 侧）</h3>
+
+<table>
+  <tr><th>文件</th><th>路径</th><th>职责</th></tr>
+  <tr><td><code>ZygoteProcess.java</code></td><td><code>frameworks/base/core/java/android/os/</code></td><td>连接 Zygote socket，发送 fork 命令（<code>start()</code> → <code>startViaZygote()</code> → <code>zygoteSendArgsAndGetResult()</code>）</td></tr>
+  <tr><td><code>ActivityThread.java</code></td><td><code>frameworks/base/core/java/android/app/</code></td><td>App 进程入口：<code>main()</code> 创建 Looper → attach → 进入消息循环</td></tr>
+</table>
+
+<h2 id="ch1-2">2.2 软件模块（运行单元）</h2>
+
+<p>Zygote 进程在运行时包含以下关键模块：</p>
+
+<div class="stat-grid">
+  <div class="stat-item"><div class="num">~7000</div><div class="label">预加载 Java 类</div></div>
+  <div class="stat-item"><div class="num">3</div><div class="label">预加载共享库</div></div>
+  <div class="stat-item"><div class="num">1</div><div class="label">ART VM 实例</div></div>
+  <div class="stat-item"><div class="num">0</div><div class="label">Binder 线程（fork 后才创建）</div></div>
+</div>
+
+<table>
+  <tr><th>运行时模块</th><th>说明</th><th>生命周期</th></tr>
+  <tr><td><strong>ART VM 实例</strong></td><td>由 <code>AndroidRuntime::startVm()</code> 创建，配置堆大小、JIT、GC 参数</td><td>Zygote 全生命周期，fork 后 COW 共享</td></tr>
+  <tr><td><strong>Boot Image</strong></td><td>预编译框架类（<code>.art</code>/<code>.oat</code>），只读内存映射</td><td>所有进程共享（内存映射）</td></tr>
+  <tr><td><strong>预加载类</strong></td><td>~7000 个系统类通过 <code>Class.forName()</code> 加载到共享堆</td><td>fork 后 COW 共享</td></tr>
+  <tr><td><strong>预加载资源</strong></td><td>系统 Drawable、ColorStateList 缓存在 Resources 对象中</td><td>fork 后 COW 共享</td></tr>
+  <tr><td><strong>共享库</strong></td><td><code>libandroid.so</code>, <code>libjnigraphics.so</code>, <code>libcompiler_rt.so</code></td><td>fork 后共享只读代码段</td></tr>
+  <tr><td><strong>GPU 驱动</strong></td><td>OpenGL/Vulkan 驱动通过 <code>nativePreloadGraphicsDriver()</code> 预加载</td><td>fork 后共享</td></tr>
+  <tr><td><strong>JCA 安全提供者</strong></td><td>AndroidKeyStoreProvider 等安全组件预热</td><td>fork 后 COW 共享</td></tr>
+  <tr><td><strong>Socket 服务端</strong></td><td>Zygote socket + USAP pool socket，poll 循环监听</td><td>仅 Zygote 父进程</td></tr>
+</table>
+
+<h2 id="ch1-3">2.3 Zygote 启动流程</h2>
+
+<p>init 通过 <code>init.rc</code> 启动 <code>app_process64</code>，以下为完整启动时序：</p>
+
+<div class="flow">
+init
+  │
+  ├─ exec: /system/bin/app_process64 -Xzygote /system/bin --zygote --start-system-server
+  │
+  ▼
+app_main.cpp::main()
+  │
+  ├─ 创建 AppRuntime (extends AndroidRuntime)
+  ├─ 解析参数: --zygote, --start-system-server
+  ├─ maybeCreateDalvikCache()
+  │
+  └─ runtime.start("com.android.internal.os.ZygoteInit", args, zygote=true)
+       │
+       ▼
+     AndroidRuntime::start()
+       │
+       ├─ JniInvocation 初始化
+       ├─ startVm(&mJavaVM, &env)          ← 创建 ART VM 实例
+       │    └─ 配置: 堆大小、JIT、GC、内存标签等（从系统属性读取）
+       ├─ startReg(env)                     ← 注册 100+ 组 JNI 原生方法
+       │
+       └─ CallStaticVoidMethod(ZygoteInit.main)
+            │
+            ▼
+          ZygoteInit.main()
+            │
+            ├─ ZygoteHooks.startZygoteNoThreadCreation()  ← 禁止新建线程
+            ├─ Os.setpgid(0, 0)                           ← 独立进程组
+            ├─ RuntimeInit.preForkInit()
+            │
+            ├─── preload() ──────────────────────────────────────────────
+            │  ├─ preloadClasses()                  ~7000 个系统类
+            │  ├─ cacheNonBootClasspathClassLoaders()  HIDL jar 预加载
+            │  ├─ preloadResources()                系统 Drawable/Color
+            │  ├─ nativePreloadAppProcessHALs()     HAL 库
+            │  ├─ maybePreloadGraphicsDriver()      GPU 驱动
+            │  ├─ preloadSharedLibraries()           libandroid.so 等
+            │  ├─ preloadTextResources()             断字器/字体缓存
+            │  ├─ WebViewFactory.prepareWebViewInZygote()
+            │  └─ warmUpJcaProviders()              安全提供者
+            │────────────────────────────────────────────────────────────
+            │
+            ├─ gcAndFinalize()                      ← 清理预加载垃圾
+            ├─ Zygote.initNativeState()             ← 信号处理、FD 跟踪
+            ├─ ZygoteHooks.stopZygoteNoThreadCreation()
+            ├─ new ZygoteServer()                   ← 创建 Socket 服务端
+            │
+            ├─ forkSystemServer()                   ← fork system_server
+            │    └─ Zygote.forkSystemServer()
+            │         ├─ ForkCommon() → fork()
+            │         └─ child: → SystemServer.main()
+            │
+            └─ zygoteServer.runSelectLoop()         ← 进入无限 poll 循环
+                 └─ 监听: Zygote socket + USAP pool socket + 活跃连接
+</div>
+
+<h2 id="ch1-4">2.4 App/Service 进程孵化流程</h2>
+
+<h3>2.4.1 请求端 → Zygote → fork → 子进程初始化</h3>
+
+<div class="flow">
+system_server (AMS)
+  │
+  ├─ Process.start() → ZygoteProcess.start()
+  │    └─ startViaZygote()
+  │         └─ zygoteSendArgsAndGetResult()  ← 通过 socket 发送参数
+  │              参数: uid, gid, runtime-flags, nice-name,
+  │                    target-class="android.app.ActivityThread", ...
+  │
+  ▼
+Zygote (poll loop 收到请求)
+  │
+  ├─ ZygoteConnection.processCommand()
+  │    ├─ 解析 ZygoteArguments
+  │    ├─ 安全策略检查
+  │    │
+  │    └─ Zygote.forkAndSpecialize(uid, gid, gids, runtimeFlags, ...)
+  │         │
+  │         ├─ ZygoteHooks.preFork()           ← 暂停 GC
+  │         ├─ nativeForkAndSpecialize()
+  │         │    ├─ ForkCommon()
+  │         │    │    ├─ 设置信号处理
+  │         │    │    ├─ 关闭/验证 FD
+  │         │    │    └─ fork()                 ← 系统调用
+  │         │    │
+  │         │    └─ SpecializeCommon() (child)
+  │         │         ├─ 设置 UID/GID/supplementary groups
+  │         │         ├─ 设置 capabilities
+  │         │         ├─ 设置 SELinux context
+  │         │         ├─ 挂载 emulated storage
+  │         │         ├─ 隔离 app data 目录
+  │         │         ├─ 初始化 native bridge
+  │         │         └─ 设置进程名
+  │         │
+  │         └─ ZygoteHooks.postForkCommon()     ← 恢复 GC
+  │
+  ▼ (child process)
+  │
+  ├─ handleChildProc()
+  │    ├─ 关闭 Zygote server socket
+  │    └─ ZygoteInit.zygoteInit()
+  │         ├─ RuntimeInit.redirectLogStreams()  ← stdout/stderr → Android log
+  │         ├─ RuntimeInit.commonInit()         ← 异常处理器、时区
+  │         ├─ nativeZygoteInit()
+  │         │    └─ AppRuntime::onZygoteInit()
+  │         │         └─ ProcessState::self()->startThreadPool()  ← 启动 Binder 线程池
+  │         │
+  │         └─ RuntimeInit.applicationInit()
+  │              └─ findStaticMain("android.app.ActivityThread")
+  │
+  ▼
+ActivityThread.main()
+  │
+  ├─ Looper.prepareMainLooper()                 ← 创建主消息循环
+  ├─ new ActivityThread()
+  ├─ thread.attach(false, startSeq)
+  │    └─ AMS.attachApplication(mAppThread)      ← 向 AMS 注册
+  │         └─ AMS 回调: bindApplication(), scheduleLaunchActivity(), ...
+  │
+  └─ Looper.loop()                              ← 进入消息循环（永不返回）
+</div>
+
+<h3>2.4.2 子进程需要加载的关键模块</h3>
+
+<table>
+  <tr><th>阶段</th><th>加载模块</th><th>来源</th></tr>
+  <tr><td>继承自 Zygote（COW 共享）</td><td>ART VM、Boot Image、预加载类(~7000)、系统资源、共享库、GPU 驱动</td><td>fork 时自动继承</td></tr>
+  <tr><td>fork 后立即</td><td>Binder 线程池（<code>ProcessState::startThreadPool</code>）</td><td><code>nativeZygoteInit()</code></td></tr>
+  <tr><td>attach 阶段</td><td>ApplicationInfo、ClassLoader（APK DEX）</td><td>AMS <code>bindApplication</code> 回调</td></tr>
+  <tr><td>Application 创建</td><td>APK 资源（Resources）、Application 类实例化</td><td><code>handleBindApplication()</code></td></tr>
+  <tr><td>组件启动</td><td>Activity/Service/Provider 类加载 + 实例化</td><td><code>scheduleLaunchActivity()</code> 等</td></tr>
+  <tr><td>JNI 库</td><td>App 自身的 <code>.so</code> 库（<code>System.loadLibrary</code>）</td><td>Application 或组件 <code>onCreate</code></td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!-- Chapter 2: OH AppSpawn -->
+<!-- ================================================================ -->
+<h1 id="ch2">3. OH AppSpawn 进程架构分析</h1>
+
+<h2 id="ch2-1">3.1 软件模块（开发单元）</h2>
+
+<h3>3.1.1 AppSpawn Daemon（服务端，5 个变体）</h3>
+
+<table>
+  <tr><th>进程名</th><th>常量名</th><th>职责</th></tr>
+  <tr><td><code>appspawn</code></td><td><code>APPSPAWN_SERVER_NAME</code></td><td>标准 ArkTS/JS 应用进程孵化器</td></tr>
+  <tr><td><code>nwebspawn</code></td><td><code>NWEBSPAWN_SERVER_NAME</code></td><td>NWeb（Web 渲染）进程孵化器</td></tr>
+  <tr><td><code>cjappspawn</code></td><td><code>CJAPPSPAWN_SERVER_NAME</code></td><td>CJ（仓颉语言）应用进程孵化器</td></tr>
+  <tr><td><code>nativespawn</code></td><td><code>NATIVESPAWN_SERVER_NAME</code></td><td>Native 子进程孵化器</td></tr>
+  <tr><td><code>hybridspawn</code></td><td><code>HYBRIDSPAWN_SERVER_NAME</code></td><td>Hybrid（ArkTS 1.2 / 混合模式）孵化器</td></tr>
+</table>
+
+<p>Daemon 源码位于 <code>base/startup/appspawn/</code>（本地源码未检出），为 C 语言实现。</p>
+
+<h3>3.1.2 AppSpawnClient（客户端，位于 ability_runtime）</h3>
+
+<table>
+  <tr><th>文件</th><th>路径</th><th>职责</th></tr>
+  <tr><td><code>app_spawn_client.h/cpp</code></td><td><code>ability_rt/services/appmgr/</code></td><td>AppSpawnClient 类：<code>OpenConnection()</code>, <code>StartProcess()</code>, 消息构建</td></tr>
+  <tr><td><code>app_spawn_socket.cpp</code></td><td><code>ability_rt/services/appmgr/src/</code></td><td>Unix domain socket 传输层</td></tr>
+  <tr><td><code>remote_client_manager.h/cpp</code></td><td><code>ability_rt/services/appmgr/</code></td><td>管理 5 个 spawn client 实例，按应用类型分发</td></tr>
+  <tr><td><code>app_mgr_service_inner.h/cpp</code></td><td><code>ability_rt/services/appmgr/</code></td><td><code>StartProcess()</code> 总入口，编排 spawn 流程</td></tr>
+</table>
+
+<h3>3.1.3 MainThread（App 侧入口，相当于 Android 的 ActivityThread）</h3>
+
+<table>
+  <tr><th>文件</th><th>路径</th><th>职责</th></tr>
+  <tr><td><code>main_thread.h</code></td><td><code>ability_rt/interfaces/kits/native/appkit/app/</code></td><td>MainThread 类定义：继承 <code>AppSchedulerHost</code>，<code>Start()</code>, <code>Attach()</code>, <code>HandleLaunchApplication()</code></td></tr>
+  <tr><td><code>main_thread.cpp</code></td><td><code>ability_rt/frameworks/native/appkit/app/</code></td><td>完整实现：事件循环、应用生命周期、运行时创建</td></tr>
+</table>
+
+<h2 id="ch2-2">3.2 软件模块（运行单元）</h2>
+
+<table>
+  <tr><th>运行时模块</th><th>说明</th><th>生命周期</th></tr>
+  <tr><td><strong>AppSpawn Daemon</strong></td><td>C 语言实现的孵化器进程，监听 socket</td><td>Daemon 全生命周期</td></tr>
+  <tr><td><strong>子进程运行时</strong></td><td>ArkTS/ETS/CJ 引擎，fork 后在子进程中创建（非预加载）</td><td>仅子进程</td></tr>
+  <tr><td><strong>EventRunner</strong></td><td>主线程事件循环（<code>EventRunner::GetMainEventRunner()</code>）</td><td>子进程全生命周期</td></tr>
+  <tr><td><strong>MainHandler</strong></td><td>处理内部事件（LAUNCH_APPLICATION, LAUNCH_ABILITY 等）</td><td>子进程全生命周期</td></tr>
+  <tr><td><strong>IPC Stub</strong></td><td><code>AppSchedulerHost</code>（IAbilityScheduler 服务端），接收 AMS 回调</td><td>子进程全生命周期</td></tr>
+  <tr><td><strong>Watchdog</strong></td><td>ANR 检测，监控主 Handler 响应</td><td>子进程全生命周期</td></tr>
+  <tr><td><strong>AbilityRecordMgr</strong></td><td>管理进程内的 Ability 实例</td><td>子进程全生命周期</td></tr>
+</table>
+
+<div class="note">
+<strong>关键区别：</strong>OH AppSpawn 不像 Android Zygote 那样预加载运行时。ArkTS 引擎在每个子进程 fork 后独立创建，不通过 COW 共享。这意味着 OH 应用启动时的运行时初始化开销更大，但隔离性更强。
+</div>
+
+<h2 id="ch2-3">3.3 AppSpawn 启动流程</h2>
+
+<div class="flow">
+init (解析 appspawn.cfg)
+  │
+  └─ exec: /system/bin/appspawn
+       │
+       ▼
+     appspawn daemon main()         (C 语言, base/startup/appspawn/)
+       │
+       ├─ 初始化沙箱环境配置
+       ├─ 初始化 SELinux 策略
+       ├─ 初始化 Access Token 管理
+       │
+       ├─ 创建 Unix domain socket
+       │    └─ /dev/unix/socket/AppSpawn
+       │
+       └─ 进入事件循环，等待 spawn 请求
+            │
+            └─ 收到请求 → fork() → 子进程 specialize
+</div>
+
+<h2 id="ch2-4">3.4 App 进程孵化流程</h2>
+
+<div class="flow">
+foundation 进程 (AbilityManagerService)
+  │
+  ├─ 需要启动 App
+  ├─ AppMgrServiceInner::StartProcess()
+  │    ├─ PreCheckStartProcess()
+  │    ├─ RemoteClientManager: 选择 spawn client
+  │    │    ├─ CJ App → cjappspawn
+  │    │    ├─ ArkTS 1.2 → hybridspawn
+  │    │    ├─ NWeb → nwebspawn
+  │    │    └─ 标准 App → appspawn
+  │    │
+  │    └─ 构建 AppSpawnStartMsg:
+  │         ├─ procName, bundleName, uid, gid, gids[]
+  │         ├─ accessTokenIdEx, apl
+  │         ├─ hapFlags, permissions
+  │         ├─ hspList, overlayInfo, dataGroupInfo
+  │         └─ code: MSG_APP_SPAWN (0)
+  │
+  ▼
+AppSpawnClient::StartProcess()
+  │
+  ├─ VerifyMsg()
+  ├─ OpenConnection()                  ← AppSpawnClientInit(socket)
+  ├─ AppSpawnReqMsgCreate()
+  ├─ AppspawnCreateDefaultMsg()
+  │    ├─ SetDacInfo(uid, gid, gids)
+  │    ├─ SetBundleInfo(bundleName)
+  │    ├─ SetAppInternetPermission()
+  │    ├─ SetAppAccessToken()
+  │    ├─ SetAppDomainInfo(hapFlags, apl)
+  │    ├─ SetStartFlags(cold, debug, asan, sandbox, ...)
+  │    ├─ SetMountPermission()
+  │    └─ SetExtMsg(renderCmd, hspList, overlay, env, ...)
+  │
+  └─ AppSpawnClientSendMsg(handle, reqHandle, &result) ← 发送到 daemon
+       │
+       ▼ (返回 child PID)
+
+appspawn daemon (收到请求)
+  │
+  ├─ 解析 SpawnMsg
+  ├─ fork()
+  │
+  └─ 子进程 specialize:
+       ├─ 设置 UID/GID/supplementary groups
+       ├─ 配置沙箱文件系统挂载
+       ├─ 设置 SELinux context
+       ├─ 设置 Access Token
+       ├─ 配置环境变量
+       └─ exec 或 跳转到 MainThread::Start()
+
+子进程 ──────────────────────────────────────────────
+  │
+  ▼
+MainThread::Start()
+  │
+  ├─ EventRunner::GetMainEventRunner()          ← 获取主事件循环
+  ├─ new MainThread()
+  ├─ thread->Init(runner)                       ← 初始化 MainHandler, Watchdog
+  ├─ thread->Attach()
+  │    └─ ConnectToAppMgr()
+  │         ├─ samgr.GetSystemAbility(APP_MGR_SERVICE_ID) ← 获取 AppMgr 代理
+  │         └─ appMgr_->AttachApplication(this)           ← 注册为 IAppScheduler
+  │
+  └─ runner->Run()                              ← 进入事件循环（阻塞）
+
+foundation 收到 AttachApplication ─────────────────
+  │
+  ├─ 查找 AppRunningRecord (by PID)
+  ├─ 设置 AppDeathRecipient (死亡监控)
+  ├─ 设置 ApplicationClient (IAppScheduler 代理)
+  │
+  └─ LaunchApplication()
+       └─ ScheduleLaunchApplication(AppLaunchData)
+            │
+            ▼ (子进程收到)
+          MainThread::HandleLaunchApplication()
+            │
+            ├─ InitCreate()                     ← ContextDeal, OHOSApplication
+            ├─ 获取 BundleInfo (from BMS)
+            ├─ LoadAbilityLibrary()              ← 加载 Ability .so 库
+            ├─ LoadNativeLibrary()               ← 加载 Native .so 库
+            ├─ 创建 ApplicationContext
+            │
+            ├─ AbilityRuntime::Runtime::Create(options)  ← 创建运行时引擎
+            │    ├─ JS/ArkTS → JsRuntime
+            │    ├─ ETS → ETSRuntime
+            │    └─ CJ → CJRuntime
+            │
+            ├─ 注册 QuickFix 补丁
+            └─ application_->OnStart()           ← 应用生命周期开始
+</div>
+
+<h3>3.4.1 子进程需要加载的关键模块</h3>
+
+<table>
+  <tr><th>阶段</th><th>加载模块</th><th>来源</th></tr>
+  <tr><td>fork 后继承</td><td>基础 C/C++ 运行时、沙箱配置</td><td>fork 继承</td></tr>
+  <tr><td>MainThread::Start()</td><td>EventRunner、MainHandler、Watchdog</td><td>自行初始化</td></tr>
+  <tr><td>Attach</td><td>IPC 连接（samgr 查找 + AppMgr 注册）</td><td>samgr IPC</td></tr>
+  <tr><td>HandleLaunchApplication</td><td>BundleInfo、Ability .so 库、Native .so 库</td><td>BMS 查询 + dlopen</td></tr>
+  <tr><td>Runtime::Create</td><td><strong>ArkTS/ETS/CJ 引擎</strong>（非预加载，独立创建）</td><td>动态加载</td></tr>
+  <tr><td>Application.OnStart</td><td>应用 Application 实例、资源管理器</td><td>运行时构造</td></tr>
+  <tr><td>Ability 启动</td><td>AbilityStage、具体 Ability 实例</td><td>运行时构造</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!-- Chapter 3: appspawn-x Design -->
+<!-- ================================================================ -->
+<h1 id="ch3">4. appspawn-x 混合孵化器设计</h1>
+
+<h2 id="ch3-1">4.1 设计目标与约束</h2>
+
+<div class="card">
+<h4>核心目标</h4>
+<p>设计一个名为 <strong>appspawn-x</strong> 的进程孵化器，能够孵化出<strong>包含 Android 应用框架和 ART 运行时</strong>的应用进程，使 Android App 可以运行在 OH 系统上。</p>
+
+<h4>设计约束</h4>
+<ul>
+  <li>appspawn-x 独立于 OH 原生 appspawn 运行，两者互不干扰</li>
+  <li>孵化出的 Android App 进程必须具备完整的 ART 运行时环境</li>
+  <li>孵化出的 Android App 进程必须能够通过适配层与 OH 系统服务通信</li>
+  <li>利用 Zygote 的预加载机制加速 Android App 启动</li>
+  <li>兼容 OH 的安全模型（沙箱、Access Token、SELinux）</li>
+</ul>
+</div>
+
+<h2 id="ch3-2">4.2 模块组合方案</h2>
+
+<h3>4.2.1 appspawn-x 需要从两个系统组合的模块</h3>
+
+<table>
+  <tr>
+    <th>模块</th>
+    <th>来源</th>
+    <th>用途</th>
+    <th>适配要求</th>
+  </tr>
+  <tr>
+    <td><strong>ART VM</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>Java/Kotlin 字节码执行引擎</td>
+    <td>保持原样，与 Zygote 中完全一致</td>
+  </tr>
+  <tr>
+    <td><strong>预加载类</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>~7000 个框架类预加载</td>
+    <td>使用 Android 的 <code>preloaded-classes</code> 列表</td>
+  </tr>
+  <tr>
+    <td><strong>预加载资源</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>系统 Drawable/Color/Text 资源</td>
+    <td>加载 Android 风格系统资源</td>
+  </tr>
+  <tr>
+    <td><strong>AndroidRuntime (JNI)</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>startVm + startReg，注册框架 JNI</td>
+    <td>保持原样</td>
+  </tr>
+  <tr>
+    <td><strong>共享库</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>libandroid, libjnigraphics, GPU 驱动</td>
+    <td>需编译适配 OH 的 <code>libandroid.so</code> 变体</td>
+  </tr>
+  <tr>
+    <td><strong>Binder 线程池</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>子进程 IPC（Android 应用框架内部通信）</td>
+    <td>需要 <code>/dev/binder</code> 或使用 OH IPC 替代</td>
+  </tr>
+  <tr>
+    <td><strong>ActivityThread</strong></td>
+    <td><span class="tag tag-android">Android</span></td>
+    <td>App 进程主入口</td>
+    <td>保持原样，通过适配层连接 OH 服务</td>
+  </tr>
+  <tr>
+    <td><strong>适配层 (oh-adapter)</strong></td>
+    <td><span class="tag tag-hybrid">Hybrid</span></td>
+    <td>桥接 Android 框架调用到 OH 系统服务</td>
+    <td><code>liboh_adapter_bridge.so</code> + Java adapter 类</td>
+  </tr>
+  <tr>
+    <td><strong>沙箱 + DAC 配置</strong></td>
+    <td><span class="tag tag-oh">OH</span></td>
+    <td>文件系统隔离、UID/GID 分配</td><td>使用 OH 的沙箱和 DAC 机制</td>
+  </tr>
+  <tr>
+    <td><strong>SELinux 策略</strong></td>
+    <td><span class="tag tag-oh">OH</span></td>
+    <td>强制访问控制</td>
+    <td>为 Android App 进程定义 OH SELinux 域</td>
+  </tr>
+  <tr>
+    <td><strong>Access Token</strong></td>
+    <td><span class="tag tag-oh">OH</span></td>
+    <td>OH 权限管理</td>
+    <td>Android App 通过适配层获取 OH Access Token</td>
+  </tr>
+  <tr>
+    <td><strong>Socket 通信（客户端）</strong></td>
+    <td><span class="tag tag-oh">OH</span></td>
+    <td>foundation 向 appspawn-x 发送 spawn 请求</td>
+    <td>复用 AppSpawnClient 协议</td>
+  </tr>
+  <tr>
+    <td><strong>OH IPC</strong></td>
+    <td><span class="tag tag-oh">OH</span></td>
+    <td>子进程与 OH 系统服务通信</td>
+    <td>通过适配层 JNI 桥接到 OH IPC</td></tr>
+</table>
+
+<h3>4.2.2 模块分层架构图</h3>
+
+<div class="flow">
+┌──────────────────────────────────────────────────────────────────────┐
+│                        appspawn-x 进程（孵化器）                       │
+│                                                                      │
+│  ┌─────────────────────────┐  ┌────────────────────────────────────┐ │
+│  │   OH 模块（沙箱+安全）     │  │   Android 模块（运行时+框架）         │ │
+│  │                         │  │                                    │ │
+│  │  - OH 沙箱配置           │  │  - ART VM 实例                     │ │
+│  │  - SELinux 策略          │  │  - Boot Image (.art/.oat)          │ │
+│  │  - Access Token 管理     │  │  - 预加载类 (~7000)                 │ │
+│  │  - DAC (uid/gid)        │  │  - 预加载资源 (Drawable/Color)       │ │
+│  │  - Socket 监听           │  │  - 预加载共享库                     │ │
+│  │  - OH IPC 库             │  │  - GPU 驱动                       │ │
+│  │                         │  │  - AndroidRuntime JNI 注册          │ │
+│  └─────────────────────────┘  │  - 适配层 (liboh_adapter_bridge.so) │ │
+│                                │  - ZygoteInit 预加载逻辑            │ │
+│                                └────────────────────────────────────┘ │
+│                                                                      │
+│  Socket: /dev/unix/socket/AppSpawnX                                  │
+└──────────────────────────────────────────────────────────────────────┘
+                    │
+                    │ fork()
+                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    Android App 子进程                                  │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                  Android 应用框架层                              │   │
+│  │  ActivityThread.main() → Looper → Handler → 消息循环            │   │
+│  │  Activity / Service / ContentProvider / BroadcastReceiver      │   │
+│  ├───────────────────────────────────────────────────────────────┤   │
+│  │                  适配层 (Adapter Layer)                         │   │
+│  │  ActivityManagerAdapter    WindowManagerAdapter                 │   │
+│  │  ServiceConnectionRegistry  ContentProviderBridge              │   │
+│  │  liboh_adapter_bridge.so (JNI → OH IPC)                       │   │
+│  ├───────────────────────────────────────────────────────────────┤   │
+│  │                  OH 系统交互层                                  │   │
+│  │  OH IPC (samgr, IAbilityManager, IAppMgr, ...)               │   │
+│  │  OH Access Token   OH 沙箱隔离                                 │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  继承自 appspawn-x（COW 共享）:                                       │
+│    ART VM + Boot Image + 预加载类 + 资源 + 共享库 + GPU 驱动           │
+└──────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h2 id="ch3-3">4.3 appspawn-x 启动流程</h2>
+
+<div class="flow">
+OH init (解析 appspawn-x.cfg)
+  │
+  └─ exec: /system/bin/appspawn-x
+       │
+       ▼
+appspawn-x main()
+  │
+  ├─══════ OH 初始化（与 appspawn 共享） ══════
+  │  ├─ 初始化沙箱环境配置
+  │  ├─ 初始化 SELinux 策略
+  │  ├─ 初始化 Access Token 管理
+  │  └─ 创建 Socket: /dev/unix/socket/AppSpawnX
+  │
+  ├─══════ Android 运行时初始化（Zygote 逻辑） ══════
+  │  ├─ JniInvocation 初始化
+  │  ├─ AndroidRuntime::startVm()         ← 创建 ART VM
+  │  │    └─ 配置堆大小、JIT、GC 等参数
+  │  ├─ AndroidRuntime::startReg()        ← 注册框架 JNI 方法
+  │  │
+  │  ├─── preload() ────────────────────────────────
+  │  │  ├─ preloadClasses()            ~7000 个 Android 框架类
+  │  │  ├─ preloadResources()          系统 Drawable/Color
+  │  │  ├─ preloadSharedLibraries()    libandroid.so 等
+  │  │  ├─ preloadGraphicsDriver()     GPU 驱动
+  │  │  ├─ warmUpJcaProviders()        安全提供者
+  │  │  └─ preloadAdapterBridge()      ← 新增: 预加载适配层
+  │  │       ├─ System.loadLibrary("oh_adapter_bridge")
+  │  │       └─ 缓存适配层 Java 类 (Adapter, Bridge 等)
+  │  │──────────────────────────────────────────────
+  │  │
+  │  └─ gcAndFinalize()                 ← 清理预加载垃圾
+  │
+  └─ 进入事件循环，等待 spawn 请求
+       └─ poll: Socket FD
+</div>
+
+<h2 id="ch3-4">4.4 Android App 进程孵化流程</h2>
+
+<div class="flow">
+foundation 进程 (AppMgrServiceInner)
+  │
+  ├─ 检测到目标 App 为 Android App（通过 BundleInfo 标记）
+  ├─ RemoteClientManager::GetAndroidSpawnClient()
+  │    └─ 选择 appspawn-x 的 AppSpawnClient
+  │
+  ├─ 构建 AppSpawnStartMsg
+  │    ├─ 标准字段: procName, bundleName, uid, gid, ...
+  │    └─ 扩展字段: android_app=true, apk_path, dex_paths, ...
+  │
+  └─ AppSpawnClient::StartProcess() → 发送到 appspawn-x
+       │
+       ▼
+appspawn-x (收到 spawn 请求)
+  │
+  ├─ 解析请求消息
+  │
+  ├─── fork() ──────────────────────────────────────
+  │
+  │  父进程: 返回 child PID → foundation
+  │
+  │  子进程:
+  │  │
+  │  ├─══════ OH 侧特化（与 appspawn 相同） ══════
+  │  │  ├─ 设置 UID/GID/supplementary groups
+  │  │  ├─ 配置沙箱文件系统挂载
+  │  │  ├─ 设置 SELinux context (u:r:android_app:s0)
+  │  │  ├─ 设置 Access Token
+  │  │  └─ 配置环境变量
+  │  │
+  │  ├─══════ Android 侧初始化 ══════
+  │  │  ├─ ZygoteInit.nativeZygoteInit()
+  │  │  │    └─ 不加载 Android libbinder（系统服务走 OH ipc_core）
+  │  │  │       或 加载 Android libbinder（支持 App 内部跨进程通信）
+  │  │  │
+  │  │  ├─ OHEnvironment.initialize()        ← 初始化适配层
+  │  │  │    ├─ nativeInitialize()
+  │  │  │    ├─ nativeConnectToOHServices()   ← 连接 OH 系统服务
+  │  │  │    └─ nativeAttachApplication()     ← 向 OH AppMgr 注册
+  │  │  │
+  │  │  └─ RuntimeInit.findStaticMain("android.app.ActivityThread")
+  │  │
+  │  ▼
+  │  ActivityThread.main()
+  │  │
+  │  ├─ Looper.prepareMainLooper()
+  │  ├─ new ActivityThread()
+  │  ├─ thread.attach()
+  │  │    └─ AMS 实际上是 ActivityManagerAdapter
+  │  │         └─ 通过适配层向 OH AbilityManager 注册
+  │  │
+  │  └─ Looper.loop()                       ← App 进入消息循环
+  │
+  └─────────────────────────────────────────────────
+</div>
+
+<h2 id="ch3-5">4.5 与 appspawn 的共享与差异</h2>
+
+<h3>4.5.1 共享实现</h3>
+
+<table>
+  <tr><th>模块</th><th>共享内容</th><th>说明</th></tr>
+  <tr>
+    <td>Socket 通信协议</td>
+    <td><span class="tag tag-share">共享</span> AppSpawnClient 消息格式</td>
+    <td>foundation 使用相同的 <code>AppSpawnReqMsg</code> 协议与 appspawn-x 通信，仅 socket 名不同</td>
+  </tr>
+  <tr>
+    <td>DAC 设置</td>
+    <td><span class="tag tag-share">共享</span> SetDacInfo 逻辑</td>
+    <td>UID/GID/supplementary groups 设置完全相同</td>
+  </tr>
+  <tr>
+    <td>沙箱配置</td>
+    <td><span class="tag tag-share">共享</span> 沙箱挂载框架</td>
+    <td>文件系统隔离机制相同，但挂载路径需包含 Android APK 相关目录</td>
+  </tr>
+  <tr>
+    <td>SELinux 框架</td>
+    <td><span class="tag tag-share">共享</span> SELinux 上下文设置代码</td>
+    <td>调用接口相同，但 Android App 使用专用 SELinux 域 <code>u:r:android_app:s0</code></td>
+  </tr>
+  <tr>
+    <td>Access Token</td>
+    <td><span class="tag tag-share">共享</span> Token 分配机制</td>
+    <td>Android App 在 OH 中也需要 Access Token 来获取 OH 权限</td>
+  </tr>
+  <tr>
+    <td>fork 基础流程</td>
+    <td><span class="tag tag-share">共享</span> fork + specialize 框架</td>
+    <td>fork 系统调用 + 子进程特化（设置 UID/GID/SELinux）流程一致</td>
+  </tr>
+  <tr>
+    <td>进程监控</td>
+    <td><span class="tag tag-share">共享</span> 进程死亡通知</td>
+    <td>通过 AppDeathRecipient 监控进程状态</td>
+  </tr>
+</table>
+
+<h3>4.5.2 差异实现</h3>
+
+<table>
+  <tr><th>模块</th><th>appspawn</th><th>appspawn-x</th><th>差异原因</th></tr>
+  <tr>
+    <td>运行时预加载</td>
+    <td><span class="tag tag-oh">无</span> 不预加载运行时</td>
+    <td><span class="tag tag-new">新增</span> 预加载 ART VM + ~7000 类 + 资源</td>
+    <td>Android Zygote 的核心优化，必须保留以加速 App 启动</td>
+  </tr>
+  <tr>
+    <td>VM 引擎</td>
+    <td>ArkTS/ETS/CJ（fork 后创建）</td>
+    <td>ART VM（fork 前已创建，COW 共享）</td>
+    <td>不同语言运行时</td>
+  </tr>
+  <tr>
+    <td>子进程入口</td>
+    <td><code>MainThread::Start()</code></td>
+    <td><code>ActivityThread.main()</code></td>
+    <td>Android App 生命周期由 ActivityThread 驱动</td>
+  </tr>
+  <tr>
+    <td>系统服务注册</td>
+    <td>samgr → AppMgr.AttachApplication()</td>
+    <td>适配层 → OH AppMgr + OH AbilityManager</td>
+    <td>Android App 通过适配层间接注册到 OH 系统</td>
+  </tr>
+  <tr>
+    <td>事件循环</td>
+    <td>EventRunner / EventHandler</td>
+    <td>Looper / Handler / MessageQueue</td>
+    <td>Android 框架依赖 Looper 事件模型</td>
+  </tr>
+  <tr>
+    <td>IPC 机制</td>
+    <td>OH IPC Core</td>
+    <td>OH IPC Core（通过适配层 JNI 桥接）+ 可选的受限 Android Binder（App 内部）</td>
+    <td>系统服务通信走 OH IPC，App 内部组件可用 Android Binder</td>
+  </tr>
+  <tr>
+    <td>Socket 名称</td>
+    <td><code>/dev/unix/socket/AppSpawn</code></td>
+    <td><code>/dev/unix/socket/AppSpawnX</code></td>
+    <td>独立监听，互不干扰</td>
+  </tr>
+  <tr>
+    <td>沙箱额外挂载</td>
+    <td>HAP 相关目录</td>
+    <td>APK 安装目录、DEX 缓存、Android data 目录</td>
+    <td>Android App 文件布局与 OH HAP 不同</td>
+  </tr>
+  <tr>
+    <td>进程标识</td>
+    <td>OH bundleName</td>
+    <td>Android packageName（适配层映射到 bundleName）</td>
+    <td>包名体系不同</td>
+  </tr>
+  <tr>
+    <td>预加载适配层</td>
+    <td>无</td>
+    <td><span class="tag tag-new">新增</span> 预加载 <code>liboh_adapter_bridge.so</code> 和适配层 Java 类</td>
+    <td>适配层在每个 Android App 进程中都需要，预加载可加速启动</td>
+  </tr>
+  <tr>
+    <td>init 配置</td>
+    <td>appspawn.cfg</td>
+    <td><span class="tag tag-new">新增</span> appspawn-x.cfg</td>
+    <td>独立服务声明</td>
+  </tr>
+</table>
+
+<h2 id="ch3-6">4.6 进程内运行时架构</h2>
+
+<h3>4.6.1 appspawn-x 孵化器进程内部结构</h3>
+
+<div class="flow">
+appspawn-x 进程内存布局
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────────────────────────────────┐
+│                C/C++ 层                          │
+│  ┌───────────────────────────────────────────┐  │
+│  │  OH 沙箱管理器 (共享自 appspawn)            │  │
+│  │  OH SELinux 策略管理 (共享自 appspawn)       │  │
+│  │  OH Access Token 管理 (共享自 appspawn)      │  │
+│  │  Socket 服务端 (/dev/unix/socket/AppSpawnX) │  │
+│  └───────────────────────────────────────────┘  │
+│                                                  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  AndroidRuntime (来自 Android)              │  │
+│  │  ├─ ART VM 实例                            │  │
+│  │  ├─ JNI 方法注册表 (100+ 组)               │  │
+│  │  └─ Boot Image 内存映射                    │  │
+│  └───────────────────────────────────────────┘  │
+│                                                  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  预加载共享库                               │  │
+│  │  ├─ libandroid.so                          │  │
+│  │  ├─ libjnigraphics.so                     │  │
+│  │  ├─ libcompiler_rt.so                     │  │
+│  │  ├─ GPU driver (.so)                      │  │
+│  │  └─ liboh_adapter_bridge.so (适配层)       │  │
+│  └───────────────────────────────────────────┘  │
+│                                                  │
+├─────────────────────────────────────────────────┤
+│                Java 堆（ART 管理）                │
+│  ┌───────────────────────────────────────────┐  │
+│  │  预加载类 (~7000 个 Android 框架类)          │  │
+│  │  预加载系统资源 (Drawable/Color)             │  │
+│  │  适配层 Java 类缓存                         │  │
+│  │  JCA 安全提供者                             │  │
+│  │  DEX 缓存                                  │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+
+fork() 后上述内存通过 COW 共享给子进程
+</div>
+
+<h3>4.6.2 appspawn-x.cfg 配置示例</h3>
+
+<pre><code>{
+    "jobs": [{
+        "name": "services:appspawn-x",
+        "cmds": [
+            "mkdir /data/service/el1/public/android_apps 0711 system system",
+            "mkdir /data/misc/android_dalvik-cache 0711 root root"
+        ]
+    }],
+    "services": [{
+        "name": "appspawn-x",
+        "path": ["/system/bin/appspawn-x"],
+        "uid": "root",
+        "gid": ["system", "shell"],
+        "importance": -20,
+        "critical": [1, 4, 240],
+        "secon": "u:r:appspawn_x:s0",
+        "caps": ["SYS_PTRACE", "KILL", "SETUID", "SETGID", "SETPCAP",
+                 "NET_ADMIN", "NET_RAW", "DAC_OVERRIDE"],
+        "writepid": ["/dev/memcg/perf_sensitive/cgroup.procs"],
+        "bootevents": ["bootevent.appspawn_x.ready"]
+    }]
+}</code></pre>
+
+<h3>4.6.3 appspawn-x 可执行文件构成</h3>
+
+<p><code>appspawn-x</code> 本质上是一个融合了 Android <code>app_process</code> 和 OH <code>appspawn</code> 功能的混合二进制文件。</p>
+
+<table>
+  <tr><th>组成部分</th><th>来源</th><th>说明</th></tr>
+  <tr>
+    <td><code>main()</code></td>
+    <td><span class="tag tag-new">新开发</span></td>
+    <td>混合入口：先执行 OH 初始化（沙箱/SELinux/Socket），再执行 Android 运行时初始化（ART/预加载），最后进入事件循环</td>
+  </tr>
+  <tr>
+    <td>OH 沙箱/安全模块</td>
+    <td><span class="tag tag-oh">OH appspawn</span></td>
+    <td>链接 OH 的沙箱配置库、SELinux 库、Access Token 库</td>
+  </tr>
+  <tr>
+    <td><code>AppRuntime</code> 类</td>
+    <td><span class="tag tag-android">Android app_main.cpp</span></td>
+    <td>继承 <code>AndroidRuntime</code>，重写 <code>onZygoteInit()</code> 以初始化 OH IPC 而非 Android Binder</td>
+  </tr>
+  <tr>
+    <td>预加载逻辑</td>
+    <td><span class="tag tag-android">Android ZygoteInit.java</span></td>
+    <td>复用 <code>preloadClasses()</code>、<code>preloadResources()</code> 等方法，新增 <code>preloadAdapterBridge()</code></td>
+  </tr>
+  <tr>
+    <td>fork + specialize</td>
+    <td><span class="tag tag-hybrid">混合</span></td>
+    <td>fork 使用 Android 的 <code>ForkCommon()</code>，specialize 使用 OH 的沙箱挂载 + Android 的 UID/GID 设置</td>
+  </tr>
+  <tr>
+    <td>Socket 事件循环</td>
+    <td><span class="tag tag-hybrid">混合</span></td>
+    <td>参考 OH appspawn 的事件循环，接收 AppSpawnClient 协议消息</td>
+  </tr>
+</table>
+
+<div class="important">
+<strong>关键设计决策：用户态 Binder 框架选择</strong><br>
+OH 和 Android 的 IPC 底层均基于 Linux Binder 驱动（<code>/dev/binder</code>），区别仅在用户态封装框架：
+<ul>
+  <li><strong>OH IPC 框架</strong>：<code>ipc_core</code> / <code>ipc_single</code>（<code>libsamgr_proxy.z.so</code>、<code>libipc_core.z.so</code>）—— OH 系统服务使用此框架注册和通信</li>
+  <li><strong>Android Binder 框架</strong>：<code>libbinder.so</code>（<code>ProcessState</code>、<code>IPCThreadState</code>、Java 层 <code>android.os.Binder</code>）—— Android AIDL 接口基于此框架</li>
+</ul>
+两套框架共享同一个内核 Binder 驱动，但各自维护独立的 <code>ProcessState</code> / 线程池 / <code>ServiceManager</code> 上下文（context manager）。appspawn-x 孵化的 Android App 进程需要决定加载哪套用户态框架：
+<ul>
+  <li><strong>方案 A（推荐）</strong>：仅加载 OH IPC 框架。所有系统服务调用通过适配层 JNI 桥接到 OH <code>ipc_core</code>。Android <code>libbinder</code> 不加载、不启动 <code>ProcessState</code> / Binder 线程池。优点：架构简洁，无需两套框架共存的兼容问题。缺点：Android App 内部跨进程 Binder 通信不可用（如多进程 ContentProvider）。</li>
+  <li><strong>方案 B</strong>：OH IPC 框架 + Android <code>libbinder</code> 共存。系统服务调用走适配层 → OH IPC，但同时加载 Android <code>libbinder</code> 以支持 App 内部的跨进程 AIDL 通信（如 ContentProvider、bound Service 的跨进程场景）。两套框架通过不同的 Binder context 区分（OH 使用默认 context，Android 使用 <code>/dev/binder</code> 的不同 context ID 或 <code>/dev/vndbinder</code>）。优点：App 内部跨进程能力完整。缺点：需处理两套框架共存、线程池管理、context 隔离等复杂性。</li>
+</ul>
+在本项目当前阶段（单进程 Android App），推荐方案 A。当需要支持多进程 Android App 时再引入方案 B。
+</div>
+
+<h3>4.6.1 为什么 Android App 内部跨进程不能直接改用 OH IPC</h3>
+
+<p>OH App 内部跨进程通信使用 OH IPC 框架（<code>IPC Kit</code> / <code>@ohos.rpc</code>），基于 <code>IRemoteBroker</code> + <code>IRemoteObject.sendRequest()</code> + <code>MessageParcel</code> 序列化。一个自然的想法是：让 Android App 内部跨进程也统一使用 OH IPC，从而避免两套框架共存。但这条路径存在根本性障碍：</p>
+
+<h4>（1）API 层不兼容</h4>
+
+<p>两套 IPC 框架虽然底层共享 Binder 驱动，但用户态 API 完全不同：</p>
+
+<table>
+  <tr><th>维度</th><th>Android Binder API</th><th>OH IPC API</th></tr>
+  <tr><td>接口定义语言</td><td>AIDL → 生成 <code>Stub</code>/<code>Proxy</code>（基于 <code>android.os.Binder</code>）</td><td>IDL → 生成 <code>IRemoteBroker</code>（基于 <code>IRemoteObject</code>）</td></tr>
+  <tr><td>序列化</td><td><code>android.os.Parcel</code></td><td><code>OHOS::MessageParcel</code> / <code>rpc.MessageSequence</code></td></tr>
+  <tr><td>事务调用</td><td><code>IBinder.transact()</code> / <code>Binder.onTransact()</code></td><td><code>IRemoteObject.SendRequest()</code> / <code>OnRemoteRequest()</code></td></tr>
+  <tr><td>死亡通知</td><td><code>IBinder.linkToDeath(DeathRecipient)</code></td><td><code>IRemoteObject.AddDeathRecipient()</code></td></tr>
+  <tr><td>基类</td><td><code>android.os.Binder</code> / <code>android.os.IBinder</code></td><td><code>OHOS::IRemoteBroker</code> / <code>OHOS::IRemoteObject</code></td></tr>
+</table>
+
+<h4>（2）AIDL 生成代码无法复用</h4>
+
+<p>Android App 自定义的 AIDL 接口由 <code>aidl</code> 工具自动生成 <code>Stub</code>/<code>Proxy</code> 代码，这些代码硬编码调用 <code>Parcel.writeXxx()</code>、<code>IBinder.transact()</code> 等 Android Binder API。要改用 OH IPC，每个 AIDL 接口都需要重新生成或适配——而 App 自定义的 AIDL 接口数量是<strong>不可预知</strong>的。</p>
+
+<h4>（3）与系统服务适配的本质区别</h4>
+
+<p>这一点与本项目当前的系统服务适配层形成鲜明对比：</p>
+
+<table>
+  <tr><th>对比维度</th><th>系统服务 IPC（当前适配层）</th><th>App 内部跨进程 IPC</th></tr>
+  <tr><td>接口来源</td><td>AOSP 定义，数量已知</td><td>每个 App 自定义，数量未知</td></tr>
+  <tr><td>接口规模</td><td>4 大接口，530 个方法</td><td>无上限（取决于 App）</td></tr>
+  <tr><td>适配方式</td><td>逐个桥接（<code>extends IXxx.Stub</code>）</td><td>无法逐个桥接</td></tr>
+  <tr><td>可行性</td><td>✅ 已实现</td><td>❌ 不可行</td></tr>
+</table>
+
+<h4>（4）Framework 内部的 Binder 依赖</h4>
+
+<p>Android Framework 自身在 App 内部多进程场景大量使用 Binder IPC：</p>
+<ul>
+  <li><code>ContentProvider</code> 跨进程访问：<code>IContentProvider</code>（AIDL）+ <code>BulkCursorToCursorAdaptor</code>（通过 Binder 传输 <code>CursorWindow</code>）</li>
+  <li><code>Messenger</code>：基于 <code>Handler</code> + <code>IBinder</code> 的轻量跨进程通信</li>
+  <li>App 内部 bound Service：<code>onBind()</code> 返回的 <code>IBinder</code> 直接传递给客户端进程</li>
+</ul>
+
+<h4>（5）第三方库</h4>
+
+<p>大量第三方 SDK（广告、推送、跨进程组件库）直接使用 AIDL 或 <code>android.os.Binder</code> API，这部分完全不可控，也无法逐一适配。</p>
+
+<div class="important">
+<strong>结论</strong>：Android App 内部跨进程通信<strong>必须保留 Android <code>libbinder</code> 框架</strong>，不能替换为 OH IPC。因此，当需要支持多进程 Android App 时，必须采用方案 B——让两套用户态 Binder 框架（OH <code>ipc_core</code> + Android <code>libbinder</code>）在同一进程中通过不同的 Binder context 共存。
+</div>
+
+<hr>
+
+<div class="card" style="background: #e8f5e9; border-color: #a5d6a7;">
+<h4 style="border-color: #2e7d32;">总结</h4>
+<p><strong>appspawn-x</strong> 是一个独立于 OH 原生 appspawn 的混合进程孵化器，它：</p>
+<ul>
+  <li>继承了 OH appspawn 的<strong>安全与沙箱能力</strong>（DAC、SELinux、Access Token、沙箱挂载）</li>
+  <li>继承了 Android Zygote 的<strong>运行时预加载能力</strong>（ART VM、7000+ 类、资源、共享库、GPU 驱动）</li>
+  <li>新增了<strong>适配层预加载</strong>（liboh_adapter_bridge.so + Java Adapter 类）</li>
+  <li>使用 OH 的 AppSpawnClient 通信协议，可被 foundation 进程通过标准接口调度</li>
+  <li>孵化出的 Android App 进程通过适配层与 OH 系统服务无缝通信</li>
+</ul>
+</div>
+
+<!-- ================================================================ -->
+<!-- Chapter 4: Detailed Implementation Design -->
+<!-- ================================================================ -->
+
+<h1 id="ch4">5. appspawn-x 详细实现设计</h1>
+
+<h2 id="ch4-1">5.1 源码目录结构与文件说明</h2>
+
+<p>appspawn-x 的实现代码位于 <code>D:\code\adapter\appspawn-x\</code>，目录结构如下：</p>
+
+<pre><code>adapter/appspawn-x/
+├── src/
+│   ├── main.cpp                    # 主程序入口
+│   ├── spawn_msg.h                 # 消息结构定义（header-only）
+│   ├── appspawnx_runtime.h         # AppSpawnXRuntime 类声明
+│   ├── appspawnx_runtime.cpp       # ART VM 创建、JNI 注册、预加载
+│   ├── spawn_server.h              # SpawnServer 类声明
+│   ├── spawn_server.cpp            # Unix Socket 服务器、事件循环
+│   ├── child_main.h                # ChildMain 类声明
+│   └── child_main.cpp              # 子进程 OH 安全特化 + Android 初始化
+├── config/
+│   ├── appspawn_x.cfg              # OH init 服务配置（JSON）
+│   └── appspawn_x_sandbox.json     # Android App 沙箱挂载规则
+├── java/com/android/internal/os/
+│   └── AppSpawnXInit.java          # Java 侧预加载与子进程初始化入口
+├── ohos_patches/
+│   └── remote_client_manager.patch # foundation RemoteClientManager 扩展补丁
+└── BUILD.gn                        # OH GN 构建配置
+</code></pre>
+
+<table>
+  <tr><th>文件</th><th>语言</th><th>行数(约)</th><th>职责说明</th></tr>
+  <tr><td><code>main.cpp</code></td><td>C++</td><td>~80</td><td>程序入口：解析命令行 → 初始化安全 → 初始化 ART VM → 预加载 → 进入事件循环</td></tr>
+  <tr><td><code>spawn_msg.h</code></td><td>C++</td><td>~60</td><td>SpawnMsg 结构体（解析后的孵化请求）、StartFlags 位定义、SpawnResult 结构体</td></tr>
+  <tr><td><code>appspawnx_runtime.h/cpp</code></td><td>C++</td><td>~200</td><td>封装 ART VM 创建（JniInvocation + JNI_CreateJavaVM）、JNI 方法注册、调用 Java preload</td></tr>
+  <tr><td><code>spawn_server.h/cpp</code></td><td>C++</td><td>~250</td><td>Unix Domain Socket 服务器：创建监听 → poll 事件循环 → 接收/解析请求 → 分发 fork</td></tr>
+  <tr><td><code>child_main.h/cpp</code></td><td>C++</td><td>~200</td><td>子进程特化：DAC → 沙箱 → SELinux → AccessToken → 适配层初始化 → ActivityThread.main()</td></tr>
+  <tr><td><code>AppSpawnXInit.java</code></td><td>Java</td><td>~250</td><td>预加载入口（父进程）+ 子进程初始化入口：加载类/资源/库/适配层 + 启动 ActivityThread</td></tr>
+  <tr><td><code>appspawn_x.cfg</code></td><td>JSON</td><td>~70</td><td>OH init 服务声明：进程路径、UID/GID、capabilities、socket、环境变量</td></tr>
+  <tr><td><code>appspawn_x_sandbox.json</code></td><td>JSON</td><td>~100</td><td>Android App 沙箱规则：系统分区只读挂载 + APK/DEX/数据目录绑定挂载</td></tr>
+  <tr><td><code>BUILD.gn</code></td><td>GN</td><td>~120</td><td>OH 构建配置：可执行文件 + 配置文件安装 + Java 库</td></tr>
+  <tr><td><code>remote_client_manager.patch</code></td><td>Patch</td><td>~40</td><td>OH ability_rt 补丁：在 RemoteClientManager 中添加 androidSpawnClient_</td></tr>
+</table>
+
+<h2 id="ch4-2">5.2 核心类设计</h2>
+
+<p>appspawn-x 的 C++ 层包含 3 个核心类，Java 层包含 1 个静态工具类：</p>
+
+<h3>5.2.1 AppSpawnXRuntime（C++）</h3>
+
+<div class="card">
+<h4>职责</h4>
+<p>封装 Android ART 虚拟机的创建和预加载过程。对应 Android 的 <code>AndroidRuntime</code> 类，但适配了 OH 环境（不启动 Android Binder 线程池）。</p>
+
+<pre><code>class AppSpawnXRuntime {
+    JavaVM* javaVm_;              // ART VM 实例
+    JNIEnv* env_;                 // 主线程 JNI 环境
+
+    // 缓存的 Java 引用
+    jclass appSpawnXInitClass_;   // AppSpawnXInit 类
+    jmethodID preloadMethod_;     // preload() 方法
+    jmethodID initChildMethod_;   // initChild() 方法
+
+public:
+    int startVm();       // 创建 ART VM + 注册 JNI
+    int preload();       // 调用 Java 预加载
+    void onChildInit();  // 子进程初始化（OH IPC）
+};
+</code></pre>
+
+<h4>关键方法</h4>
+<table>
+  <tr><th>方法</th><th>调用时机</th><th>功能</th></tr>
+  <tr><td><code>startVm()</code></td><td>父进程启动阶段</td><td>通过 <code>JniInvocation</code> 加载 libart.so → <code>JNI_CreateJavaVM()</code> 创建 VM → 注册 100+ JNI 方法组 → 缓存 Java 类引用</td></tr>
+  <tr><td><code>preload()</code></td><td>父进程启动阶段</td><td>调用 <code>AppSpawnXInit.preload()</code>：加载 ~7000 类、系统资源、共享库、GPU 驱动、适配层</td></tr>
+  <tr><td><code>onChildInit()</code></td><td>子进程 fork 后</td><td>方案 A：跳过 Binder 线程池；方案 B：调用 <code>ProcessState::self()-&gt;startThreadPool()</code></td></tr>
+</table>
+</div>
+
+<h3>5.2.2 SpawnServer（C++）</h3>
+
+<div class="card">
+<h4>职责</h4>
+<p>Unix Domain Socket 服务器，接收 foundation 通过 AppSpawnClient 发送的孵化请求，管理事件循环。对应 OH appspawn 的 Socket 监听模块 + Android Zygote 的 <code>ZygoteServer.runSelectLoop()</code>。</p>
+
+<pre><code>class SpawnServer {
+    std::string socketName_;      // "AppSpawnX"
+    std::string socketPath_;      // "/dev/unix/socket/AppSpawnX"
+    int listenFd_;                // 监听 socket fd
+    SpawnHandler spawnHandler_;   // fork 回调
+
+public:
+    int initSecurity(const std::string&amp; sandboxConfig);  // OH 安全初始化
+    int createListenSocket();                              // 创建监听 socket
+    void setSpawnHandler(SpawnHandler handler);            // 注册 fork 处理器
+    void run();                                            // 进入事件循环
+    void closeSocket();                                    // 子进程关闭 socket
+};
+</code></pre>
+
+<h4>事件循环模型</h4>
+<pre><code>SpawnServer::run()
+  ├── 安装 SIGCHLD 信号处理器（回收僵尸进程）
+  └── poll() 循环
+       ├── listenFd_ 有事件 → accept() → handleConnection()
+       │    ├── 读取消息 → parseMessage() → SpawnMsg
+       │    ├── 调用 spawnHandler_(msg) → fork()
+       │    └── sendResult(clientFd, {pid, result})
+       └── 超时/中断 → 继续循环
+</code></pre>
+</div>
+
+<h3>5.2.3 ChildMain（C++）</h3>
+
+<div class="card">
+<h4>职责</h4>
+<p>子进程特化逻辑。在 <code>fork()</code> 之后由子进程调用，执行 OH 安全设置 + Android 运行时初始化，最终进入 <code>ActivityThread.main()</code>。此函数不会返回。</p>
+
+<pre><code>class ChildMain {
+public:
+    [[noreturn]] static void run(const SpawnMsg&amp; msg,
+                                  AppSpawnXRuntime* runtime);
+private:
+    static int applyDac(const SpawnMsg&amp; msg);          // 设置 UID/GID
+    static int applySandbox(const SpawnMsg&amp; msg);      // 挂载沙箱
+    static int applySELinux(const SpawnMsg&amp; msg);      // 设置安全上下文
+    static int applyAccessToken(const SpawnMsg&amp; msg);  // 设置访问令牌
+    static int initAdapterLayer(JNIEnv* env);           // 初始化适配层
+    static void launchActivityThread(JNIEnv* env,       // 启动 ActivityThread
+                                      const SpawnMsg&amp; msg);
+};
+</code></pre>
+
+<h4>特化流程</h4>
+<pre><code>ChildMain::run(msg, runtime)
+  ├── ══ OH 安全特化（与 appspawn 共享逻辑）══
+  │   ├── applyDac()         setgroups() → setgid() → setuid()
+  │   ├── applySandbox()     unshare(CLONE_NEWNS) → bind mount 挂载规则
+  │   ├── applySELinux()     setcon("u:r:android_app:s0")
+  │   └── applyAccessToken() SetSelfTokenID(accessTokenIdEx)
+  │
+  ├── ══ Android 运行时初始化 ══
+  │   ├── runtime-&gt;onChildInit()     OH IPC 连接（或启动 Binder 线程池）
+  │   ├── initAdapterLayer()          OHEnvironment.initialize()
+  │   └── launchActivityThread()      AppSpawnXInit.initChild()
+  │       ├── Process.setArgV0(procName)
+  │       ├── VMRuntime.setTargetSdkVersion()
+  │       ├── initCommonRuntime()     异常处理器、时区
+  │       ├── initAdapterLayer()      适配层连接 OH 系统服务
+  │       └── invokeStaticMain("android.app.ActivityThread")
+  │           └── ActivityThread.main() → Looper.loop() [永不返回]
+  │
+  └── _exit(1)  // 仅在异常情况下到达
+</code></pre>
+</div>
+
+<h3>5.2.4 AppSpawnXInit（Java）</h3>
+
+<div class="card">
+<h4>职责</h4>
+<p>Java 侧入口，提供两个 JNI 可调用的静态方法。复用 <code>ZygoteInit</code> 的预加载逻辑，增加适配层预加载。</p>
+
+<table>
+  <tr><th>方法</th><th>调用时机</th><th>功能</th></tr>
+  <tr><td><code>preload()</code></td><td>父进程启动阶段</td><td>加载 ~7000 框架类 + 系统资源 + 共享库（libandroid.so 等）+ GPU 驱动 + JCA 安全 + <strong>适配层</strong>（liboh_adapter_bridge.so + Adapter Java 类）</td></tr>
+  <tr><td><code>initChild(procName, targetClass, sdkVersion)</code></td><td>子进程 fork 后</td><td>设置进程名 → 设置 SDK 版本 → 初始化通用运行时 → 初始化适配层 → 反射调用 <code>targetClass.main()</code></td></tr>
+</table>
+
+<h4>预加载项清单</h4>
+<table>
+  <tr><th>预加载项</th><th>来源</th><th>说明</th></tr>
+  <tr><td>Android 框架类</td><td>Android ZygoteInit</td><td><code>/system/etc/preloaded-classes</code>，~7000 个类，<code>Class.forName()</code> 强制初始化</td></tr>
+  <tr><td>系统资源</td><td>Android ZygoteInit</td><td>Drawable、ColorStateList 缓存，<code>Resources.getSystem()</code></td></tr>
+  <tr><td>共享库</td><td>Android ZygoteInit</td><td>libandroid.so、libjnigraphics.so、libcompiler_rt.so</td></tr>
+  <tr><td>GPU 驱动</td><td>Android ZygoteInit</td><td>OpenGL/Vulkan 驱动预加载</td></tr>
+  <tr><td>JCA 安全提供者</td><td>Android ZygoteInit</td><td>AndroidKeyStoreProvider 等</td></tr>
+  <tr><td><strong>适配层 JNI 库</strong></td><td><strong>appspawn-x 新增</strong></td><td><code>liboh_adapter_bridge.so</code>：Android → OH 桥接 JNI 库</td></tr>
+  <tr><td><strong>适配层 Java 类</strong></td><td><strong>appspawn-x 新增</strong></td><td>ActivityManagerAdapter、IntentWantConverter 等 11 个 Adapter 类</td></tr>
+</table>
+</div>
+
+<h2 id="ch4-3">5.3 主程序启动流程（详细）</h2>
+
+<p><code>main.cpp</code> 的 <code>main()</code> 函数将整个启动过程分为 4 个阶段：</p>
+
+<pre><code>main(argc, argv)
+  │
+  ├── 解析命令行参数
+  │   --socket-name AppSpawnX        Socket 名称（默认 "AppSpawnX"）
+  │   --sandbox-config /path/to.json  沙箱配置文件路径
+  │
+  ├── ═══════════════════════════════════════════════════
+  │   阶段 1：OH 安全模块初始化
+  │   ═══════════════════════════════════════════════════
+  │   SpawnServer server("AppSpawnX")
+  │   server.initSecurity(sandboxConfigPath)
+  │   │   ├── 加载沙箱配置 JSON（appspawn_x_sandbox.json）
+  │   │   ├── 初始化 SELinux 策略管理
+  │   │   └── 初始化 AccessToken 管理
+  │   │
+  │   server.createListenSocket()
+  │       ├── socket(AF_UNIX, SOCK_STREAM, 0)
+  │       ├── bind("/dev/unix/socket/AppSpawnX")
+  │       ├── listen(backlog=8)
+  │       └── chmod(0660) + chown(root:system)
+  │
+  ├── ═══════════════════════════════════════════════════
+  │   阶段 2：Android ART VM 创建
+  │   ═══════════════════════════════════════════════════
+  │   AppSpawnXRuntime runtime
+  │   runtime.startVm()
+  │   │   ├── JniInvocation::Init(NULL)  → 加载 libart.so
+  │   │   ├── JNI_CreateJavaVM(&amp;javaVm_, &amp;env_, &amp;initArgs)
+  │   │   │   VM 参数：
+  │   │   │     -Xms64m -Xmx512m
+  │   │   │     -Xusejit:true
+  │   │   │     -Djava.class.path=$BOOTCLASSPATH
+  │   │   │     -Xbootclasspath:$BOOTCLASSPATH
+  │   │   ├── registerNativeMethods()   → 注册 100+ JNI 方法组
+  │   │   └── cacheJavaReferences()     → 查找并缓存 AppSpawnXInit 类
+  │
+  ├── ═══════════════════════════════════════════════════
+  │   阶段 3：预加载（Preload）
+  │   ═══════════════════════════════════════════════════
+  │   runtime.preload()
+  │   │   └── JNI 调用 AppSpawnXInit.preload()
+  │   │       ├── preloadClasses()         ~7000 Android 框架类
+  │   │       ├── preloadResources()       系统 Drawable/ColorStateList
+  │   │       ├── preloadSharedLibraries() libandroid.so 等
+  │   │       ├── preloadGraphicsDriver()  GPU 驱动
+  │   │       ├── warmUpJcaProviders()     安全提供者
+  │   │       ├── <strong>preloadAdapterBridge()</strong>  liboh_adapter_bridge.so + Adapter 类
+  │   │       └── gcAndFinalize()          清理预加载垃圾
+  │   │
+  │   此时进程内存布局已包含完整的 Android 框架 + 适配层
+  │   fork() 后子进程通过 COW 共享所有预加载内容
+  │
+  └── ═══════════════════════════════════════════════════
+      阶段 4：进入事件循环
+      ═══════════════════════════════════════════════════
+      server.setSpawnHandler(lambda)
+      │   lambda = [&amp;](const SpawnMsg&amp; msg) → int {
+      │       pid = fork();
+      │       if (pid == 0) {  // 子进程
+      │           server.closeSocket();
+      │           ChildMain::run(msg, &amp;runtime);  // 不返回
+      │       }
+      │       return pid;  // 父进程返回 PID
+      │   }
+      │
+      server.run()   ← 进入 poll() 无限循环，永不返回
+</code></pre>
+
+<div class="note">
+<strong>与 Android Zygote 启动流程的对应关系：</strong><br>
+阶段 1 → 无对应（Zygote 不做安全初始化，由子进程自行设置）<br>
+阶段 2 → <code>app_main.cpp::main()</code> → <code>AndroidRuntime::start()</code> → <code>startVm()</code> + <code>startReg()</code><br>
+阶段 3 → <code>ZygoteInit.main()</code> → <code>preload()</code><br>
+阶段 4 → <code>ZygoteServer.runSelectLoop()</code>
+</div>
+
+<h2 id="ch4-4">5.4 消息处理与 Fork 流程（详细）</h2>
+
+<h3>5.4.1 消息格式</h3>
+
+<p>appspawn-x 使用与 OH appspawn 相同的 AppSpawnClient 通信协议。消息由 foundation 进程通过 <code>AppSpawnClient::StartProcess()</code> 发送。</p>
+
+<table>
+  <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+  <tr><td>code</td><td>int32</td><td>消息类型：0=MSG_APP_SPAWN</td></tr>
+  <tr><td>procName</td><td>string</td><td>进程名（如 "com.example.app"）</td></tr>
+  <tr><td>bundleName</td><td>string</td><td>包名（如 "com.example.app"）</td></tr>
+  <tr><td>uid / gid / gids[]</td><td>int32</td><td>DAC 标识</td></tr>
+  <tr><td>accessTokenIdEx</td><td>uint64</td><td>OH AccessToken</td></tr>
+  <tr><td>hapFlags</td><td>uint32</td><td>预装标志</td></tr>
+  <tr><td>apl</td><td>string</td><td>权限等级（normal/system_basic/system_core）</td></tr>
+  <tr><td>flags</td><td>uint64</td><td>StartFlags 位掩码</td></tr>
+  <tr style="background:#fff3e0;"><td><strong>apkPath</strong></td><td>string</td><td><strong>Android 扩展</strong>：APK 文件路径</td></tr>
+  <tr style="background:#fff3e0;"><td><strong>dexPaths</strong></td><td>string</td><td><strong>Android 扩展</strong>：DEX 搜索路径列表</td></tr>
+  <tr style="background:#fff3e0;"><td><strong>nativeLibPaths</strong></td><td>string</td><td><strong>Android 扩展</strong>：Native 库搜索路径</td></tr>
+  <tr style="background:#fff3e0;"><td><strong>targetClass</strong></td><td>string</td><td><strong>Android 扩展</strong>：入口类（默认 "android.app.ActivityThread"）</td></tr>
+  <tr style="background:#fff3e0;"><td><strong>targetSdkVersion</strong></td><td>int32</td><td><strong>Android 扩展</strong>：目标 SDK 版本</td></tr>
+  <tr style="background:#fff3e0;"><td><strong>selinuxContext</strong></td><td>string</td><td><strong>Android 扩展</strong>：SELinux 上下文（默认 "u:r:android_app:s0"）</td></tr>
+</table>
+
+<p>橙色高亮行为 appspawn-x 相对于标准 appspawn 新增的扩展字段，通过 <code>AppSpawnStartMsg</code> 的 <code>ExtMsg</code> 机制传递。</p>
+
+<h3>5.4.2 消息处理流程</h3>
+
+<pre><code>foundation (AppMgrServiceInner::StartProcess)
+  │
+  │  识别 Android App → 选择 androidSpawnClient_
+  │  构建 AppSpawnStartMsg（包含 Android 扩展字段）
+  │  AppSpawnClient::StartProcess(startMsg, &amp;pid)
+  │    ├── OpenConnection("AppSpawnX")
+  │    ├── AppSpawnReqMsgCreate(MSG_APP_SPAWN, procName)
+  │    ├── AppspawnCreateDefaultMsg()    标准字段
+  │    ├── AppspawnSetExtMsg()           Android 扩展字段
+  │    └── AppSpawnClientSendMsg()       发送到 appspawn-x
+  │
+  ↓ (Unix Socket)
+  │
+appspawn-x (SpawnServer::handleConnection)
+  │
+  ├── 读取消息 → parseMessage() → SpawnMsg
+  │
+  ├── 调用 spawnHandler_ 回调
+  │   │
+  │   ├── pid = fork()
+  │   │
+  │   ├── [pid &gt; 0] 父进程
+  │   │   └── 返回 pid
+  │   │
+  │   └── [pid == 0] 子进程
+  │       ├── server.closeSocket()   关闭监听 socket
+  │       └── ChildMain::run(msg, &amp;runtime)   → 不返回
+  │
+  └── sendResult(clientFd, {pid, 0})   → 返回给 foundation
+</code></pre>
+
+<h3>5.4.3 SIGCHLD 处理</h3>
+
+<p>父进程通过 <code>SIGCHLD</code> 信号处理器回收退出的子进程，防止僵尸进程堆积：</p>
+
+<pre><code>static void sigchldHandler(int) {
+    int status;
+    pid_t pid;
+    while ((pid = waitpid(-1, &amp;status, WNOHANG)) &gt; 0) {
+        LOGI("Child pid=%d exited, status=%d", pid, WEXITSTATUS(status));
+    }
+}
+</code></pre>
+
+<h2 id="ch4-5">5.5 子进程特化流程（详细）</h2>
+
+<p><code>ChildMain::run()</code> 是子进程的入口，执行顺序严格固定：</p>
+
+<h3>5.5.1 OH 安全特化（共 4 步）</h3>
+
+<table>
+  <tr><th>步骤</th><th>函数</th><th>系统调用</th><th>说明</th></tr>
+  <tr><td>1</td><td><code>applyDac()</code></td><td><code>setgroups()</code> → <code>setgid()</code> → <code>setuid()</code></td><td>必须先 setgroups 再 setuid（setuid 后无法再改组）</td></tr>
+  <tr><td>2</td><td><code>applySandbox()</code></td><td><code>unshare(CLONE_NEWNS)</code> → <code>mount()</code></td><td>创建独立 mount namespace，按 sandbox JSON 绑定挂载</td></tr>
+  <tr><td>3</td><td><code>applySELinux()</code></td><td><code>setcon()</code></td><td>设置 SELinux 安全上下文为 <code>u:r:android_app:s0</code></td></tr>
+  <tr><td>4</td><td><code>applyAccessToken()</code></td><td>OH API</td><td>调用 <code>SetSelfTokenID(accessTokenIdEx)</code> 设置 OH 权限令牌</td></tr>
+</table>
+
+<div class="note">
+<strong>顺序约束：</strong>DAC 必须在沙箱之前设置（某些挂载操作需要 root 权限）。SELinux 上下文设置应在沙箱之后（确保沙箱挂载不受 SELinux 阻止）。AccessToken 设置可在任意位置，但建议在安全上下文设置完毕后。
+</div>
+
+<h3>5.5.2 Android 运行时初始化（共 3 步）</h3>
+
+<table>
+  <tr><th>步骤</th><th>函数</th><th>说明</th></tr>
+  <tr><td>5</td><td><code>runtime-&gt;onChildInit()</code></td><td>方案 A：初始化 OH IPC 连接（无 Binder 线程池）<br>方案 B：<code>ProcessState::self()-&gt;startThreadPool()</code>（启动 Binder 线程池）</td></tr>
+  <tr><td>6</td><td><code>initAdapterLayer()</code></td><td>反射调用 <code>OHEnvironment.initialize()</code>：加载适配层、连接 OH 系统服务</td></tr>
+  <tr><td>7</td><td><code>launchActivityThread()</code></td><td>JNI 调用 <code>AppSpawnXInit.initChild(procName, targetClass, sdkVersion)</code>：设置进程名 → 初始化通用运行时 → 反射调用 <code>ActivityThread.main()</code></td></tr>
+</table>
+
+<h3>5.5.3 子进程与父进程的内存关系</h3>
+
+<pre><code>
+┌── appspawn-x 父进程内存 ──────────────────────────────────────────┐
+│                                                                    │
+│  ┌─ ART VM 堆（~200MB preloaded）────────────────────────────────┐│
+│  │  ~7000 Android 框架类实例                         [COW 共享] ││
+│  │  系统资源缓存（Drawable/Color）                    [COW 共享] ││
+│  │  适配层 Java 类缓存                               [COW 共享] ││
+│  └───────────────────────────────────────────────────────────────┘│
+│  ┌─ Native 代码段（只读）────────────────────────────────────────┐│
+│  │  libart.so / libandroid_runtime.so                 [fork 共享] ││
+│  │  libandroid.so / libjnigraphics.so                 [fork 共享] ││
+│  │  liboh_adapter_bridge.so                           [fork 共享] ││
+│  │  GPU driver .so                                    [fork 共享] ││
+│  └───────────────────────────────────────────────────────────────┘│
+│  ┌─ Boot Image（只读 mmap）──────────────────────────────────────┐│
+│  │  framework .art/.oat 预编译文件                    [fork 共享] ││
+│  └───────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  fork() ───→ 子进程继承所有上述内存（COW）                        │
+│              子进程新增：                                          │
+│               - App 自身的 DEX/类                                  │
+│               - App 的 View/Layout 实例                           │
+│               - Looper/Handler/MessageQueue                       │
+│               - 适配层运行时状态（OH IPC 连接等）                 │
+└────────────────────────────────────────────────────────────────────┘
+</code></pre>
+
+<h2 id="ch4-6">5.6 Java 侧预加载与子进程初始化</h2>
+
+<h3 id="ch4-6-1">5.6.1 preload()（父进程）</h3>
+
+<pre><code>AppSpawnXInit.preload()
+  │
+  ├── preloadClasses()
+  │   ├── 读取 /system/etc/preloaded-classes
+  │   └── 对每行：Class.forName(className, true, null)
+  │       ├── 成功：类加载到 boot ClassLoader，COW 共享
+  │       └── 失败：跳过（部分类可能不在 boot classpath）
+  │
+  ├── preloadResources()
+  │   └── Resources.getSystem().obtainTypedArray(preloaded_drawables)
+  │       → 逐个加载 Drawable/ColorStateList 到缓存
+  │
+  ├── preloadSharedLibraries()
+  │   ├── System.loadLibrary("android")
+  │   ├── System.loadLibrary("jnigraphics")
+  │   └── System.loadLibrary("compiler_rt")
+  │
+  ├── preloadGraphicsDriver()
+  │   └── nativePreloadGraphicsDriver()  → GPU 驱动
+  │
+  ├── warmUpJcaProviders()
+  │   └── Security.getProviders()  → 初始化安全提供者
+  │
+  ├── <strong>preloadAdapterBridge()</strong>          ← appspawn-x 新增
+  │   ├── System.loadLibrary("oh_adapter_bridge")
+  │   └── Class.forName() 缓存 11 个适配层类
+  │
+  └── gcAndFinalize()
+      └── System.gc() → runFinalizationSync() → System.gc()
+</code></pre>
+
+<h3 id="ch4-6-2">5.6.2 预加载框架类分类分析</h3>
+
+<p>Android Zygote 的 <code>preloadClasses()</code> 从 <code>/system/etc/preloaded-classes</code> 文件读取需要预加载的类列表。AOSP 14 中该文件包含约 <strong>14,000 个类</strong>。这些类按功能可分为以下类别：</p>
+
+<h4>（1）预加载类的分类与统计</h4>
+
+<table>
+  <tr><th>分类</th><th>包前缀</th><th>类数(约)</th><th>说明</th><th>示例</th></tr>
+  <tr style="background:#e8f5e9;"><td rowspan="10"><strong>App 必需</strong><br>（三方 App 直接依赖）</td><td><code>android.app.*</code></td><td>1,086</td><td>四大组件、对话框、通知、Fragment</td><td>Activity, Service, Application, Dialog, Notification</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.content.*</code></td><td>583</td><td>Context、Intent、ContentResolver、SharedPreferences</td><td>Context, Intent, BroadcastReceiver, ContentProvider</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.view.*</code></td><td>1,043</td><td>View 体系、窗口管理、触摸事件、动画</td><td>View, ViewGroup, LayoutInflater, Window, MotionEvent</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.widget.*</code></td><td>398</td><td>UI 控件</td><td>TextView, Button, EditText, ListView, ImageView</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.os.*</code></td><td>594</td><td>Handler/Looper 消息机制、Binder IPC、进程/线程</td><td>Handler, Looper, Bundle, Message, Parcel, Process</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.graphics.*</code></td><td>345</td><td>2D 绘图、Bitmap、Canvas、Paint</td><td>Paint, Canvas, Bitmap, Color, Drawable, Path</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.text.*</code></td><td>238</td><td>文本处理、Spannable、Html 解析</td><td>TextUtils, SpannableString, Html, Editable</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.util.*</code></td><td>179</td><td>日志、集合、工具类</td><td>Log, ArrayMap, SparseArray, Pair, LruCache</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.database.*</code></td><td>98</td><td>数据库、Cursor</td><td>Cursor, CursorAdapter, DatabaseUtils, SQLException</td></tr>
+  <tr style="background:#e8f5e9;"><td><code>android.animation.*</code></td><td>73</td><td>属性动画</td><td>ValueAnimator, ObjectAnimator, AnimatorSet</td></tr>
+  <tr style="background:#e8f5e9;"><td colspan="2"><strong>App 必需 小计</strong></td><td><strong>~4,637</strong></td><td colspan="2">三方 App 开发中直接使用的 API，<strong>必须预加载</strong></td></tr>
+
+  <tr style="background:#fff8e1;"><td rowspan="6"><strong>部分需要</strong><br>（视 App 功能而定）</td><td><code>android.media.*</code></td><td>601</td><td>音视频播放/录制、音频管理</td><td>MediaPlayer, AudioTrack, AudioManager, MediaCodec</td></tr>
+  <tr style="background:#fff8e1;"><td><code>android.net.*</code></td><td>223</td><td>网络连接、URI、HTTP</td><td>Uri, HttpURLConnection, ConnectivityManager</td></tr>
+  <tr style="background:#fff8e1;"><td><code>android.webkit.*</code></td><td>72</td><td>WebView</td><td>WebView, WebViewClient, WebChromeClient</td></tr>
+  <tr style="background:#fff8e1;"><td><code>android.location.*</code></td><td>133</td><td>GPS 定位</td><td>Location, LocationManager, Criteria</td></tr>
+  <tr style="background:#fff8e1;"><td><code>android.content.pm.*</code></td><td>310</td><td>包管理信息查询</td><td>PackageManager, ApplicationInfo, ActivityInfo</td></tr>
+  <tr style="background:#fff8e1;"><td><code>android.provider.*</code></td><td>115</td><td>系统内容提供者常量</td><td>MediaStore, ContactsContract, Settings</td></tr>
+  <tr style="background:#fff8e1;"><td colspan="2"><strong>部分需要 小计</strong></td><td><strong>~1,454</strong></td><td colspan="2">取决于 App 是否使用相关功能，<strong>可选预加载</strong></td></tr>
+
+  <tr style="background:#ffebee;"><td rowspan="13"><strong>系统服务专用</strong><br>（三方 App 不需要）</td><td><code>android.telephony.*</code></td><td>629</td><td>电话/短信/蜂窝网络系统服务</td><td>TelephonyManager, SmsManager, PhoneStateListener</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.hardware.*</code></td><td>852</td><td>硬件管理系统服务（Camera/Sensor/USB/指纹）</td><td>Camera, SensorManager, Vibrator, FingerprintManager</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.service.*</code></td><td>285</td><td>系统服务框架接口</td><td>AutofillService, WallpaperService, VoiceInteractionService</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.security.*</code></td><td>188</td><td>系统安全/证书/密钥库</td><td>KeyStore, KeyChain, KeyPairGeneratorSpec</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.nfc.*</code></td><td>48</td><td>NFC 系统服务</td><td>NfcAdapter, NfcManager, NdefMessage, Tag</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.accounts.*</code></td><td>53</td><td>账户/认证系统</td><td>AccountManager, Account, AuthenticatorDescription</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.print.*</code></td><td>33</td><td>打印系统服务</td><td>PrintManager, PrintAttributes, PrintJobInfo</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.app.admin.*</code></td><td>56</td><td>设备管理策略</td><td>DevicePolicyManager, SystemUpdatePolicy</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.inputmethodservice.*</code></td><td>14</td><td>输入法服务框架</td><td>InputMethodService, AbstractInputMethodService</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.speech.*</code></td><td>18</td><td>语音识别系统</td><td>SpeechRecognizer, RecognitionListener</td></tr>
+  <tr style="background:#ffebee;"><td><code>com.android.server.*</code></td><td>84</td><td>system_server 内部类</td><td>LocalServices, BackupHelper, PermissionBackupHelper</td></tr>
+  <tr style="background:#ffebee;"><td><code>com.android.internal.*</code></td><td>2,323</td><td>框架内部实现（大部分为系统专用）</td><td>内部事件日志、系统元数据、服务内部实现</td></tr>
+  <tr style="background:#ffebee;"><td><code>android.companion/apex/blob.*</code></td><td>33</td><td>配套设备/APEX/Blob 系统</td><td>CompanionDeviceManager, ApexInfo, BlobStoreManager</td></tr>
+  <tr style="background:#ffebee;"><td colspan="2"><strong>系统服务专用 小计</strong></td><td><strong>~4,616</strong></td><td colspan="2">仅 system_server 或系统服务使用，<strong>appspawn-x 不需要加载</strong></td></tr>
+
+  <tr><td rowspan="4"><strong>Java 标准库等</strong></td><td><code>java.*</code> / <code>javax.*</code></td><td>~114</td><td>Java 标准类库</td><td>StringWriter, PrintWriter, JsonParser</td></tr>
+  <tr><td><code>dalvik.*</code> / <code>libcore.*</code></td><td>~200</td><td>ART 运行时基础</td><td>DexFile, NativeStart, IoUtils</td></tr>
+  <tr><td><code>org.*</code> / <code>sun.*</code></td><td>~50</td><td>XML/W3C/安全工具</td><td>XmlPullParser, DocumentBuilder, X509Certificate</td></tr>
+  <tr><td>其他 <code>com.android.*</code></td><td>~900</td><td>混合（部分 App 需要、部分系统专用）</td><td>—</td></tr>
+</table>
+
+<h4>（2）appspawn-x 的预加载裁剪策略</h4>
+
+<p>appspawn-x 仅孵化三方 Android App 进程，<strong>不需要孵化 system_server 或系统服务进程</strong>。因此可以大幅裁剪预加载列表：</p>
+
+<div class="card" style="background: #e8f5e9; border-color: #a5d6a7;">
+<h4 style="border-color: #2e7d32;">裁剪效果</h4>
+<table>
+  <tr><th>指标</th><th>Android Zygote（完整）</th><th>appspawn-x（裁剪后）</th><th>减少</th></tr>
+  <tr><td>预加载类总数</td><td>~14,000</td><td>~9,000</td><td><strong>-36%</strong></td></tr>
+  <tr><td>预加载耗时（估算）</td><td>~3-4 秒</td><td>~2-2.5 秒</td><td><strong>-35%</strong></td></tr>
+  <tr><td>预加载内存占用（估算）</td><td>~200MB</td><td>~130MB</td><td><strong>-35%</strong></td></tr>
+</table>
+</div>
+
+<p><strong>可安全移除的类别</strong>（按移除优先级排列）：</p>
+
+<table>
+  <tr><th>优先级</th><th>移除类别</th><th>类数</th><th>移除理由</th></tr>
+  <tr><td>P0</td><td><code>com.android.internal.*</code>（系统内部子集）</td><td>~1,800</td><td>系统服务内部实现，三方 App 无法访问（@hide API）</td></tr>
+  <tr><td>P0</td><td><code>android.hardware.*</code></td><td>852</td><td>Camera/Sensor/USB/指纹等硬件管理服务，在 OH 上由 OH 硬件子系统替代</td></tr>
+  <tr><td>P0</td><td><code>android.telephony.*</code></td><td>629</td><td>电话/短信/蜂窝子系统，在 OH 上由 OH 电话服务替代</td></tr>
+  <tr><td>P1</td><td><code>android.service.*</code></td><td>285</td><td>系统服务框架接口，三方 App 不实现这些服务</td></tr>
+  <tr><td>P1</td><td><code>android.security.*</code></td><td>188</td><td>系统安全/证书服务，在 OH 上由 OH 安全子系统替代</td></tr>
+  <tr><td>P1</td><td><code>com.android.server.*</code></td><td>84</td><td>纯 system_server 内部类</td></tr>
+  <tr><td>P2</td><td><code>android.app.admin.*</code></td><td>56</td><td>设备管理策略，三方 App 极少使用</td></tr>
+  <tr><td>P2</td><td><code>android.accounts.*</code></td><td>53</td><td>账户系统，在 OH 上需要重新适配</td></tr>
+  <tr><td>P2</td><td><code>android.nfc.*</code></td><td>48</td><td>NFC 子系统，在 OH 上由 OH NFC 服务替代</td></tr>
+  <tr><td>P2</td><td><code>android.print.*</code></td><td>33</td><td>打印服务，移动 App 极少使用</td></tr>
+  <tr><td>P2</td><td><code>android.companion/apex/blob/*</code></td><td>33</td><td>配套设备/APEX/Blob 纯系统功能</td></tr>
+  <tr><td>P2</td><td><code>android.speech.*</code></td><td>18</td><td>语音识别系统服务</td></tr>
+  <tr><td>P2</td><td><code>android.inputmethodservice.*</code></td><td>14</td><td>输入法服务框架（非 App 使用）</td></tr>
+  <tr><td>P2</td><td><code>android.view.textservice.*</code></td><td>19</td><td>拼写检查系统服务</td></tr>
+  <tr><td></td><td><strong>合计可移除</strong></td><td><strong>~4,112+</strong></td><td></td></tr>
+</table>
+
+<div class="note">
+<strong>注意事项：</strong>
+<ul>
+  <li><code>com.android.internal.*</code> 中约有 500 个类被三方 App 间接依赖（如 <code>com.android.internal.R</code> 资源引用），不能全部移除，需逐一甄别。</li>
+  <li>「部分需要」类别（android.media/net/webkit/location 等）建议保留，因为大量三方 App 使用多媒体和网络功能。</li>
+  <li>裁剪后的预加载列表应放在 <code>/system/etc/preloaded-classes-appspawnx</code>，与 Zygote 的完整列表分开管理。</li>
+</ul>
+</div>
+
+<h3 id="ch4-6-3">5.6.3 initChild()（子进程）</h3>
+
+<pre><code>AppSpawnXInit.initChild(procName, targetClass, targetSdkVersion)
+  │
+  ├── Process.setArgV0(procName)                设置进程名
+  ├── VMRuntime.setTargetSdkVersion(sdk)        设置目标 SDK
+  ├── initCommonRuntime()
+  │   ├── 设置默认 UncaughtExceptionHandler
+  │   └── 重定向 stdout/stderr → log
+  ├── initAdapterLayer()
+  │   └── 反射调用 OHEnvironment.initialize()
+  └── invokeStaticMain(targetClass)
+      ├── Class.forName("android.app.ActivityThread")
+      ├── clazz.getMethod("main", String[].class)
+      └── mainMethod.invoke(null, new String[0])
+          └── ActivityThread.main() → Looper.loop()  ← 永不返回
+</code></pre>
+
+<h2 id="ch4-7">5.7 foundation 侧集成</h2>
+
+<h3>5.7.1 RemoteClientManager 扩展</h3>
+
+<p>在 OH 的 <code>ability_rt/services/appmgr/</code> 中，<code>RemoteClientManager</code> 管理所有 spawn 客户端实例。需要添加第 6 个客户端：</p>
+
+<pre><code>// remote_client_manager.h 新增成员
+std::shared_ptr&lt;AppSpawnClient&gt; androidSpawnClient_;
+
+// remote_client_manager.cpp 构造函数新增初始化
+androidSpawnClient_(std::make_shared&lt;AppSpawnClient&gt;("AppSpawnX"))
+
+// 新增访问方法
+std::shared_ptr&lt;AppSpawnClient&gt; GetAndroidSpawnClient() const;
+</code></pre>
+
+<h3>5.7.2 Android App 识别与路由</h3>
+
+<pre><code>// AppMgrServiceInner::StartProcess() 中添加路由分支
+std::shared_ptr&lt;AppSpawnClient&gt; client;
+if (appInfo.isAndroidApp) {
+    client = remoteClientManager_-&gt;GetAndroidSpawnClient();
+} else if (appInfo.isCJApp) {
+    client = remoteClientManager_-&gt;GetCJSpawnClient();
+} else if (appInfo.isHybridApp) {
+    client = remoteClientManager_-&gt;GetHybridSpawnClient();
+} else {
+    client = remoteClientManager_-&gt;GetSpawnClient();
+}
+</code></pre>
+
+<p><strong>Android App 识别</strong>：在 <code>BundleInfo</code> 中添加 <code>isAndroidApp</code> 标志位，由 BMS 在解析 APK 包格式时设置。</p>
+
+<h3>5.7.3 扩展消息构建</h3>
+
+<pre><code>// CreateStartMsg() 中为 Android App 添加扩展字段
+if (appInfo.isAndroidApp) {
+    startMsg.SetExtMsg("apk_path", appInfo.apkPath);
+    startMsg.SetExtMsg("dex_paths", appInfo.dexPaths);
+    startMsg.SetExtMsg("native_lib_paths", appInfo.nativeLibPaths);
+    startMsg.SetExtMsg("target_class", "android.app.ActivityThread");
+    startMsg.SetExtMsg("target_sdk_version",
+                        std::to_string(appInfo.targetSdkVersion));
+}
+</code></pre>
+
+<h2 id="ch4-8">5.8 配置文件设计</h2>
+
+<h3>5.8.1 appspawn_x.cfg — init 服务配置</h3>
+
+<table>
+  <tr><th>配置项</th><th>值</th><th>说明</th></tr>
+  <tr><td>name</td><td>"appspawn-x"</td><td>服务名称</td></tr>
+  <tr><td>path</td><td>["/system/bin/appspawn-x", "--socket-name", "AppSpawnX"]</td><td>可执行文件和启动参数</td></tr>
+  <tr><td>uid / gid</td><td>root / [system, shell]</td><td>需要 root 以执行 setuid/setgid</td></tr>
+  <tr><td>critical</td><td>[1, 4, 240]</td><td>崩溃重启策略：最多 4 次/240 秒</td></tr>
+  <tr><td>secon</td><td>"u:r:appspawn_x:s0"</td><td>服务自身的 SELinux 上下文</td></tr>
+  <tr><td>caps</td><td>SYS_PTRACE, KILL, SETUID, SETGID, ...</td><td>Linux capabilities（与 appspawn 一致）</td></tr>
+  <tr><td>socket</td><td>AppSpawnX, AF_UNIX, SOCK_STREAM</td><td>监听 socket 配置</td></tr>
+  <tr><td>env</td><td>ANDROID_ROOT, BOOTCLASSPATH, ...</td><td>Android 运行时环境变量</td></tr>
+</table>
+
+<h3>5.8.2 appspawn_x_sandbox.json — 沙箱挂载规则</h3>
+
+<table>
+  <tr><th>层级</th><th>挂载规则</th><th>说明</th></tr>
+  <tr><td rowspan="3"><strong>通用基础层</strong></td><td><code>/system</code> → 只读绑定</td><td>含 Android framework JAR</td></tr>
+  <tr><td><code>/vendor</code> → 只读绑定</td><td>硬件驱动</td></tr>
+  <tr><td><code>/dev</code>, <code>/proc</code>, <code>/sys</code></td><td>设备/进程/内核</td></tr>
+  <tr><td rowspan="4"><strong>Android 专用层</strong></td><td><code>/data/app</code> → 只读</td><td>用户安装 APK</td></tr>
+  <tr><td><code>/data/dalvik-cache</code> → 读写</td><td>DEX 编译缓存</td></tr>
+  <tr><td><code>/data/data/&lt;pkg&gt;</code> → 读写</td><td>App 私有数据</td></tr>
+  <tr><td><code>/storage/emulated/0/Android/data/&lt;pkg&gt;</code></td><td>外部存储数据</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!-- Chapter 5: Build Environment Setup -->
+<!-- ================================================================ -->
+
+<h1 id="ch5">6. 编译构建环境搭建</h1>
+
+<h2 id="ch5-1">6.1 开发环境要求</h2>
+
+<table>
+  <tr><th>项目</th><th>要求</th><th>说明</th></tr>
+  <tr><td>操作系统</td><td>Ubuntu 20.04+ / 22.04 LTS</td><td>OH 官方推荐构建环境</td></tr>
+  <tr><td>OH SDK</td><td>OpenHarmony 5.0+ 全量代码</td><td>含 appspawn、ability_rt、graphic_2d</td></tr>
+  <tr><td>Android Runtime</td><td>AOSP 14 ART 交叉编译产物</td><td>libart.so、libandroid_runtime.so 等</td></tr>
+  <tr><td>GN + Ninja</td><td>OH 内置构建工具</td><td>通过 build.sh 调用</td></tr>
+  <tr><td>交叉编译器</td><td>aarch64-linux-ohos (Clang/LLVM)</td><td>OH 预编译工具链</td></tr>
+  <tr><td>磁盘空间</td><td>≥ 200GB</td><td>OH 全量 + AOSP ART + 编译产物</td></tr>
+  <tr><td>内存</td><td>≥ 32GB（推荐 64GB）</td><td>全量编译所需</td></tr>
+</table>
+
+<h2 id="ch5-2">6.2 源码目录布局</h2>
+
+<h3>方式一：OH 代码树内集成（推荐）</h3>
+
+<pre><code># 在 OH 代码树中创建软链接
+cd /path/to/oh_source
+ln -s /path/to/adapter/appspawn-x third_party/appspawnx
+
+# 注册部件 (third_party/appspawnx/bundle.json)
+{
+  "name": "@ohos/appspawnx",
+  "component": {
+    "name": "appspawnx",
+    "subsystem": "startup",
+    "build": {
+      "group_type": {
+        "fwk_group": ["//third_party/appspawnx:appspawnx_packages"]
+      }
+    }
+  }
+}
+</code></pre>
+
+<h3>方式二：独立编译</h3>
+
+<pre><code># 设置 OH 编译环境
+source /path/to/oh_source/build/envsetup.sh
+
+# 指定 OH 源码根目录和 Android 预编译库路径
+gn gen out/appspawnx --args='
+  target_os = "ohos"
+  target_cpu = "arm64"
+  oh_source_root = "/path/to/oh_source"
+  android_prebuilt_root = "/path/to/android_prebuilt"
+'
+ninja -C out/appspawnx appspawn-x
+</code></pre>
+
+<h2 id="ch5-3">6.3 BUILD.gn 构建配置</h2>
+
+<table>
+  <tr><th>目标名</th><th>类型</th><th>输出位置</th><th>说明</th></tr>
+  <tr><td><code>appspawn-x</code></td><td>ohos_executable</td><td><code>/system/bin/appspawn-x</code></td><td>守护进程可执行文件</td></tr>
+  <tr><td><code>appspawn_x_cfg</code></td><td>ohos_prebuilt_etc</td><td><code>/system/etc/init/appspawn_x.cfg</code></td><td>init 服务配置</td></tr>
+  <tr><td><code>appspawn_x_sandbox_config</code></td><td>ohos_prebuilt_etc</td><td><code>/system/etc/appspawn_x_sandbox.json</code></td><td>沙箱配置</td></tr>
+  <tr><td><code>appspawnx_java</code></td><td>ohos_java_library</td><td>appspawnx_java.jar</td><td>AppSpawnXInit.java</td></tr>
+  <tr><td><code>appspawnx_packages</code></td><td>group</td><td>—</td><td>聚合安装目标</td></tr>
+</table>
+
+<h2 id="ch5-4">6.4 依赖库说明</h2>
+
+<h3>OH 系统库（从 OH 源码构建）</h3>
+
+<table>
+  <tr><th>库</th><th>GN 依赖</th><th>用途</th></tr>
+  <tr><td>libhilog.z.so</td><td>hilog:libhilog</td><td>日志系统</td></tr>
+  <tr><td>libipc_core.z.so</td><td>ipc:ipc_core</td><td>OH IPC 框架</td></tr>
+  <tr><td>libsamgr_proxy.z.so</td><td>samgr:samgr_proxy</td><td>系统服务管理器</td></tr>
+  <tr><td>libaccesstoken_manager_sdk.z.so</td><td>access_token:libaccesstoken_manager_sdk</td><td>权限令牌管理</td></tr>
+  <tr><td>librestorecon.z.so</td><td>selinux_adapter:librestorecon</td><td>SELinux 上下文</td></tr>
+  <tr><td>libappspawn_client.z.so</td><td>appspawn:appspawn_client</td><td>AppSpawn 通信协议</td></tr>
+</table>
+
+<h3>Android 运行时库（需交叉编译）</h3>
+
+<p>以下 Android 运行时库需要使用 OH 编译工具链重新编译（详见 6.5 节）：</p>
+
+<table>
+  <tr><th>库</th><th>AOSP 源码路径</th><th>用途</th><th>直接依赖库数</th></tr>
+  <tr><td>libart.so</td><td>art/runtime/</td><td>ART 虚拟机核心（GC、JIT、解释器、类加载）</td><td>~20</td></tr>
+  <tr><td>libandroid_runtime.so</td><td>frameworks/base/core/jni/</td><td>Android 框架 JNI 注册（100+ 方法组）</td><td>~60</td></tr>
+  <tr><td>libnativehelper.so</td><td>libnativehelper/</td><td>JNI 辅助库（JniInvocation、JNIHelp）</td><td>~5</td></tr>
+  <tr><td>libandroid.so</td><td>frameworks/base/native/</td><td>NDK native API 实现</td><td>~15</td></tr>
+  <tr><td>libcutils.so</td><td>system/core/libcutils/</td><td>Android 系统工具（属性、日志、Ashmem）</td><td>~5</td></tr>
+  <tr><td>libutils.so</td><td>system/core/libutils/</td><td>Android C++ 工具（RefBase、String、Vector）</td><td>~5</td></tr>
+  <tr><td>liblog.so</td><td>system/logging/liblog/</td><td>Android 日志系统</td><td>~2</td></tr>
+  <tr><td>libbinder.so</td><td>frameworks/native/libs/binder/</td><td>Binder IPC 框架（方案 B 需要）</td><td>~10</td></tr>
+</table>
+
+<h3>适配层库（本项目产物）</h3>
+
+<table>
+  <tr><th>库</th><th>用途</th></tr>
+  <tr><td>liboh_adapter_bridge.so</td><td>Android → OH 桥接 JNI 库</td></tr>
+  <tr><td>oh-adapter-framework.jar</td><td>Java 侧适配器类</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<!-- Section 6.5: Cross-Compilation -->
+<!-- ================================================================ -->
+
+<h2 id="ch5-5">6.5 Android 运行时库交叉编译</h2>
+
+<h3>6.5.1 什么是交叉编译</h3>
+
+<p>Android 运行时库（libart.so、libandroid_runtime.so 等）原本是为 Android 操作系统编译的。<strong>不能直接将 Android 编译产物的 .so 复制到 OH 上使用</strong>，因为两者的用户态运行环境不同：</p>
+
+<table>
+  <tr><th>维度</th><th>Android 原生编译</th><th>appspawn-x 需要的编译</th></tr>
+  <tr><td>目标三元组</td><td><code>aarch64-linux-android</code></td><td><code>aarch64-linux-ohos</code></td></tr>
+  <tr><td>C 标准库</td><td>Bionic libc（<code>libc.so</code>）</td><td>musl libc（<code>libc.so</code>）</td></tr>
+  <tr><td>动态链接器</td><td><code>/system/bin/linker64</code></td><td><code>/system/lib/ld-musl-aarch64.so.1</code></td></tr>
+  <tr><td>编译器</td><td>Android Clang</td><td>OH Clang</td></tr>
+  <tr><td>内核头文件</td><td>Android 定制 Linux headers</td><td>OH 定制 Linux headers</td></tr>
+  <tr><td>ELF OS/ABI 标记</td><td>ELFOSABI_NONE (Android)</td><td>ELFOSABI_NONE (OHOS)</td></tr>
+</table>
+
+<p><strong>交叉编译 = 用 OH 的 Clang 工具链重新编译 AOSP 的 C++ 源码</strong>，使产物链接 musl libc、使用 OH 动态链接器，能在 OH 系统上正确加载和运行。</p>
+
+<div class="note">
+两者底层都是 Linux 内核 + ARM64 指令集，机器码本身是兼容的。不兼容的是<strong>用户态 ABI</strong>：C 库符号表、系统调用封装、线程本地存储（TLS）、动态链接机制等。
+</div>
+
+<h3>6.5.2 Bionic 专有 API 适配</h3>
+
+<p>Android 的 C 标准库 Bionic 包含多个专有 API，在 musl libc 中不存在。这是交叉编译的<strong>核心难点</strong>。需要逐一提供兼容实现：</p>
+
+<h4>（1）系统属性 API（最关键）</h4>
+
+<p>Android 全系统依赖 Bionic 的系统属性机制（<code>/dev/__properties__</code> 共享内存），ART 和框架大量使用：</p>
+
+<table>
+  <tr><th>Bionic API</th><th>头文件</th><th>用途</th><th>OH 替代方案</th></tr>
+  <tr><td><code>__system_property_find()</code></td><td><code>&lt;sys/system_properties.h&gt;</code></td><td>查找系统属性</td><td rowspan="3">封装 OH 的 <code>SystemGetParameter()</code> / <code>SystemSetParameter()</code>（来自 <code>init:libbegetutil</code>）</td></tr>
+  <tr><td><code>__system_property_read_callback()</code></td><td><code>&lt;sys/system_properties.h&gt;</code></td><td>读取属性值</td></tr>
+  <tr><td><code>__system_property_set()</code></td><td><code>&lt;sys/system_properties.h&gt;</code></td><td>设置属性值</td></tr>
+  <tr><td><code>add_sysprop_change_callback()</code></td><td>Bionic 内部</td><td>属性变更监听</td><td>OH <code>WatchParameter()</code></td></tr>
+</table>
+
+<p><strong>适配方案</strong>：创建 <code>bionic_compat/system_properties.cpp</code>，实现上述函数，内部转调 OH sysparam API：</p>
+
+<pre><code>// bionic_compat/system_properties.cpp
+#include &lt;sys/system_properties.h&gt;  // 我们提供的兼容头文件
+#include "parameter.h"               // OH: init:libbegetutil
+
+// Android 属性名 → OH 参数名映射（直接透传）
+int __system_property_set(const char* name, const char* value) {
+    return SystemSetParameter(name, value);
+}
+
+// 返回 prop_info 指针（在兼容层中封装为查找结果）
+const prop_info* __system_property_find(const char* name) {
+    char value[PARAM_VALUE_LEN_MAX] = {0};
+    int ret = SystemGetParameter(name, NULL, value, PARAM_VALUE_LEN_MAX);
+    if (ret == 0) {
+        return create_prop_info_cache(name, value);  // 缓存查询结果
+    }
+    return nullptr;
+}
+
+void __system_property_read_callback(const prop_info* pi,
+        void (*callback)(void*, const char*, const char*, uint32_t),
+        void* cookie) {
+    if (pi) {
+        callback(cookie, pi-&gt;name, pi-&gt;value, pi-&gt;serial);
+    }
+}
+</code></pre>
+
+<h4>（2）内存管理 API</h4>
+
+<p>Bionic 提供了 Android 专有的 <code>malloc</code> 扩展，用于 Zygote fork 后的内存管理：</p>
+
+<table>
+  <tr><th>Bionic API</th><th>头文件</th><th>用途</th><th>OH 适配</th></tr>
+  <tr><td><code>android_mallopt(M_SET_ZYGOTE_CHILD)</code></td><td><code>&lt;bionic/malloc.h&gt;</code></td><td>标记进程为 Zygote 子进程，触发 jemalloc 行为调整</td><td>空实现（musl 使用不同的 malloc 实现）</td></tr>
+  <tr><td><code>android_mallopt(M_INIT_ZYGOTE_CHILD_PROFILING)</code></td><td><code>&lt;bionic/malloc.h&gt;</code></td><td>初始化堆内存 profiling</td><td>空实现</td></tr>
+  <tr><td><code>android_mallopt(M_GET_MALLOC_LEAK_INFO)</code></td><td><code>&lt;bionic/malloc.h&gt;</code></td><td>获取 malloc 泄漏信息</td><td>空实现或使用 OH 的 hichecker</td></tr>
+  <tr><td><code>mallopt(M_PURGE)</code></td><td><code>&lt;malloc.h&gt;</code></td><td>清理未使用的内存页</td><td>musl 的 <code>malloc_trim()</code> 替代</td></tr>
+  <tr><td><code>mallopt(M_DECAY_TIME)</code></td><td><code>&lt;malloc.h&gt;</code></td><td>jemalloc 衰减时间</td><td>空实现（musl 不使用 jemalloc）</td></tr>
+</table>
+
+<pre><code>// bionic_compat/malloc_compat.cpp
+#include &lt;bionic/malloc.h&gt;  // 我们提供的兼容头文件
+
+bool android_mallopt(int opcode, void* arg, size_t arg_size) {
+    // musl 不支持这些 Bionic 专有 malloc 选项
+    // 大部分可以安全地返回 true（表示"成功"但实际无操作）
+    switch (opcode) {
+        case M_SET_ZYGOTE_CHILD:
+        case M_INIT_ZYGOTE_CHILD_PROFILING:
+            return true;  // 无操作，安全忽略
+        case M_PURGE:
+            malloc_trim(0);  // musl 标准实现
+            return true;
+        default:
+            return false;
+    }
+}
+</code></pre>
+
+<h4>（3）栈保护与安全 API</h4>
+
+<table>
+  <tr><th>Bionic API</th><th>用途</th><th>OH 适配</th></tr>
+  <tr><td><code>android_reset_stack_guards()</code></td><td>fork 后重新随机化栈金丝雀值</td><td>直接读取 <code>/dev/urandom</code> 设置 <code>__stack_chk_guard</code></td></tr>
+  <tr><td><code>android_fdsan_set_error_level()</code></td><td>文件描述符泄漏检测级别</td><td>空实现（OH 无 fdsan）</td></tr>
+  <tr><td><code>android_fdsan_get_error_level()</code></td><td>获取 fdsan 错误级别</td><td>返回 DISABLED</td></tr>
+</table>
+
+<h4>（4）其他 Bionic 差异</h4>
+
+<table>
+  <tr><th>差异点</th><th>Bionic 行为</th><th>musl 行为</th><th>影响</th></tr>
+  <tr><td>TLS（线程本地存储）</td><td>Bionic 专有 TLS slot 分配机制</td><td>标准 ELF TLS</td><td>ART 的 Thread 结构需要适配 TLS 访问方式</td></tr>
+  <tr><td><code>pthread_internal_t</code></td><td>Bionic 扩展字段（tid 缓存等）</td><td>musl 标准实现</td><td>ART 直接访问 pthread 内部结构的代码需要修改</td></tr>
+  <tr><td><code>__BIONIC__</code> 宏</td><td>已定义</td><td>未定义</td><td>AOSP 源码中 <code>#if defined(__BIONIC__)</code> 条件编译分支将走 else 路径</td></tr>
+  <tr><td>信号处理</td><td>Bionic 信号链（sigchain）</td><td>标准 POSIX 信号</td><td>需要移植 <code>libsigchain</code> 或使用 musl 的信号处理</td></tr>
+</table>
+
+<h3>6.5.3 libandroid_runtime 依赖树分析</h3>
+
+<p><code>libandroid_runtime.so</code> 是依赖最复杂的库，它是 Android 框架 JNI 层的核心。其完整依赖树如下：</p>
+
+<table>
+  <tr><th>依赖分类</th><th>库名</th><th>appspawn-x 是否需要</th><th>说明</th></tr>
+  <tr><td rowspan="4"><strong>IPC / 系统</strong></td><td>libbinder, libbinder_ndk</td><td>方案 B 需要</td><td>Android Binder 用户态框架</td></tr>
+  <tr><td>libcutils, libutils, libbase</td><td>✅ 必须</td><td>基础工具库（属性、日志、智能指针）</td></tr>
+  <tr><td>liblog</td><td>✅ 必须</td><td>Android 日志系统</td></tr>
+  <tr><td>libhidlbase</td><td>❌ 不需要</td><td>HIDL HAL 接口基础（OH 上无 Android HAL）</td></tr>
+  <tr><td rowspan="5"><strong>图形 / 渲染</strong></td><td>libhwui, libskia</td><td>✅ 必须</td><td>硬件加速 UI 渲染、2D 图形引擎</td></tr>
+  <tr><td>libgui, libui, libnativewindow</td><td>✅ 需适配</td><td>Surface/窗口管理（需桥接到 OH RenderService）</td></tr>
+  <tr><td>libEGL, libGLESv2, libvulkan</td><td>✅ 需适配</td><td>GPU API（使用 OH 的 GPU 驱动）</td></tr>
+  <tr><td>libharfbuzz_ng, libminikin</td><td>✅ 必须</td><td>文字排版/渲染引擎</td></tr>
+  <tr><td>libgraphicsenv</td><td>✅ 需适配</td><td>图形环境配置</td></tr>
+  <tr><td rowspan="3"><strong>多媒体</strong></td><td>libaudioclient, libmedia</td><td>⚠️ 可延迟</td><td>音频/媒体框架（需桥接到 OH 音频服务）</td></tr>
+  <tr><td>libcamera_client</td><td>⚠️ 可延迟</td><td>相机框架（需桥接到 OH Camera 服务）</td></tr>
+  <tr><td>libmediandk</td><td>⚠️ 可延迟</td><td>NDK 媒体 API</td></tr>
+  <tr><td rowspan="3"><strong>输入 / 传感器</strong></td><td>libinput</td><td>✅ 需适配</td><td>输入事件（已有 InputEventBridge 适配）</td></tr>
+  <tr><td>libsensor</td><td>⚠️ 可延迟</td><td>传感器框架</td></tr>
+  <tr><td>libusbhost</td><td>❌ 不需要</td><td>USB Host 模式</td></tr>
+  <tr><td rowspan="3"><strong>安全</strong></td><td>libselinux</td><td>✅ 需适配</td><td>SELinux 上下文（使用 OH 的 selinux_adapter）</td></tr>
+  <tr><td>libcrypto</td><td>✅ 必须</td><td>OpenSSL 加密库</td></tr>
+  <tr><td>libseccomp_policy</td><td>❌ 不需要</td><td>Seccomp 沙箱策略（OH 有自己的沙箱）</td></tr>
+  <tr><td rowspan="4"><strong>可跳过</strong></td><td>libhardware, libhardware_legacy</td><td>❌ 不需要</td><td>Android HAL 接口（OH 上不使用）</td></tr>
+  <tr><td>libnetd_client, libnetdutils</td><td>❌ 不需要</td><td>Android netd 网络守护进程客户端</td></tr>
+  <tr><td>libpdfium</td><td>❌ 不需要</td><td>PDF 渲染（按需）</td></tr>
+  <tr><td>libappfuse, libincfs</td><td>❌ 不需要</td><td>FUSE/IncFS 文件系统（Android 特有）</td></tr>
+</table>
+
+<h3>6.5.4 分层编译策略</h3>
+
+<p>由于 <code>libandroid_runtime.so</code> 的依赖极其庞大（~60 个直接依赖），一次性全部交叉编译不现实。采用<strong>分层递进</strong>策略：</p>
+
+<div class="card" style="background: #e3f2fd; border-color: #90caf9;">
+<h4 style="border-color: #1565c0;">第 1 层：Bionic 兼容层（最先完成）</h4>
+<p>创建 <code>libbionic_compat.so</code>，实现所有 Bionic 专有 API 的 OH 替代：</p>
+<pre><code>adapter/appspawn-x/bionic_compat/
+├── include/
+│   ├── sys/system_properties.h       # 属性 API 兼容头文件
+│   ├── bionic/malloc.h               # android_mallopt 兼容头文件
+│   ├── android/fdsan.h               # fdsan 空实现头文件
+│   └── bionic/mte.h                  # MTE 空实现头文件
+├── src/
+│   ├── system_properties.cpp         # 转调 OH SystemGetParameter/SetParameter
+│   ├── malloc_compat.cpp             # android_mallopt 空实现
+│   ├── fdsan_compat.cpp              # fdsan 空实现
+│   └── stack_guard.cpp               # android_reset_stack_guards 实现
+└── BUILD.gn
+</code></pre>
+<p><strong>依赖</strong>：仅依赖 OH 的 <code>init:libbegetutil</code>（sysparam）和 musl libc。<br>
+<strong>产物</strong>：<code>libbionic_compat.so</code> + 兼容头文件目录。</p>
+</div>
+
+<div class="card" style="background: #fff8e1; border-color: #ffe082;">
+<h4 style="border-color: #f57f17;">第 2 层：Android 基础库（核心工具）</h4>
+<p>使用 OH Clang + 第 1 层兼容头文件，编译 Android 基础库：</p>
+<table>
+  <tr><th>库</th><th>AOSP 源码</th><th>编译要点</th></tr>
+  <tr><td>liblog</td><td>system/logging/liblog/</td><td>将 Android logd 协议替换为 OH hilog 输出</td></tr>
+  <tr><td>libcutils</td><td>system/core/libcutils/</td><td>链接 libbionic_compat 获取属性 API；Ashmem 使用标准 POSIX shm</td></tr>
+  <tr><td>libutils</td><td>system/core/libutils/</td><td>RefBase/String/Vector 等 C++ 工具，无 Bionic 特有依赖</td></tr>
+  <tr><td>libbase</td><td>system/libbase/</td><td>基础工具（文件、字符串），少量属性依赖</td></tr>
+  <tr><td>libnativehelper</td><td>libnativehelper/</td><td>JniInvocation + JNIHelp，依赖 liblog</td></tr>
+</table>
+<p><strong>编译命令示例</strong>：</p>
+<pre><code># 设置 OH 交叉编译环境
+export OH_SYSROOT=/path/to/oh_source/prebuilts/ohos-sdk/linux/native/sysroot
+export OH_CLANG=/path/to/oh_source/prebuilts/clang/ohos/linux-x86_64/bin/clang++
+export BIONIC_COMPAT=/path/to/adapter/appspawn-x/bionic_compat
+
+# 编译 libcutils（示例）
+$OH_CLANG --target=aarch64-linux-ohos \
+    --sysroot=$OH_SYSROOT \
+    -I $BIONIC_COMPAT/include \
+    -I /path/to/aosp/system/core/libcutils/include \
+    -shared -o libcutils.so \
+    /path/to/aosp/system/core/libcutils/native/*.cpp \
+    -L . -lbionic_compat -llog \
+    -fPIC -std=c++17
+</code></pre>
+</div>
+
+<div class="card" style="background: #fce4ec; border-color: #ef9a9a;">
+<h4 style="border-color: #c62828;">第 3 层：ART 虚拟机</h4>
+<p>ART 是最核心也是最复杂的编译目标：</p>
+<table>
+  <tr><th>库</th><th>AOSP 源码</th><th>编译要点</th></tr>
+  <tr><td>libart.so</td><td>art/runtime/</td><td>ART 运行时核心。需适配：TLS 访问方式（Bionic → musl）、pthread 内部结构访问、信号链（libsigchain）、GC 的 madvise/mprotect 调用</td></tr>
+  <tr><td>libart-compiler.so</td><td>art/compiler/</td><td>JIT 编译器。依赖 libart</td></tr>
+  <tr><td>libdexfile.so</td><td>art/libdexfile/</td><td>DEX 文件解析。依赖较少，较容易编译</td></tr>
+  <tr><td>libsigchain.so</td><td>art/sigchainlib/</td><td>信号链管理。需适配 musl 的信号处理机制</td></tr>
+</table>
+<p><strong>关键适配点</strong>：</p>
+<pre><code>// ART 源码中的 Bionic 条件编译示例
+// art/runtime/thread.cc
+#if defined(__BIONIC__)
+    // Bionic 专有：直接访问 TLS slot 获取 Thread 指针
+    __set_tls(Thread::kTlsSlot, self);
+#else
+    // 非 Bionic：使用 pthread_setspecific（性能较低但通用）
+    pthread_setspecific(Thread::pthread_key_self_, self);
+#endif
+
+// 交叉编译时 __BIONIC__ 未定义，自动走 else 分支
+// 这些分支已经存在于 ART 源码中（为 host 编译准备的）
+</code></pre>
+<div class="note">
+<strong>好消息</strong>：ART 源码已经支持在 Linux host 上编译运行（用于 <code>dex2oat</code> 等工具），因此大部分 <code>#if !defined(__BIONIC__)</code> 的替代路径已经实现。交叉编译主要工作是确保这些路径在 aarch64-linux-ohos 目标上也能正确工作。
+</div>
+</div>
+
+<div class="card" style="background: #e8eaf6; border-color: #9fa8da;">
+<h4 style="border-color: #283593;">第 4 层：Android 框架 JNI（libandroid_runtime）</h4>
+<p>这是依赖最广的层，需要裁剪不必要的子系统：</p>
+
+<p><strong>裁剪策略</strong>：<code>libandroid_runtime.so</code> 包含 100+ 个 JNI 注册文件，每个对应一个 Android Framework Java 类。对于 appspawn-x 仅孵化三方 App 的场景，可以裁剪大量系统服务相关的 JNI：</p>
+
+<table>
+  <tr><th>JNI 模块</th><th>是否保留</th><th>说明</th></tr>
+  <tr style="background:#e8f5e9;"><td>android_app_ActivityThread.cpp</td><td>✅ 保留</td><td>App 主线程入口</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_view_*.cpp（~20 个）</td><td>✅ 保留</td><td>View 体系 JNI</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_graphics_*.cpp（~15 个）</td><td>✅ 保留</td><td>2D 图形 JNI</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_os_*.cpp（~10 个）</td><td>✅ 保留</td><td>Handler/Looper/Binder JNI</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_content_*.cpp（~5 个）</td><td>✅ 保留</td><td>Context/Intent JNI</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_text_*.cpp（~5 个）</td><td>✅ 保留</td><td>文本渲染 JNI</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_database_*.cpp（~3 个）</td><td>✅ 保留</td><td>SQLite JNI</td></tr>
+  <tr style="background:#e8f5e9;"><td>android_util_*.cpp（~5 个）</td><td>✅ 保留</td><td>日志/AssetManager JNI</td></tr>
+  <tr style="background:#fff8e1;"><td>android_media_*.cpp（~10 个）</td><td>⚠️ 延迟</td><td>媒体播放 JNI（需桥接到 OH 音视频）</td></tr>
+  <tr style="background:#fff8e1;"><td>android_net_*.cpp（~3 个）</td><td>⚠️ 延迟</td><td>网络 JNI（可使用标准 socket）</td></tr>
+  <tr style="background:#ffebee;"><td>android_hardware_*.cpp（~10 个）</td><td>❌ 移除</td><td>Camera/Sensor HAL JNI</td></tr>
+  <tr style="background:#ffebee;"><td>android_bluetooth_*.cpp</td><td>❌ 移除</td><td>蓝牙 JNI</td></tr>
+  <tr style="background:#ffebee;"><td>android_nfc_*.cpp</td><td>❌ 移除</td><td>NFC JNI</td></tr>
+  <tr style="background:#ffebee;"><td>android_service_*.cpp</td><td>❌ 移除</td><td>系统服务 JNI</td></tr>
+</table>
+
+<p>裁剪后 <code>libandroid_runtime.so</code> 的直接依赖从 ~60 个降至 ~25 个，大幅降低编译复杂度。</p>
+</div>
+
+<h3>6.5.5 完整编译流程</h3>
+
+<pre><code>
+编译流程总览
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+输入：
+  ├── AOSP 14 源码（art/、frameworks/、system/core/ 等）
+  ├── OH 5.0 SDK（Clang 工具链 + musl sysroot）
+  └── Bionic 兼容层源码（adapter/appspawn-x/bionic_compat/）
+
+第 1 层：libbionic_compat.so
+  ├── 输入：bionic_compat/src/*.cpp
+  ├── 依赖：OH musl libc + init:libbegetutil
+  └── 产物：libbionic_compat.so + 兼容头文件
+
+第 2 层：Android 基础库
+  ├── 输入：AOSP system/core/、system/logging/ 源码
+  ├── 依赖：第 1 层 + OH musl libc
+  └── 产物：liblog.so, libcutils.so, libutils.so,
+            libbase.so, libnativehelper.so
+
+第 3 层：ART 虚拟机
+  ├── 输入：AOSP art/ 源码
+  ├── 依赖：第 1-2 层
+  └── 产物：libart.so, libart-compiler.so,
+            libdexfile.so, libsigchain.so
+
+第 4 层：Android 框架 JNI（裁剪版）
+  ├── 输入：AOSP frameworks/base/core/jni/ 源码（裁剪后）
+  ├── 依赖：第 1-3 层 + 图形库（libskia 等）
+  └── 产物：libandroid_runtime.so（裁剪版，~25 个依赖）
+
+appspawn-x 可执行文件
+  ├── 输入：adapter/appspawn-x/src/*.cpp
+  ├── 依赖：第 1-4 层 + OH 系统库
+  └── 产物：/system/bin/appspawn-x
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+</code></pre>
+
+<h3>6.5.6 GN 构建集成</h3>
+
+<p>将分层编译集成到 OH 的 GN 构建系统中：</p>
+
+<pre><code># third_party/android_runtime/BUILD.gn
+
+# 第 1 层：Bionic 兼容层
+ohos_shared_library("bionic_compat") {
+  sources = [
+    "bionic_compat/src/system_properties.cpp",
+    "bionic_compat/src/malloc_compat.cpp",
+    "bionic_compat/src/fdsan_compat.cpp",
+    "bionic_compat/src/stack_guard.cpp",
+  ]
+  include_dirs = [ "bionic_compat/include" ]
+  external_deps = [ "init:libbegetutil" ]  # OH 属性系统
+  part_name = "appspawnx"
+}
+
+# 第 2 层：Android 基础库
+ohos_shared_library("android_liblog") {
+  sources = [ ... ]  # AOSP system/logging/liblog/ 源文件
+  include_dirs = [
+    "bionic_compat/include",
+    "aosp/system/logging/liblog/include",
+  ]
+  deps = [ ":bionic_compat" ]
+  # 将 Android ALOG 输出转到 OH hilog
+  defines = [ "ALOG_TO_HILOG=1" ]
+  part_name = "appspawnx"
+}
+
+ohos_shared_library("android_libcutils") {
+  sources = [ ... ]
+  deps = [ ":bionic_compat", ":android_liblog" ]
+  part_name = "appspawnx"
+}
+
+# 第 3 层：ART
+ohos_shared_library("android_libart") {
+  sources = [ ... ]  # AOSP art/runtime/ 源文件
+  deps = [
+    ":bionic_compat",
+    ":android_liblog",
+    ":android_libcutils",
+    ":android_libutils",
+    ":android_libbase",
+  ]
+  cflags_cc = [
+    "-DART_TARGET",                # ARM64 目标
+    "-DART_DEFAULT_GC_TYPE=CMC",   # 并发标记清除 GC
+  ]
+  part_name = "appspawnx"
+}
+
+# 第 4 层：框架 JNI（裁剪版）
+ohos_shared_library("android_libandroid_runtime") {
+  sources = [
+    # 仅保留三方 App 必需的 JNI 模块
+    "aosp/frameworks/base/core/jni/AndroidRuntime.cpp",
+    "aosp/frameworks/base/core/jni/android_app_ActivityThread.cpp",
+    "aosp/frameworks/base/core/jni/android_view_*.cpp",
+    "aosp/frameworks/base/core/jni/android_graphics_*.cpp",
+    "aosp/frameworks/base/core/jni/android_os_*.cpp",
+    "aosp/frameworks/base/core/jni/android_content_*.cpp",
+    "aosp/frameworks/base/core/jni/android_text_*.cpp",
+    "aosp/frameworks/base/core/jni/android_database_*.cpp",
+    "aosp/frameworks/base/core/jni/android_util_*.cpp",
+    # 不包含: android_hardware_*, android_bluetooth_*,
+    #          android_nfc_*, android_service_* 等
+  ]
+  deps = [
+    ":android_libart",
+    ":bionic_compat",
+    # ... 其他依赖
+  ]
+  part_name = "appspawnx"
+}
+</code></pre>
+
+<h2 id="ch5-6">6.6 编译与部署步骤</h2>
+
+<h3>步骤 1：准备 Bionic 兼容层</h3>
+
+<pre><code># 创建兼容层头文件和实现
+cd /path/to/adapter/appspawn-x/bionic_compat
+
+# 编译兼容层（会被后续所有层依赖）
+# 在 OH GN 构建系统中自动处理
+</code></pre>
+
+<h3>步骤 2：编译 Android 运行时库（分层）</h3>
+
+<pre><code># 将 AOSP 源码放置到 OH 代码树
+cd /path/to/oh_source
+mkdir -p third_party/android_runtime
+ln -s /path/to/aosp/art third_party/android_runtime/aosp_art
+ln -s /path/to/aosp/system/core third_party/android_runtime/aosp_system_core
+ln -s /path/to/aosp/frameworks/base third_party/android_runtime/aosp_frameworks
+
+# 编译全部 4 层
+./build.sh --product-name rk3568 --ccache \
+           --build-target android_libandroid_runtime
+</code></pre>
+
+<h3>步骤 3：编译 appspawn-x</h3>
+
+<pre><code>cd /path/to/oh_source
+./build.sh --product-name rk3568 --ccache \
+           --build-target appspawnx_packages
+</code></pre>
+
+<h3>步骤 3：部署到设备</h3>
+
+<pre><code># 推送文件
+hdc shell mount -o rw,remount /
+hdc file send out/.../system/bin/appspawn-x /system/bin/appspawn-x
+hdc file send out/.../system/etc/init/appspawn_x.cfg /system/etc/init/appspawn_x.cfg
+hdc file send out/.../system/etc/appspawn_x_sandbox.json /system/etc/appspawn_x_sandbox.json
+
+# 推送 Android 运行时库和框架 JAR
+hdc file send prebuilt/libart.so /system/lib64/libart.so
+hdc file send prebuilt/framework.jar /system/framework/framework.jar
+
+# 设置权限并重启
+hdc shell chmod 755 /system/bin/appspawn-x
+hdc shell reboot
+</code></pre>
+
+<h2 id="ch5-6">6.6 验证与调试</h2>
+
+<h3>基本验证</h3>
+
+<pre><code># 检查进程是否启动
+hdc shell ps -ef | grep appspawn-x
+# 预期: root &lt;PID&gt; 1 ... /system/bin/appspawn-x
+
+# 检查 socket
+hdc shell ls -la /dev/unix/socket/AppSpawnX
+# 预期: srw-rw---- root system ... AppSpawnX
+
+# 检查 bootevent
+hdc shell param get bootevent.appspawn_x.ready
+# 预期: true
+
+# 查看启动日志
+hdc shell hilog -T AppSpawnX
+</code></pre>
+
+<h3>孵化测试</h3>
+
+<pre><code># 启动测试 App
+hdc shell aa start -a MainAbility -b com.example.helloworld
+
+# 检查子进程（应为 appspawn-x 的子进程）
+hdc shell ps -ef | grep helloworld
+
+# 查看完整日志
+hdc shell hilog -T AppSpawnX -T AppSpawnXInit -T OH_AMAdapter
+</code></pre>
+
+<h3>调试技巧</h3>
+
+<table>
+  <tr><th>问题</th><th>调试方法</th></tr>
+  <tr><td>ART VM 创建失败</td><td>检查 BOOTCLASSPATH 环境变量；确认 libart.so ABI 兼容</td></tr>
+  <tr><td>预加载类失败</td><td>检查 framework.jar 是否在 classpath；查看 AppSpawnXInit 日志</td></tr>
+  <tr><td>Socket 连接被拒</td><td>检查 socket 权限 (0660)；检查 SELinux 策略</td></tr>
+  <tr><td>fork 后子进程崩溃</td><td>检查 UID/GID 设置；检查沙箱挂载；查看 /proc/&lt;pid&gt;/maps</td></tr>
+  <tr><td>适配层初始化失败</td><td>检查 liboh_adapter_bridge.so 路径；查看 OH_Environment 日志</td></tr>
+  <tr><td>ActivityThread 不启动</td><td>检查 APK/DEX 是否挂载到沙箱内；检查 ClassLoader 配置</td></tr>
+</table>
+
+</div>
+</body>
+</html>

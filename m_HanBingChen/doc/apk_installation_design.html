@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android APK 在 OH 系统上的安装设计</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --new: #00695c;
+    --high: #c62828;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(90deg, #e3f2fd, transparent); padding: 10px 12px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #e8eaf6, transparent); padding: 8px 12px; }
+  h3 { color: var(--text); font-size: 1.15em; margin: 20px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #1565c0, #00695c); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: #263238; color: #eeffff; border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.85em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; color: inherit; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-bridged { background: var(--bridged); }
+  .tag-stub { background: var(--stub); }
+  .tag-new { background: var(--new); }
+  .tag-mod { background: #f57f17; color: white; }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .toc .sub2 { padding-left: 48px; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+<h1>Android APK 在 OpenHarmony 系统上的安装设计</h1>
+<p>版本：2.0 &nbsp;|&nbsp; 日期：2026-03-16 &nbsp;|&nbsp; 状态：设计中</p>
+</div>
+
+<!-- ==================== TOC ==================== -->
+<div class="toc">
+<h3>目录</h3>
+<ul>
+  <li><a href="#ch1">1. 概述</a></li>
+  <li><a href="#ch1a">附录 A. Android APK 与 OH HAP 对比分析</a>
+    <ul class="sub">
+      <li><a href="#chA-1">A.1 包格式对比</a></li>
+      <li><a href="#chA-2">A.2 安装流程对比</a></li>
+      <li><a href="#chA-3">A.3 目录结构对比</a></li>
+      <li><a href="#chA-4">A.4 元数据模型对比</a></li>
+    </ul>
+  </li>
+  <li><a href="#ch2">2. Android 系统中 installd 与 PMS 的实现原理</a>
+    <ul class="sub">
+      <li><a href="#ch2-1">2.1 Android 包管理架构总览</a></li>
+      <li><a href="#ch2-2">2.2 App ↔ PMS 接口与交互流程</a></li>
+      <li><a href="#ch2-3">2.3 PMS ↔ installd 接口与交互流程</a></li>
+      <li><a href="#ch2-4">2.4 APK 安装端到端流程</a></li>
+      <li><a href="#ch2-5">2.5 包查询端到端流程</a></li>
+    </ul>
+  </li>
+  <li><a href="#ch3">3. OH 系统中 installd 与 BMS 的实现原理</a>
+    <ul class="sub">
+      <li><a href="#ch3-1">3.1 OH 包管理架构总览</a></li>
+      <li><a href="#ch3-2">3.2 App ↔ BMS 接口与交互流程</a></li>
+      <li><a href="#ch3-3">3.3 BMS ↔ installd 接口与交互流程</a></li>
+      <li><a href="#ch3-4">3.4 HAP 安装端到端流程</a></li>
+      <li><a href="#ch3-5">3.5 包查询端到端流程</a></li>
+    </ul>
+  </li>
+  <li><a href="#ch4">4. APK 安装到 OH 系统的适配设计方案</a>
+    <ul class="sub">
+      <li><a href="#ch4-0">4.0 OH 侧修改总览</a>
+        <ul class="sub2">
+          <li><a href="#ch4-0-1">4.0.1 OH BMS 修改清单</a></li>
+          <li><a href="#ch4-0-2">4.0.2 Adapter 新增模块清单</a></li>
+          <li><a href="#ch4-0-3">4.0.3 端到端安装流程概要</a></li>
+          <li><a href="#ch4-0-4">4.0.4 关键映射关系</a></li>
+        </ul>
+      </li>
+      <li><a href="#ch4-1">4.1 核心问题与设计目标</a></li>
+      <li><a href="#ch4-2">4.2 方案选型与整体架构</a></li>
+      <li><a href="#ch4-3">4.3 Android App ↔ installd/PMS 接口适配到 OH</a></li>
+      <li><a href="#ch4-4">4.4 OH installd 增强设计</a></li>
+      <li><a href="#ch4-5">4.5 OH BMS 增强设计</a></li>
+      <li><a href="#ch4-6">4.6 APK 解析器设计</a></li>
+      <li><a href="#ch4-7">4.7 安装入口与完整安装流程</a></li>
+      <li><a href="#ch4-8">4.8 APK 文件部署与 Native 库提取</a></li>
+      <li><a href="#ch4-9">4.9 DEX 优化 (dex2oat)</a></li>
+      <li><a href="#ch4-10">4.10 目录结构与数据目录映射</a></li>
+      <li><a href="#ch4-11">4.11 签名验证</a></li>
+      <li><a href="#ch4-12">4.12 PackageManager 适配器设计</a></li>
+      <li><a href="#ch4-13">4.13 卸载与更新</a></li>
+      <li><a href="#ch4-14">4.14 与现有适配层的集成</a></li>
+      <li><a href="#ch4-15">4.15 源码目录结构与文件清单</a></li>
+    </ul>
+  </li>
+</ul>
+</div>
+
+<!-- ==================== Chapter 1 ==================== -->
+<h1 id="ch1">1. 概述</h1>
+
+<p>本文档设计 Android APK 在 OpenHarmony (OH) 系统上的安装机制。文档首先分别分析 Android 和 OH 两个系统中包管理与安装守护进程的实现原理，
+然后基于对两个系统的深入理解，给出将 Android APK 安装到 OH 系统并正确启动运行的完整设计方案。</p>
+
+<div class="card">
+<h3>文档结构</h3>
+<table>
+<tr><th>章节</th><th>内容</th><th>目的</th></tr>
+<tr><td>第 2 章</td><td>Android installd + PMS 实现原理</td><td>理解 Android 端接口与流程，明确需要适配的接口</td></tr>
+<tr><td>第 3 章</td><td>OH installd + BMS 实现原理</td><td>理解 OH 端接口与流程，明确可复用的能力</td></tr>
+<tr><td>第 4 章</td><td>APK 安装到 OH 的适配方案</td><td>桥接两端差异，给出完整设计</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>前置依赖</h3>
+<ul>
+<li><strong>appspawn-x</strong>（已设计）— Android 应用进程孵化器，提供 ART VM + 预加载 + fork</li>
+<li><strong>适配层框架</strong>（已实现）— ActivityManagerAdapter、IntentWantConverter 等</li>
+<li><strong>BroadcastEventConverter</strong>（已实现）— OH CommonEvent ↔ Android Broadcast 映射</li>
+</ul>
+</div>
+
+<!-- ==================== Appendix A: APK vs HAP ==================== -->
+<h1 id="ch1a">附录 A. Android APK 与 OH HAP 对比分析</h1>
+
+<h2 id="chA-1">A.1 包格式对比</h2>
+
+<table>
+<tr><th>特性</th><th>Android APK</th><th>OH HAP</th></tr>
+<tr><td>文件格式</td><td>ZIP 压缩包（.apk 后缀）</td><td>ZIP 压缩包（.hap 后缀）</td></tr>
+<tr><td>清单文件</td><td>AndroidManifest.xml（二进制 AXML 格式）</td><td>module.json（JSON 文本）</td></tr>
+<tr><td>可执行代码</td><td>classes.dex（Dalvik 字节码）</td><td>*.abc（方舟字节码）</td></tr>
+<tr><td>资源文件</td><td>resources.arsc + res/（AAPT 编译格式）</td><td>resources/ 目录（OH 资源格式）</td></tr>
+<tr><td>Native 库</td><td>lib/{abi}/*.so</td><td>libs/{abi}/*.so</td></tr>
+<tr><td>签名方式</td><td>V1(JAR) / V2(APK Signing) / V3 / V4</td><td>HAP 签名（hap-sign-tool, EdDSA/RSA）</td></tr>
+<tr><td>资源 ID</td><td>0x7fXXYYYY 格式</td><td>$string:xxx 引用格式</td></tr>
+<tr><td>安装后优化</td><td>dex2oat → OAT/VDEX 文件</td><td>无（.abc 直接执行）或方舟 AOT</td></tr>
+</table>
+
+<h4>APK 内部结构</h4>
+<pre><code>app.apk (ZIP)
+├── META-INF/                    # 签名信息
+│   ├── MANIFEST.MF              # 文件清单与哈希
+│   ├── CERT.SF                  # 签名文件 (V1)
+│   └── CERT.RSA                 # 证书链 (V1)
+├── AndroidManifest.xml          # 二进制 XML（AXML 格式）
+├── classes.dex                  # 主 DEX 文件（Dalvik 字节码）
+├── classes2.dex                 # 多 DEX（可选）
+├── resources.arsc               # 编译后的资源表
+├── res/                         # 资源文件（drawable/layout/values 等）
+├── assets/                      # 原始资源文件
+├── lib/                         # Native 库
+│   ├── arm64-v8a/*.so
+│   └── armeabi-v7a/*.so
+└── kotlin/                      # Kotlin 元数据（可选）</code></pre>
+
+<h4>HAP 内部结构</h4>
+<pre><code>app.hap (ZIP)
+├── module.json                  # 模块清单（JSON 文本）
+├── ets/                         # 编译后的 TypeScript/JS
+│   └── modules_static.abc       # 方舟字节码
+├── resources/                   # 资源文件
+│   ├── base/                    # 默认资源
+│   └── rawfile/                 # 原始资源
+├── libs/                        # Native 库
+│   ├── arm64-v8a/*.so
+│   └── armeabi-v7a/*.so
+└── assets/                      # 资产文件</code></pre>
+
+<h2 id="chA-2">A.2 安装流程对比</h2>
+
+<table>
+<tr><th>阶段</th><th>Android (PMS + installd)</th><th>OH (BMS + installd)</th></tr>
+<tr><td>1. 入口</td><td>PackageInstaller.createSession()</td><td>IBundleInstaller.Install()</td></tr>
+<tr><td>2. 暂存</td><td>复制到 /data/app/{pkg}-{sessionId}/</td><td>复制到临时安装目录</td></tr>
+<tr><td>3. 签名验证</td><td>ApkSignatureVerifier (V1/V2/V3/V4)</td><td>installd.VerifyCodeSignature (EdDSA/RSA)</td></tr>
+<tr><td>4. 元数据解析</td><td>PackageParser 解析二进制 AndroidManifest.xml</td><td>ModuleProfile 解析 module.json</td></tr>
+<tr><td>5. Native 库提取</td><td>提取 lib/ 下对应 ABI 的 .so 文件</td><td>提取 libs/ 下的 .so 文件</td></tr>
+<tr><td>6. 代码优化</td><td>dex2oat: DEX → OAT（AOT 编译）</td><td>无需 或 ExecuteAOT（方舟 AOT）</td></tr>
+<tr><td>7. 数据目录</td><td>创建 /data/data/{pkg}/（CE/DE 两级）</td><td>创建 /data/app/el1-5/{bundle}/（五级加密）</td></tr>
+<tr><td>8. 注册</td><td>写入 /data/system/packages.xml</td><td>写入 RDB 数据库（SQLite）</td></tr>
+<tr><td>9. 通知</td><td>ACTION_PACKAGE_ADDED 广播</td><td>CommonEvent: usual.event.BUNDLE_ADDED</td></tr>
+</table>
+
+<h2 id="chA-3">A.3 目录结构对比</h2>
+
+<table>
+<tr><th>用途</th><th>Android 路径</th><th>OH 路径</th></tr>
+<tr><td>安装目录（代码）</td><td>/data/app/{pkg}-{uid}/</td><td>/data/app/el1/bundle/public/{bundle}/</td></tr>
+<tr><td>APK/HAP 文件</td><td>/data/app/{pkg}-{uid}/base.apk</td><td>/data/app/el1/bundle/public/{bundle}/entry/</td></tr>
+<tr><td>Native 库</td><td>/data/app/{pkg}-{uid}/lib/arm64-v8a/</td><td>/data/app/el1/bundle/public/{bundle}/libs/</td></tr>
+<tr><td>DEX/AOT 产物</td><td>/data/app/{pkg}-{uid}/oat/arm64/</td><td>不适用（或方舟 AOT 产物）</td></tr>
+<tr><td>应用数据</td><td>/data/data/{pkg}/</td><td>/data/app/el2/{userId}/database/{bundle}/</td></tr>
+<tr><td>应用缓存</td><td>/data/data/{pkg}/cache/</td><td>/data/app/el2/{userId}/cache/{bundle}/</td></tr>
+<tr><td>外部存储</td><td>/storage/emulated/0/Android/data/{pkg}/</td><td>/storage/media/{userId}/{bundle}/</td></tr>
+<tr><td>包数据库</td><td>/data/system/packages.xml</td><td>/data/service/el1/public/bms/bmsdb.db (SQLite)</td></tr>
+</table>
+
+<h2 id="chA-4">A.4 元数据模型对比</h2>
+
+<table>
+<tr><th>Android 概念</th><th>Android 数据结构</th><th>OH 概念</th><th>OH 数据结构</th></tr>
+<tr><td>应用包</td><td>PackageInfo</td><td>Bundle</td><td>BundleInfo</td></tr>
+<tr><td>应用信息</td><td>ApplicationInfo</td><td>应用信息</td><td>ApplicationInfo (OH)</td></tr>
+<tr><td>模块（无）</td><td>—（单 APK）</td><td>模块</td><td>HapModuleInfo (Entry/Feature/Shared)</td></tr>
+<tr><td>Activity</td><td>ActivityInfo</td><td>Page Ability</td><td>AbilityInfo (type=PAGE)</td></tr>
+<tr><td>Service</td><td>ServiceInfo</td><td>Service Extension</td><td>ExtensionAbilityInfo (type=SERVICE)</td></tr>
+<tr><td>BroadcastReceiver</td><td>ActivityInfo (receiver)</td><td>Static Subscriber</td><td>ExtensionAbilityInfo (type=STATICSUBSCRIBER)</td></tr>
+<tr><td>ContentProvider</td><td>ProviderInfo</td><td>DataShare Extension</td><td>ExtensionAbilityInfo (type=DATASHARE)</td></tr>
+<tr><td>Intent Filter</td><td>IntentFilter</td><td>Skills</td><td>SkillUri (actions[] + entities[] + uris[])</td></tr>
+<tr><td>权限声明</td><td>PermissionInfo</td><td>权限定义</td><td>DefinePermission</td></tr>
+<tr><td>权限请求</td><td>uses-permission</td><td>请求权限</td><td>RequestPermission</td></tr>
+<tr><td>包管理数据库</td><td>packages.xml (XML)</td><td>BMS 数据库</td><td>RDB / SQLite (bmsdb.db)</td></tr>
+</table>
+
+<!-- ==================== Chapter 2 ==================== -->
+<h1 id="ch2">2. Android 系统中 installd 与 PMS 的实现原理</h1>
+
+<h2 id="ch2-1">2.1 Android 包管理架构总览</h2>
+
+<p>Android 的包管理由三层组成：客户端 API 层（App 使用）、系统服务层（PMS）、Native 守护进程层（installd）。</p>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Android App 进程                            │
+│                                                                     │
+│  context.getPackageManager()                                        │
+│       │                                                             │
+│       ▼                                                             │
+│  ┌──────────────────────────┐                                       │
+│  │ ApplicationPackageManager │  ← 客户端代理，每个 App 进程一个实例     │
+│  │ extends PackageManager    │                                       │
+│  └───────────┬──────────────┘                                       │
+│              │ Binder IPC (IPackageManager.aidl)                     │
+└──────────────┼──────────────────────────────────────────────────────┘
+               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      system_server 进程                              │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │ PackageManagerService (PMS)                               │       │
+│  │  · extends IPackageManager.Stub                           │       │
+│  │  · ServiceManager.addService("package", this)             │       │
+│  │  · 注册时机：system_server 启动阶段                         │       │
+│  │                                                           │       │
+│  │  内部组件：                                                │       │
+│  │  ├─ ComputerEngine     — 查询逻辑实现（快照模式）            │       │
+│  │  ├─ InstallPackageHelper — 安装逻辑                        │       │
+│  │  ├─ PackageInstallerService — 安装会话管理                  │       │
+│  │  ├─ PermissionManagerService — 权限管理（独立服务）          │       │
+│  │  └─ Installer          — installd 的 Java 代理             │       │
+│  └──────────────┬───────────────────────────────────────────┘       │
+│                 │ Binder IPC (IInstalld.aidl)                        │
+└─────────────────┼───────────────────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    installd 守护进程 (Native)                        │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │ InstalldNativeService                                     │       │
+│  │  · extends BinderService&lt;InstalldNativeService&gt;          │       │
+│  │  · Binder 服务名: "installd"                               │       │
+│  │  · 以 root 权限运行                                        │       │
+│  │                                                           │       │
+│  │  核心职责：                                                │       │
+│  │  ├─ 文件系统操作（需要 root 权限）                          │       │
+│  │  ├─ 应用数据目录创建/删除                                   │       │
+│  │  ├─ DEX 优化（调用 dex2oat）                               │       │
+│  │  ├─ 文件权限和 SELinux 上下文设置                           │       │
+│  │  └─ Native 库提取和链接                                    │       │
+│  └──────────────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────────────┘
+</div>
+
+<div class="info">
+<strong>关键设计原则：</strong>PMS 运行在 system_server 进程中（非 root），无法直接操作文件系统（创建目录、设置权限等）。
+所有需要特权的文件操作委托给以 root 运行的 installd 守护进程，通过 Binder IPC 调用。
+这是 Android 的权限分离设计。
+</div>
+
+<h2 id="ch2-2">2.2 App ↔ PMS 接口与交互流程</h2>
+
+<h3>2.2.1 接口获取方式</h3>
+
+<pre><code>// App 获取 PackageManager 的方式
+PackageManager pm = context.getPackageManager();
+// 内部实现：
+// ApplicationPackageManager 持有 IPackageManager 的 Binder 代理
+// IPackageManager proxy = ActivityThread.getPackageManager()
+//     → ServiceManager.getService("package")  → IPackageManager.Stub.asInterface(binder)</code></pre>
+
+<h3>2.2.2 IPackageManager 核心方法分类</h3>
+
+<p>IPackageManager.aidl 定义了约 <strong>130+</strong> 个方法，按功能分类如下：</p>
+
+<div class="card">
+<table>
+<tr><th>类别</th><th>方法数</th><th>核心方法</th><th>说明</th></tr>
+<tr><td><strong>包信息查询</strong></td><td>~25</td>
+<td><code>getPackageInfo()</code><br><code>getApplicationInfo()</code><br><code>getInstalledPackages()</code><br><code>getPackageUid()</code></td>
+<td>查询已安装包的元数据、UID 映射</td></tr>
+<tr><td><strong>组件查询</strong></td><td>~15</td>
+<td><code>getActivityInfo()</code><br><code>getServiceInfo()</code><br><code>getReceiverInfo()</code><br><code>getProviderInfo()</code></td>
+<td>查询四大组件信息</td></tr>
+<tr><td><strong>Intent 解析</strong></td><td>~15</td>
+<td><code>resolveIntent()</code><br><code>queryIntentActivities()</code><br><code>queryIntentServices()</code><br><code>resolveContentProvider()</code></td>
+<td>隐式 Intent 匹配，组件发现</td></tr>
+<tr><td><strong>安装/卸载</strong></td><td>~10</td>
+<td><code>deletePackageAsUser()</code><br><code>installExistingPackageAsUser()</code><br><code>finishPackageInstall()</code></td>
+<td>包的安装、卸载、更新</td></tr>
+<tr><td><strong>权限管理</strong></td><td>~10</td>
+<td><code>checkPermission()</code><br><code>grantRuntimePermission()</code><br><code>checkUidPermission()</code></td>
+<td>权限检查与授予（委托 PermissionManager）</td></tr>
+<tr><td><strong>组件状态</strong></td><td>~10</td>
+<td><code>setComponentEnabledSetting()</code><br><code>getComponentEnabledSetting()</code><br><code>setApplicationHiddenSettingAsUser()</code></td>
+<td>启用/禁用组件</td></tr>
+<tr><td><strong>签名验证</strong></td><td>~8</td>
+<td><code>checkSignatures()</code><br><code>hasSigningCertificate()</code></td>
+<td>包签名校验</td></tr>
+<tr><td><strong>数据管理</strong></td><td>~8</td>
+<td><code>deleteApplicationCacheFiles()</code><br><code>clearApplicationUserData()</code><br><code>freeStorage()</code></td>
+<td>应用数据清理与存储管理</td></tr>
+<tr><td><strong>DEX 优化</strong></td><td>~5</td>
+<td><code>performDexOptMode()</code><br><code>notifyDexLoad()</code></td>
+<td>触发 DEX 编译优化</td></tr>
+<tr><td><strong>系统特性</strong></td><td>~10</td>
+<td><code>hasSystemFeature()</code><br><code>getSystemSharedLibraryNames()</code></td>
+<td>系统能力查询</td></tr>
+<tr><td><strong>其他</strong></td><td>~20+</td>
+<td>Instant App、备份恢复、MIME 类型等</td>
+<td>辅助功能</td></tr>
+</table>
+</div>
+
+<h3>2.2.3 App ↔ PMS 交互流程图</h3>
+
+<div class="diagram">
+【场景一：包信息查询】
+
+App 进程                              system_server (PMS)
+   │                                        │
+   │  pm.getPackageInfo("com.foo", flags)    │
+   ├───────────────────────────────────────►│
+   │        Binder IPC                       │
+   │                                        │  1. Computer snapshot = snapshotComputer()
+   │                                        │  2. PackageState ps = mPackages.get("com.foo")
+   │                                        │  3. 按 flags 构建 PackageInfo：
+   │                                        │     · GET_ACTIVITIES → 填充 activities[]
+   │                                        │     · GET_PERMISSIONS → 填充 requestedPermissions[]
+   │                                        │     · GET_SIGNATURES → 填充 signingInfo
+   │                                        │  4. 检查调用方可见性 (package visibility)
+   │       PackageInfo (Parcelable)         │
+   │◄───────────────────────────────────────┤
+   │                                        │
+
+【场景二：隐式 Intent 解析】
+
+App 进程                              system_server (PMS)
+   │                                        │
+   │  pm.queryIntentActivities(intent, 0)   │
+   ├───────────────────────────────────────►│
+   │                                        │  1. 取 intent 的 action/category/data/type
+   │                                        │  2. ActivityIntentResolver 匹配：
+   │                                        │     · 遍历所有已注册的 IntentFilter
+   │                                        │     · 匹配 action → category → data → type
+   │                                        │     · 按 priority 排序
+   │                                        │  3. 过滤不可见包
+   │       List&lt;ResolveInfo&gt;               │
+   │◄───────────────────────────────────────┤
+   │                                        │
+
+【场景三：安装请求】
+
+App / Shell                PackageInstallerService          PMS            installd
+   │                              │                         │                │
+   │  session = createSession()   │                         │                │
+   ├─────────────────────────────►│                         │                │
+   │  session.openWrite()         │                         │                │
+   ├─────────────────────────────►│ (写入 APK 到暂存目录)    │                │
+   │  session.commit()            │                         │                │
+   ├─────────────────────────────►│                         │                │
+   │                              │  installStage()         │                │
+   │                              ├────────────────────────►│                │
+   │                              │                         │  createAppData │
+   │                              │                         ├───────────────►│
+   │                              │                         │  dexopt        │
+   │                              │                         ├───────────────►│
+   │                              │                         │  更新 packages  │
+   │                              │                         │  发送广播       │
+   │  onPackageInstalled()        │                         │                │
+   │◄─────────────────────────────┤                         │                │
+</div>
+
+<h3>2.2.4 PMS 核心数据结构</h3>
+
+<table>
+<tr><th>数据结构</th><th>用途</th><th>关键字段</th></tr>
+<tr><td><code>PackageInfo</code></td><td>完整包信息（返回给 App）</td>
+<td>packageName, versionCode, applicationInfo, activities[], services[], providers[], requestedPermissions[], signingInfo</td></tr>
+<tr><td><code>ApplicationInfo</code></td><td>应用级信息</td>
+<td>packageName, uid, sourceDir, dataDir, nativeLibraryDir, targetSdkVersion, flags (debuggable/system/installed)</td></tr>
+<tr><td><code>ActivityInfo</code></td><td>Activity 组件信息</td>
+<td>name, packageName, exported, launchMode, taskAffinity, permission, theme</td></tr>
+<tr><td><code>ServiceInfo</code></td><td>Service 组件信息</td>
+<td>name, packageName, exported, permission, flags</td></tr>
+<tr><td><code>ProviderInfo</code></td><td>ContentProvider 信息</td>
+<td>name, packageName, authority, readPermission, writePermission, exported</td></tr>
+<tr><td><code>ResolveInfo</code></td><td>Intent 解析结果</td>
+<td>activityInfo, serviceInfo, filter, priority, match</td></tr>
+</table>
+
+<h2 id="ch2-3">2.3 PMS ↔ installd 接口与交互流程</h2>
+
+<h3>2.3.1 接口连接方式</h3>
+
+<pre><code>// Installer.java — PMS 内部的 installd 代理
+// 位于 frameworks/services/core/java/com/android/server/pm/Installer.java
+
+// 连接 installd Binder 服务
+IBinder binder = ServiceManager.getService("installd");
+IInstalld mInstalld = IInstalld.Stub.asInterface(binder);
+
+// 服务名: "installd"
+// installd 以 root 权限运行，提供特权文件操作
+// Installer 类实现了 DeathRecipient，installd 崩溃后自动重连</code></pre>
+
+<h3>2.3.2 IInstalld 核心方法</h3>
+
+<div class="card">
+<table>
+<tr><th>类别</th><th>方法</th><th>说明</th></tr>
+<tr><td rowspan="5"><strong>应用数据目录</strong></td>
+<td><code>createAppData(CreateAppDataArgs)</code></td><td>创建 /data/data/{pkg}/ 目录结构，设置 UID/GID/SELinux</td></tr>
+<tr><td><code>createAppDataBatched(args[])</code></td><td>批量创建（开机时优化）</td></tr>
+<tr><td><code>clearAppData(uuid, pkg, userId, flags)</code></td><td>清空应用数据（保留目录）</td></tr>
+<tr><td><code>destroyAppData(uuid, pkg, userId, flags)</code></td><td>完全删除应用数据目录</td></tr>
+<tr><td><code>fixupAppData(uuid, flags)</code></td><td>修复损坏的应用数据</td></tr>
+
+<tr><td rowspan="4"><strong>DEX 优化</strong></td>
+<td><code>dexopt(apkPath, uid, pkgName, isa, filter, ...)</code></td><td>调用 dex2oat 编译 DEX → OAT</td></tr>
+<tr><td><code>mergeProfiles(uid, pkg, profileName)</code></td><td>合并运行时 profile 数据</td></tr>
+<tr><td><code>deleteOdex(pkg, apkPath, isa, oatDir)</code></td><td>删除 OAT 产物</td></tr>
+<tr><td><code>rmdex(codePath, isa)</code></td><td>删除 DEX 缓存</td></tr>
+
+<tr><td rowspan="3"><strong>安装文件操作</strong></td>
+<td><code>moveCompleteApp(fromUuid, toUuid, pkg, ...)</code></td><td>跨存储卷迁移应用</td></tr>
+<tr><td><code>createOatDir(pkg, oatDir, isa)</code></td><td>创建 OAT 输出目录</td></tr>
+<tr><td><code>linkNativeLibraryDirectory(...)</code></td><td>创建 Native 库符号链接</td></tr>
+
+<tr><td rowspan="2"><strong>存储管理</strong></td>
+<td><code>getAppSize(uuid, pkgNames[], userId, ...)</code></td><td>计算应用存储占用</td></tr>
+<tr><td><code>freeCache(uuid, targetFreeBytes, flags)</code></td><td>清理缓存释放空间</td></tr>
+
+<tr><td rowspan="2"><strong>用户管理</strong></td>
+<td><code>createUserData(uuid, userId, serial, flags)</code></td><td>创建用户级数据目录</td></tr>
+<tr><td><code>destroyUserData(uuid, userId, flags)</code></td><td>删除用户数据</td></tr>
+</table>
+</div>
+
+<h3>2.3.3 CreateAppDataArgs 参数结构</h3>
+
+<pre><code>// CreateAppDataArgs — 创建应用数据目录的参数
+parcelable CreateAppDataArgs {
+    String uuid;            // 存储卷 UUID (null = 内部存储)
+    String packageName;     // 包名
+    int userId;            // 用户 ID
+    int flags;             // FLAG_STORAGE_CE | FLAG_STORAGE_DE
+    int appId;             // 应用 ID (UID = userId * 100000 + appId)
+    String seInfo;         // SELinux 信息字符串
+    int targetSdkVersion;  // 目标 SDK 版本
+}
+
+// 返回值
+parcelable CreateAppDataResult {
+    long ceDataInode;      // CE 存储的 inode 号（用于后续操作）
+    int exceptionCode;     // 0 = 成功
+    String exceptionMessage;
+}</code></pre>
+
+<h3>2.3.4 PMS ↔ installd 交互流程</h3>
+
+<div class="diagram">
+PMS (Installer.java)                           installd (InstalldNativeService)
+       │                                              │
+       │ === 安装阶段 ===                               │
+       │                                              │
+       │  createAppData(args)                         │
+       ├─────────────────────────────────────────────►│
+       │                                              │  1. mkdir /data/data/{pkg}/
+       │                                              │  2. mkdir /data/user_de/0/{pkg}/
+       │                                              │  3. chown uid:gid
+       │                                              │  4. chmod 0771
+       │                                              │  5. setfilecon (SELinux)
+       │                                              │  6. 创建 cache/, code_cache/, files/ 等子目录
+       │  CreateAppDataResult                         │
+       │◄─────────────────────────────────────────────┤
+       │                                              │
+       │  createOatDir(pkg, oatDir, "arm64")          │
+       ├─────────────────────────────────────────────►│
+       │                                              │  mkdir /data/app/{pkg}-xxx/oat/arm64/
+       │  OK                                          │
+       │◄─────────────────────────────────────────────┤
+       │                                              │
+       │  dexopt(apkPath, uid, pkg, "arm64",          │
+       │         "speed", debuggable, oatDir, ...)    │
+       ├─────────────────────────────────────────────►│
+       │                                              │  1. fork()
+       │                                              │  2. 子进程 setuid(uid)
+       │                                              │  3. exec("/system/bin/dex2oat",
+       │                                              │       "--dex-file=base.apk",
+       │                                              │       "--oat-file=base.odex",
+       │                                              │       "--compiler-filter=speed",
+       │                                              │       "--instruction-set=arm64")
+       │                                              │  4. waitpid()
+       │  dexopt result                               │
+       │◄─────────────────────────────────────────────┤
+       │                                              │
+       │ === 卸载阶段 ===                               │
+       │                                              │
+       │  destroyAppData(uuid, pkg, userId, flags)    │
+       ├─────────────────────────────────────────────►│
+       │                                              │  rm -rf /data/data/{pkg}/
+       │                                              │  rm -rf /data/user_de/0/{pkg}/
+       │  OK                                          │
+       │◄─────────────────────────────────────────────┤
+</div>
+
+<h2 id="ch2-4">2.4 APK 安装端到端流程</h2>
+
+<div class="card">
+<h4>完整安装流程（12 步）</h4>
+<table>
+<tr><th>步骤</th><th>执行者</th><th>操作</th><th>说明</th></tr>
+<tr><td>1</td><td>App / Shell</td><td>createSession(SessionParams)</td><td>创建安装会话，分配暂存目录</td></tr>
+<tr><td>2</td><td>App / Shell</td><td>session.openWrite() + 写入 APK</td><td>APK 文件写入 /data/app/{pkg}-{sessionId}/</td></tr>
+<tr><td>3</td><td>App / Shell</td><td>session.commit()</td><td>提交安装请求</td></tr>
+<tr><td>4</td><td>PMS</td><td>ApkSignatureVerifier 验证签名</td><td>V1/V2/V3 签名验证，证书一致性检查</td></tr>
+<tr><td>5</td><td>PMS</td><td>PackageParser 解析 AndroidManifest.xml</td><td>提取包名、组件、权限、SDK 版本等元数据</td></tr>
+<tr><td>6</td><td>PMS</td><td>版本/签名/兼容性检查</td><td>升级时 versionCode ≥ 旧版本，签名必须匹配</td></tr>
+<tr><td>7</td><td>PMS → installd</td><td>createAppData()</td><td>创建 /data/data/{pkg}/ 及子目录</td></tr>
+<tr><td>8</td><td>PMS → installd</td><td>NativeLibraryHelper 提取 .so</td><td>从 APK lib/ 提取匹配 ABI 的 Native 库</td></tr>
+<tr><td>9</td><td>PMS → installd</td><td>dexopt()</td><td>dex2oat 编译 DEX → OAT（AOT 优化）</td></tr>
+<tr><td>10</td><td>PMS</td><td>注册到 mPackages 缓存</td><td>PackageState 写入内存缓存</td></tr>
+<tr><td>11</td><td>PMS</td><td>持久化到 packages.xml</td><td>写入 /data/system/packages.xml</td></tr>
+<tr><td>12</td><td>PMS</td><td>发送 ACTION_PACKAGE_ADDED 广播</td><td>通知桌面、设置等应用刷新</td></tr>
+</table>
+</div>
+
+<h2 id="ch2-5">2.5 包查询端到端流程</h2>
+
+<pre><code>// App 调用
+PackageInfo info = pm.getPackageInfo("com.example.app", PackageManager.GET_ACTIVITIES);
+
+// 调用链：
+App.getPackageInfo()
+  → ApplicationPackageManager.getPackageInfo()        // 客户端代理
+    → IPackageManager.Stub.Proxy.getPackageInfo()     // Binder 序列化
+      → [Binder IPC 传输]
+        → PackageManagerService.getPackageInfo()      // 服务端入口
+          → Computer.snapshotComputer()               // 获取一致性快照
+            → ComputerEngine.getPackageInfo()         // 查询实现
+              → mPackages.get(packageName)            // HashMap 查找
+              → generatePackageInfo(ps, flags)        // 按 flags 构建返回值
+                → 填充 activities[] / services[] / permissions[]
+          → PackageInfo (Parcelable)                  // 序列化返回
+      → [Binder IPC 返回]
+    → PackageInfo 反序列化
+  → 返回给 App</code></pre>
+
+<div class="note">
+<strong>快照模式 (Snapshot Pattern)：</strong>PMS 使用 ComputerEngine 的只读快照处理查询请求。
+每次查询调用 <code>snapshotComputer()</code> 获取不可变的数据副本，避免加锁，保证并发安全。
+</div>
+
+<!-- ==================== Chapter 3 ==================== -->
+<h1 id="ch3">3. OH 系统中 installd 与 BMS 的实现原理</h1>
+
+<h2 id="ch3-1">3.1 OH 包管理架构总览</h2>
+
+<p>OH 的包管理架构与 Android 类似，也分三层：客户端 API 层、系统服务层（BMS）、Native 守护进程层（installd）。
+但 OH 使用 HiRPC/Binder 替代 Android Binder，使用 HAP 替代 APK，使用 module.json 替代 AndroidManifest.xml。</p>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│                          OH App 进程                                │
+│                                                                     │
+│  ┌──────────────────────────┐                                       │
+│  │ BundleMgrClient           │  ← 客户端代理（单例模式）               │
+│  │ (DelayedSingleton)        │                                       │
+│  └───────────┬──────────────┘                                       │
+│              │ HiRPC/Binder IPC (IBundleMgr)                        │
+└──────────────┼──────────────────────────────────────────────────────┘
+               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    foundation 进程                                   │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │ BundleManagerService (BMS)                                │       │
+│  │  · SA ID: 401                                             │       │
+│  │  · InterfaceDescriptor: "ohos.appexecfwk.BundleMgr"      │       │
+│  │  · 通过 SystemAbilityManager 注册和发现                     │       │
+│  │                                                           │       │
+│  │  内部组件：                                                │       │
+│  │  ├─ BundleDataMgr      — 包数据管理（RDB/SQLite 持久化）    │       │
+│  │  ├─ BundleInstallerManager — 安装任务线程池                 │       │
+│  │  ├─ BundleInstaller     — 单次安装状态机                    │       │
+│  │  ├─ BundleScanner       — 开机扫描 /system/app + /data/app │       │
+│  │  └─ InstalldClient      — installd 的 C++ 代理             │       │
+│  └──────────────┬───────────────────────────────────────────┘       │
+│                 │ HiRPC/Binder IPC (IInstalld)                       │
+└─────────────────┼───────────────────────────────────────────────────┘
+                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    installd 守护进程 (Native)                        │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────┐       │
+│  │ InstalldService → InstalldHostImpl                        │       │
+│  │  · SystemAbility，独立进程                                 │       │
+│  │  · InterfaceDescriptor: "ohos.appexecfwk.Installd"        │       │
+│  │  · 以 root/install 权限运行                                │       │
+│  │                                                           │       │
+│  │  核心职责：                                                │       │
+│  │  ├─ Bundle 代码目录创建 (CreateBundleDir)                  │       │
+│  │  ├─ HAP 文件提取 (ExtractModuleFiles)                     │       │
+│  │  ├─ 应用数据目录创建/删除 (CreateBundleDataDir)             │       │
+│  │  ├─ AOT 编译 (ExecuteAOT — 方舟编译器)                     │       │
+│  │  ├─ 代码签名验证 (VerifyCodeSignature)                     │       │
+│  │  ├─ 加密目录管理 (SetEncryptionDir)                        │       │
+│  │  └─ 目录 APL (Access Policy Level) 设置                   │       │
+│  └──────────────────────────────────────────────────────────┘       │
+└─────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h2 id="ch3-2">3.2 App ↔ BMS 接口与交互流程</h2>
+
+<h3>3.2.1 接口获取方式</h3>
+
+<pre><code>// OH App 获取 BMS 的方式（C++ 侧）
+auto bundleMgr = DelayedSingleton&lt;BundleMgrClient&gt;::GetInstance();
+BundleInfo bundleInfo;
+bundleMgr-&gt;GetBundleInfo("com.example.app", BundleFlag::GET_BUNDLE_DEFAULT, bundleInfo, userId);
+
+// 内部实现：
+// BundleMgrClient 通过 SystemAbilityManager 获取 BMS 代理
+// sptr&lt;ISystemAbilityManager&gt; sam = SystemAbilityManagerClient::GetInstance().GetSystemAbilityManager();
+// sptr&lt;IRemoteObject&gt; remoteObject = sam-&gt;GetSystemAbility(BUNDLE_MGR_SERVICE_SYS_ABILITY_ID);
+// sptr&lt;IBundleMgr&gt; proxy = iface_cast&lt;IBundleMgr&gt;(remoteObject);</code></pre>
+
+<h3>3.2.2 IBundleMgr 核心方法分类</h3>
+
+<div class="card">
+<table>
+<tr><th>类别</th><th>方法数</th><th>核心方法</th><th>说明</th></tr>
+<tr><td><strong>Bundle 查询</strong></td><td>~15</td>
+<td><code>GetBundleInfo()</code><br><code>GetBundleInfoV9()</code><br><code>BatchGetBundleInfo()</code><br><code>GetBundleInfoForSelf()</code></td>
+<td>查询 Bundle 元数据</td></tr>
+<tr><td><strong>Application 查询</strong></td><td>~10</td>
+<td><code>GetApplicationInfo()</code><br><code>GetApplicationInfos()</code></td>
+<td>查询应用级信息</td></tr>
+<tr><td><strong>Ability 查询</strong></td><td>~15</td>
+<td><code>QueryAbilityInfo()</code><br><code>QueryAbilityInfos()</code><br><code>QueryAbilityInfoByUri()</code></td>
+<td>通过 Want 查询 Ability（类似 Android resolveIntent）</td></tr>
+<tr><td><strong>Extension 查询</strong></td><td>~10</td>
+<td><code>QueryExtensionAbilityInfos()</code><br><code>QueryExtensionAbilityInfosV9()</code></td>
+<td>查询 Extension Ability（Service、DataShare 等）</td></tr>
+<tr><td><strong>UID 映射</strong></td><td>~8</td>
+<td><code>GetUidByBundleName()</code><br><code>GetBundleNameForUid()</code><br><code>GetBundlesForUid()</code><br><code>GetNameForUid()</code></td>
+<td>包名 ↔ UID 转换</td></tr>
+</table>
+</div>
+
+<h3>3.2.3 IBundleInstaller 安装接口</h3>
+
+<div class="card">
+<table>
+<tr><th>方法</th><th>参数</th><th>说明</th></tr>
+<tr><td><code>Install(path, param, receiver)</code></td><td>单个 HAP 路径</td><td>安装单个 HAP 包</td></tr>
+<tr><td><code>Install(paths[], param, receiver)</code></td><td>多个 HAP 路径</td><td>安装 Entry + Feature 多模块</td></tr>
+<tr><td><code>Uninstall(bundleName, param, receiver)</code></td><td>Bundle 名称</td><td>卸载整个 Bundle</td></tr>
+<tr><td><code>Uninstall(bundleName, moduleName, ...)</code></td><td>Bundle + 模块名</td><td>卸载单个 Feature 模块</td></tr>
+<tr><td><code>Recover(bundleName, param, receiver)</code></td><td>Bundle 名称</td><td>恢复未完成的安装</td></tr>
+<tr><td><code>InstallSandboxApp(bundleName, dlpType, ...)</code></td><td>沙箱参数</td><td>安装沙箱隔离副本</td></tr>
+<tr><td><code>InstallCloneApp(bundleName, userId, ...)</code></td><td>克隆参数</td><td>安装应用分身</td></tr>
+<tr><td><code>StreamInstall(paths[], param, receiver)</code></td><td>流式安装参数</td><td>增量/流式安装</td></tr>
+</table>
+</div>
+
+<h3>3.2.4 App ↔ BMS 交互流程图</h3>
+
+<div class="diagram">
+【场景一：Bundle 信息查询】
+
+OH App 进程                             foundation (BMS)
+   │                                        │
+   │  GetBundleInfo("com.foo", flags)       │
+   ├───────────────────────────────────────►│
+   │        HiRPC/Binder IPC                │
+   │                                        │  1. BundleDataMgr::GetInnerBundleInfo("com.foo")
+   │                                        │  2. 从 RDB 缓存中查找 InnerBundleInfo
+   │                                        │  3. 按 flags 构建 BundleInfo：
+   │                                        │     · GET_BUNDLE_INFO_WITH_ABILITY → 填充 abilityInfos
+   │                                        │     · GET_BUNDLE_INFO_WITH_HAP_MODULE → 填充 hapModuleInfos
+   │                                        │     · GET_BUNDLE_INFO_WITH_REQUESTED_PERMISSION → 权限
+   │       BundleInfo (Parcelable)          │
+   │◄───────────────────────────────────────┤
+
+【场景二：Ability 解析（类似 Android resolveIntent）】
+
+OH App 进程                             foundation (BMS)
+   │                                        │
+   │  QueryAbilityInfos(want, flags)        │
+   ├───────────────────────────────────────►│
+   │                                        │  1. 取 Want 的 bundleName + abilityName
+   │                                        │  2. 显式：直接查找匹配的 AbilityInfo
+   │                                        │  3. 隐式：遍历所有 Ability 的 skills
+   │                                        │     · 匹配 action → entity → uri
+   │                                        │  4. 过滤 visible=false 的 Ability
+   │       vector&lt;AbilityInfo&gt;             │
+   │◄───────────────────────────────────────┤
+
+【场景三：HAP 安装】
+
+用户/工具            BundleInstallerManager          BMS           InstalldClient
+   │                        │                        │                │
+   │  Install(hapPath)      │                        │                │
+   ├───────────────────────►│                        │                │
+   │                        │  CreateInstallTask()   │                │
+   │                        │  → 线程池分配任务        │                │
+   │                        │                        │                │
+   │                        │  BundleInstaller 状态机  │                │
+   │                        │  ├─ 签名验证 (15%)      │                │
+   │                        │  ├─ 解析 module.json    │                │
+   │                        │  ├─ 版本检查 (35%)      │                │
+   │                        │  │                     │                │
+   │                        │  ├─ ExtractModuleFiles  │                │
+   │                        │  ├──────────────────────┼───────────────►│
+   │                        │  │                     │                │  提取 HAP 内容
+   │                        │  │                     │                │  到安装目录
+   │                        │  │◄─────────────────────┼────────────────┤
+   │                        │  │                     │                │
+   │                        │  ├─ CreateBundleDataDir │                │
+   │                        │  ├──────────────────────┼───────────────►│
+   │                        │  │                     │                │  创建数据目录
+   │                        │  │◄─────────────────────┼────────────────┤
+   │                        │  │                     │                │
+   │                        │  ├─ 保存 BundleInfo    │                │
+   │                        │  ├─────────────────────►│  写入 RDB      │
+   │                        │  │                     │                │
+   │                        │  └─ 发送 CommonEvent    │                │
+   │  IStatusReceiver 回调   │                        │                │
+   │◄───────────────────────┤                        │                │
+</div>
+
+<h2 id="ch3-3">3.3 BMS ↔ installd 接口与交互流程</h2>
+
+<h3>3.3.1 接口连接方式</h3>
+
+<pre><code>// InstalldClient — BMS 内部的 installd 代理（单例）
+// 位于 bms/services/bundlemgr/include/installd_client.h
+
+class InstalldClient : public DelayedSingleton&lt;InstalldClient&gt; {
+    sptr&lt;IInstalld&gt; installdProxy_;   // Binder 代理
+
+    // 通过 SystemAbilityManager 获取 installd 服务
+    sptr&lt;IInstalld&gt; GetInstalldProxy() {
+        auto sam = SystemAbilityManagerClient::GetInstance().GetSystemAbilityManager();
+        auto remote = sam-&gt;GetSystemAbility(INSTALLD_SERVICE_ID);
+        return iface_cast&lt;IInstalld&gt;(remote);
+    }
+
+    // 重试机制：2 次重试，50ms 间隔
+    template&lt;typename F, typename... Args&gt;
+    ErrCode CallService(F func, Args&amp;&amp;... args);
+};</code></pre>
+
+<h3>3.3.2 IInstalld 核心方法（77 个 IPC 方法码）</h3>
+
+<div class="card">
+<table>
+<tr><th>类别</th><th>方法码</th><th>方法</th><th>说明</th></tr>
+<tr><td rowspan="6"><strong>目录操作</strong></td>
+<td>1</td><td><code>CreateBundleDir()</code></td><td>创建 Bundle 代码安装目录</td></tr>
+<tr><td>4</td><td><code>CreateBundleDataDir()</code></td><td>创建应用数据目录（el1-el5）</td></tr>
+<tr><td>5</td><td><code>CleanBundleDataDir()</code></td><td>清空数据目录内容</td></tr>
+<tr><td>6</td><td><code>RemoveBundleDataDir()</code></td><td>删除数据目录</td></tr>
+<tr><td>8</td><td><code>RemoveDir()</code></td><td>通用目录删除</td></tr>
+<tr><td>15</td><td><code>Mkdir()</code></td><td>递归创建目录</td></tr>
+
+<tr><td rowspan="4"><strong>HAP 文件处理</strong></td>
+<td>2</td><td><code>ExtractModuleFiles()</code></td><td>从 HAP 提取代码/资源到安装目录</td></tr>
+<tr><td>3</td><td><code>RenameModuleDir()</code></td><td>临时目录重命名为正式目录</td></tr>
+<tr><td>23</td><td><code>ExtractFiles()</code></td><td>通用文件提取</td></tr>
+<tr><td>30</td><td><code>ExtractDriverSoFile()</code></td><td>提取驱动 Native 库</td></tr>
+
+<tr><td rowspan="3"><strong>签名验证</strong></td>
+<td>28</td><td><code>VerifyCodeSignature()</code></td><td>验证代码签名</td></tr>
+<tr><td>33</td><td><code>VerifyCodeSignatureForHap()</code></td><td>HAP 专用签名验证</td></tr>
+<tr><td>34</td><td><code>DeliverySignProfile()</code></td><td>下发签名 Profile</td></tr>
+
+<tr><td rowspan="3"><strong>AOT 编译</strong></td>
+<td>25</td><td><code>ExecuteAOT()</code></td><td>执行方舟 AOT 编译</td></tr>
+<tr><td>46</td><td><code>PendSignAOT()</code></td><td>待签名 AOT 编译</td></tr>
+<tr><td>39</td><td><code>StopAOT()</code></td><td>停止 AOT 编译</td></tr>
+
+<tr><td rowspan="3"><strong>存储统计</strong></td>
+<td>9</td><td><code>GetBundleStats()</code></td><td>获取单个 Bundle 磁盘占用</td></tr>
+<tr><td>38</td><td><code>GetAllBundleStats()</code></td><td>获取所有 Bundle 统计</td></tr>
+<tr><td>45</td><td><code>GetDiskUsage()</code></td><td>获取磁盘总使用量</td></tr>
+
+<tr><td rowspan="2"><strong>安全/加密</strong></td>
+<td>10</td><td><code>SetDirApl()</code></td><td>设置目录 APL (Access Policy Level)</td></tr>
+<tr><td>40</td><td><code>SetEncryptionDir()</code></td><td>设置加密目录</td></tr>
+
+<tr><td rowspan="2"><strong>Native 安装</strong></td>
+<td>43</td><td><code>InstallNative()</code></td><td>安装 Native 包 (HNP)</td></tr>
+<tr><td>44</td><td><code>UninstallNative()</code></td><td>卸载 Native 包</td></tr>
+</table>
+</div>
+
+<h3>3.3.3 OH installd 与 Android installd 对比</h3>
+
+<table>
+<tr><th>特性</th><th>Android installd</th><th>OH installd</th></tr>
+<tr><td>IPC 方式</td><td>Binder (AIDL)</td><td>HiRPC/Binder (C++ 接口)</td></tr>
+<tr><td>方法数</td><td>~40</td><td>~77</td></tr>
+<tr><td>代码优化</td><td>dexopt() → 调用 dex2oat</td><td>ExecuteAOT() → 方舟 AOT 编译</td></tr>
+<tr><td>签名验证</td><td>不在 installd 中（PMS 侧完成）</td><td>在 installd 中完成 (VerifyCodeSignature)</td></tr>
+<tr><td>加密存储</td><td>CE/DE 两级</td><td>EL1-EL5 五级加密</td></tr>
+<tr><td>安全标签</td><td>SELinux context</td><td>APL (Access Policy Level) + SELinux</td></tr>
+<tr><td>多模块支持</td><td>无（单 APK）</td><td>Entry + Feature HAP 多模块</td></tr>
+<tr><td>差分更新</td><td>无（全量替换）</td><td>ExtractDiffFiles + ApplyDiffPatch</td></tr>
+<tr><td>热修复</td><td>无</td><td>Quick Fix (.hqf)</td></tr>
+</table>
+
+<h2 id="ch3-4">3.4 HAP 安装端到端流程</h2>
+
+<div class="card">
+<h4>完整安装流程（状态机，10 个阶段）</h4>
+<table>
+<tr><th>阶段</th><th>进度</th><th>操作</th><th>说明</th></tr>
+<tr><td>INSTALL_START</td><td>0%</td><td>创建安装任务</td><td>BundleInstallerManager 分配线程</td></tr>
+<tr><td>INSTALL_BUNDLE_CHECKED</td><td>5%</td><td>检查 Bundle 状态</td><td>是否正在安装中、是否已存在</td></tr>
+<tr><td>INSTALL_SYSCAP_CHECKED</td><td>10%</td><td>检查系统能力</td><td>设备是否支持 HAP 要求的 SysCap</td></tr>
+<tr><td>INSTALL_SIGNATURE_CHECKED</td><td>15%</td><td>签名验证</td><td>EdDSA/RSA 签名验证，installd.VerifyCodeSignature()</td></tr>
+<tr><td>INSTALL_PARSED</td><td>20%</td><td>解析 module.json</td><td>ModuleProfile::TransformTo() 解析清单</td></tr>
+<tr><td>INSTALL_VERSION_CHECKED</td><td>35%</td><td>版本检查</td><td>防止降级安装</td></tr>
+<tr><td>INSTALL_NATIVE_SO_CHECKED</td><td>40%</td><td>检查 Native 库</td><td>CPU ABI 兼容性验证</td></tr>
+<tr><td>INSTALL_EXTRACTED</td><td>60%</td><td>提取文件</td><td>installd.ExtractModuleFiles() 提取到安装目录</td></tr>
+<tr><td>INSTALL_INFO_SAVED</td><td>80%</td><td>保存元数据</td><td>BundleDataMgr 写入 RDB (SQLite)</td></tr>
+<tr><td>INSTALL_SUCCESS</td><td>100%</td><td>完成</td><td>RenameModuleDir + 发送 CommonEvent</td></tr>
+</table>
+</div>
+
+<h2 id="ch3-5">3.5 包查询端到端流程</h2>
+
+<pre><code>// OH App 查询 Bundle 信息
+BundleInfo bundleInfo;
+auto bundleMgr = DelayedSingleton&lt;BundleMgrClient&gt;::GetInstance();
+bundleMgr-&gt;GetBundleInfo("com.example.app",
+    BundleFlag::GET_BUNDLE_INFO_WITH_ABILITY, bundleInfo, userId);
+
+// 调用链：
+App.GetBundleInfo()
+  → BundleMgrClient::GetBundleInfo()           // 客户端代理
+    → BundleMgrProxy::GetBundleInfo()           // Binder 序列化 (MessageParcel)
+      → [HiRPC/Binder IPC 传输]
+        → BundleMgrHost::OnGetBundleInfo()      // 服务端入口
+          → BundleDataMgr::GetBundleInfo()      // 数据管理层
+            → innerBundleInfos_.find(bundleName) // 内存缓存查找
+            → InnerBundleInfo 转换为 BundleInfo   // 按 flags 裁剪字段
+          → BundleInfo (Parcelable)
+      → [HiRPC/Binder IPC 返回]
+    → BundleInfo 反序列化
+  → 返回给 App</code></pre>
+
+<div class="card">
+<h4>OH BMS 核心数据结构</h4>
+<table>
+<tr><th>数据结构</th><th>对应 Android</th><th>关键字段</th></tr>
+<tr><td><code>BundleInfo</code></td><td>PackageInfo</td>
+<td>bundleName, versionCode, versionName, hapModuleInfos[], abilityInfos[], extensionAbilityInfos[], requestPermissions[]</td></tr>
+<tr><td><code>ApplicationInfo</code></td><td>ApplicationInfo</td>
+<td>bundleName, name, uid, gid, codePath, dataDir, bundleType, process, apiTargetVersion, removable, enabled</td></tr>
+<tr><td><code>HapModuleInfo</code></td><td>无（Android 单 APK）</td>
+<td>moduleName, moduleType (entry/feature/shared), hapPath, nativeLibraryPath, abilities[], extensionAbilities[], dependencies[]</td></tr>
+<tr><td><code>AbilityInfo</code></td><td>ActivityInfo / ServiceInfo</td>
+<td>name, bundleName, moduleName, type (PAGE/SERVICE/DATA), launchMode, visible, codePath, srcLanguage, skillUri[]</td></tr>
+<tr><td><code>ExtensionAbilityInfo</code></td><td>ServiceInfo / ProviderInfo</td>
+<td>name, bundleName, type (SERVICE/DATASHARE/STATICSUBSCRIBER/...), visible, permissions</td></tr>
+</table>
+</div>
+
+<!-- ==================== Chapter 4 ==================== -->
+<h1 id="ch4">4. APK 安装到 OH 系统的适配设计方案</h1>
+
+<h2 id="ch4-0">4.0 OH 侧修改总览</h2>
+
+<p>本节总览 APK 安装功能涉及的全部 OH 侧修改和 Adapter 新增模块，供快速了解整体改动范围。各模块的详细设计见后续小节。</p>
+
+<!-- 4.0.1 OH BMS 修改清单 -->
+<h3 id="ch4-0-1">4.0.1 OH BMS（包管理服务）修改清单</h3>
+
+<p>以下修改以 patch 形式存放在 <code>ohos_patches/bundle_framework/</code>，镜像 OH 源码目录结构：</p>
+
+<table>
+<tr><th>修改文件</th><th>修改类型</th><th>修改内容</th></tr>
+<tr>
+  <td><code>interfaces/inner_api/appexecfwk_base/include/<br>bundle_constants.h.patch</code></td>
+  <td><span class="tag tag-mod">MOD</span></td>
+  <td>新增 <code>BundleType::APP_ANDROID = 10</code> 枚举值，用于在 BMS 数据库中标识 APK 安装的应用（区别于 OH 原生 APP=0）</td>
+</tr>
+<tr>
+  <td><code>services/bundlemgr/src/<br>bundle_installer.cpp.patch</code></td>
+  <td><span class="tag tag-mod">MOD</span></td>
+  <td>新增 <code>ProcessApkInstall()</code> 方法，在 BMS 安装流程中识别 <code>.apk</code> 后缀后走 APK 安装分支（8 步流程：解析→验签→检查→分配 UID→部署→构建 BundleInfo→注册→发送事件）</td>
+</tr>
+<tr>
+  <td><code>services/bundlemgr/include/installd/<br>installd_interface.h.patch</code></td>
+  <td><span class="tag tag-mod">MOD</span></td>
+  <td>扩展 installd IPC 接口，新增 5 个 Android 专用方法（IPC code 90-94），详见下表</td>
+</tr>
+<tr>
+  <td><code>services/bundlemgr/src/installd/<br>installd_host_impl_android.cpp</code></td>
+  <td><span class="tag tag-new">NEW</span></td>
+  <td>新增文件，实现上述 5 个 installd 方法的具体逻辑</td>
+</tr>
+</table>
+
+<p><strong>installd 新增的 5 个 IPC 方法：</strong></p>
+
+<table>
+<tr><th>IPC Code</th><th>方法名</th><th>功能</th><th>关键细节</th></tr>
+<tr><td>90</td><td><code>CreateAndroidDataDir()</code></td><td>创建 Android 风格数据目录</td><td>在 <code>/data/app/el2/0/android/{pkg}/</code> 下创建 cache、code_cache、databases、files、shared_prefs、lib 共 7 个子目录，设置 uid:gid 和权限 0771</td></tr>
+<tr><td>91</td><td><code>ExtractApkNativeLibs()</code></td><td>从 APK ZIP 中提取 native 库</td><td>按 ABI 优先级（arm64-v8a → armeabi-v7a → armeabi）从 <code>lib/{abi}/*.so</code> 提取到安装目录</td></tr>
+<tr><td>92</td><td><code>DexOptAndroid()</code></td><td>调用 dex2oat 编译 DEX → OAT</td><td>调用 <code>/system/android/bin/dex2oat --compiler-filter=speed</code></td></tr>
+<tr><td>93</td><td><code>RemoveAndroidDataDir()</code></td><td>卸载时清理数据目录</td><td>递归删除安装目录和数据目录</td></tr>
+<tr><td>94</td><td><code>VerifyApkSignature()</code></td><td>APK 签名验证</td><td>V2 优先，回退 V1；返回验证结果和证书指纹（SHA-256）</td></tr>
+</table>
+
+<!-- 4.0.2 Adapter 新增模块清单 -->
+<h3 id="ch4-0-2">4.0.2 Adapter 新增模块清单</h3>
+
+<p>以下模块位于 <code>framework/package-manager/</code>：</p>
+
+<h4>Java 层</h4>
+<table>
+<tr><th>文件</th><th>职责</th></tr>
+<tr><td><code>PackageManagerAdapter.java</code></td><td>extends <code>IPackageManager.Stub</code>，拦截 Android 应用的所有包查询请求，通过 JNI 路由到 OH BMS。覆盖 ~25 个关键方法（包信息查询、组件查询、权限检查、特性查询）</td></tr>
+<tr><td><code>PackageInfoBuilder.java</code></td><td>OH BundleInfo JSON → Android PackageInfo 对象转换。处理 AbilityInfo → ActivityInfo、ExtensionAbilityInfo → ServiceInfo/ProviderInfo 等反向映射</td></tr>
+<tr><td><code>PermissionMapper.java</code></td><td><code>android.permission.*</code> ↔ <code>ohos.permission.*</code> 双向权限映射表，覆盖网络、相机、存储、定位、联系人、电话、短信等 ~50+ 条映射</td></tr>
+</table>
+
+<h4>JNI / C++ 层</h4>
+<table>
+<tr><th>文件</th><th>职责</th></tr>
+<tr><td><code>apk_manifest_parser.h/cpp</code></td><td>APK 内 AndroidManifest.xml 的 AXML 二进制格式解析器。使用 AOSP <code>ResXMLParser</code>（从交叉编译的 ART 中获取），提取 package、Activity、Service、Receiver、Provider、权限、Intent-filter 等全部元数据</td></tr>
+<tr><td><code>apk_bundle_parser.h/cpp</code></td><td>将解析出的 ManifestData 映射为 OH <code>InnerBundleInfo</code> 结构：Activity → AbilityInfo(PAGE)、Service → ExtensionAbilityInfo(SERVICE)、Receiver → ExtensionAbilityInfo(STATICSUBSCRIBER)、Provider → ExtensionAbilityInfo(DATASHARE)</td></tr>
+<tr><td><code>apk_installer.h/cpp</code></td><td>文件部署：APK 复制到 <code>/data/app/android/{pkg}/base.apk</code>、native 库提取、dex2oat 调用、数据目录创建、权限设置</td></tr>
+<tr><td><code>apk_signature_verifier.h/cpp</code></td><td>APK 签名验证（V1 JAR Signing + V2 APK Signature Scheme v2），基于 OpenSSL 实现。V3 留待后续</td></tr>
+<tr><td><code>permission_mapper.h/cpp</code></td><td>C++ 侧权限映射（与 Java 侧 PermissionMapper 保持同步），用于清单解析阶段</td></tr>
+<tr><td><code>oh_bundle_mgr_client.h/cpp</code></td><td>OH BMS IPC 客户端（单例），提供 getBundleInfo、getApplicationInfo、queryAbilityInfos、checkPermission 等查询方法</td></tr>
+<tr><td><code>BUILD.gn</code></td><td>OH 侧共享库构建配置，编译产物链接到 BMS 进程。依赖 minizip、openssl、AOSP androidfw、OH appexecfwk 等</td></tr>
+</table>
+
+<!-- 4.0.3 端到端安装流程概要 -->
+<h3 id="ch4-0-3">4.0.3 端到端安装流程概要</h3>
+
+<div class="diagram">hdc install xxx.apk  /  bm install -p xxx.apk
+         │
+         ▼
+[1] BMS BundleInstaller
+    识别 .apk 后缀 → ProcessApkInstall()
+         │
+         ▼
+[2] ApkManifestParser::Parse(apk)
+    从 APK ZIP 中提取 AXML → 解析为 ManifestData
+    （package、Activity、Service、Receiver、Provider、权限、Intent-filter）
+         │
+         ▼
+[3] ApkSignatureVerifier::Verify(apk)
+    V2 优先 → 回退 V1 → 返回证书指纹(SHA-256)
+         │
+         ▼
+[4] 版本检查 + UID/GID 分配
+    升级时校验证书一致性
+         │
+         ▼
+[5] ApkInstaller::DeployApk()
+    ├── 复制 APK → /data/app/android/{pkg}/base.apk
+    ├── SelectPrimaryAbi() → 选择最优 ABI
+    ├── ExtractNativeLibs() → /data/app/android/{pkg}/lib/*.so
+    ├── RunDexOpt() → dex2oat → /data/app/android/{pkg}/oat/
+    └── CreateDataDirs() → /data/app/el2/0/android/{pkg}/
+        （cache/code_cache/databases/files/shared_prefs/lib）
+         │
+         ▼
+[6] ApkBundleParser::Build(manifest)
+    ManifestData → InnerBundleInfo
+    ├── Activity      → AbilityInfo     (type=PAGE, 名称加 "Ability" 后缀)
+    ├── Service       → ExtensionAbilityInfo (type=SERVICE)
+    ├── Receiver      → ExtensionAbilityInfo (type=STATICSUBSCRIBER)
+    ├── Provider      → ExtensionAbilityInfo (type=DATASHARE)
+    ├── Intent-filter → Skills (actions/entities/uris)
+    └── bundleType = APP_ANDROID (10)
+         │
+         ▼
+[7] BMS 数据库注册
+    AddInnerBundleInfo() 或 UpdateInnerBundleInfo()
+         │
+         ▼
+[8] 发送 CommonEvent 通知
+    BUNDLE_ADDED（新安装）/ BUNDLE_UPDATED（升级）
+         │
+         ▼
+    安装完成，应用出现在 OH 桌面
+    PackageManagerAdapter 处理后续查询</div>
+
+<!-- 4.0.4 关键映射关系 -->
+<h3 id="ch4-0-4">4.0.4 关键映射关系</h3>
+
+<table>
+<tr><th>Android 概念</th><th>OH 映射</th><th>说明</th></tr>
+<tr><td>Activity</td><td>AbilityInfo (type=PAGE)</td><td>名称自动追加 "Ability" 后缀（如 MainActivity → MainActivityAbility）</td></tr>
+<tr><td>Service</td><td>ExtensionAbilityInfo (type=SERVICE)</td><td>映射到 OH ServiceExtensionAbility</td></tr>
+<tr><td>BroadcastReceiver</td><td>ExtensionAbilityInfo (type=STATICSUBSCRIBER)</td><td>静态注册广播接收器</td></tr>
+<tr><td>ContentProvider</td><td>ExtensionAbilityInfo (type=DATASHARE)</td><td>映射到 OH DataShareExtensionAbility</td></tr>
+<tr><td>Intent Filter</td><td>Skills</td><td>actions[] + entities[] + uris[] 一一对应</td></tr>
+<tr><td><code>android.permission.*</code></td><td><code>ohos.permission.*</code></td><td>~50+ 条双向映射；无对应权限映射为 <code>ohos.permission.android.*</code></td></tr>
+<tr><td><code>/data/data/{pkg}/</code></td><td><code>/data/app/el2/0/android/{pkg}/</code></td><td>Android 应用数据目录映射</td></tr>
+<tr><td><code>/data/app/android/{pkg}/base.apk</code></td><td>—</td><td>APK 安装目标路径</td></tr>
+<tr><td>BundleType</td><td><code>APP_ANDROID = 10</code></td><td>区别于 OH 原生应用 APP=0</td></tr>
+<tr><td>Launch mode: standard/singleTop</td><td>STANDARD</td><td>—</td></tr>
+<tr><td>Launch mode: singleTask/singleInstance</td><td>SINGLETON</td><td>—</td></tr>
+</table>
+
+<div class="info">
+<strong>与现有适配层模块的关系：</strong>APK 安装完成后，应用运行时的 IPC 调用由已有的 ActivityManagerAdapter、WindowManagerAdapter 等适配器处理；进程孵化由 appspawn-x 负责。PackageManagerAdapter 仅处理包查询请求。
+</div>
+
+<h2 id="ch4-1">4.1 核心问题与设计目标</h2>
+
+<h3>4.1.1 核心问题</h3>
+
+<p>基于第 2、3 章的分析，将 Android APK 安装到 OH 系统需要解决以下核心问题：</p>
+
+<table>
+<tr><th>#</th><th>问题</th><th>Android 端</th><th>OH 端</th><th>差异分析</th></tr>
+<tr><td>1</td><td>包格式</td><td>APK (ZIP + classes.dex + AXML)</td><td>HAP (ZIP + .abc + module.json)</td><td>解析器不同，需新增 APK 解析</td></tr>
+<tr><td>2</td><td>清单格式</td><td>AndroidManifest.xml（二进制 AXML）</td><td>module.json（JSON 文本）</td><td>需 AXML 解析器 + 元数据映射</td></tr>
+<tr><td>3</td><td>代码优化</td><td>dex2oat (DEX → OAT)</td><td>ExecuteAOT (方舟编译)</td><td>需引入 dex2oat 工具链</td></tr>
+<tr><td>4</td><td>数据目录</td><td>/data/data/{pkg}/</td><td>/data/app/el2/{userId}/{bundle}/</td><td>需目录映射 + mount --bind</td></tr>
+<tr><td>5</td><td>签名方案</td><td>V1/V2/V3 APK Signing</td><td>EdDSA/RSA HAP 签名</td><td>需引入 Android 签名验证</td></tr>
+<tr><td>6</td><td>包查询接口</td><td>IPackageManager (130+ 方法)</td><td>IBundleMgr (~50 方法)</td><td>需 PackageManagerAdapter 桥接</td></tr>
+<tr><td>7</td><td>组件模型</td><td>Activity/Service/Receiver/Provider</td><td>Ability/ExtensionAbility</td><td>需组件类型映射</td></tr>
+<tr><td>8</td><td>权限命名</td><td>android.permission.*</td><td>ohos.permission.*</td><td>需权限名称映射</td></tr>
+</table>
+
+<h3>4.1.2 设计目标</h3>
+
+<ol>
+<li><strong>透明安装：</strong>用户通过 <code>bm install</code>、hdc 或文件管理器即可安装 APK</li>
+<li><strong>BMS 统一管理：</strong>Android 应用在 OH 桌面、设置中可见，与 HAP 统一管理</li>
+<li><strong>Android 兼容：</strong>应用内 PackageManager 查询返回正确的 Android 格式数据</li>
+<li><strong>最小侵入：</strong>对 OH BMS/installd 的修改尽量少，通过插件/扩展机制实现</li>
+</ol>
+
+<h2 id="ch4-2">4.2 方案选型与整体架构</h2>
+
+<table>
+<tr><th>方案</th><th>描述</th><th>优点</th><th>缺点</th><th>评估</th></tr>
+<tr>
+  <td><strong>A: APK → HAP 转换</strong></td>
+  <td>安装时将 APK 重打包为 HAP 格式</td>
+  <td>BMS 无需修改</td>
+  <td>classes.dex ≠ .abc，转换无意义；资源格式不兼容</td>
+  <td>❌ 不可行</td>
+</tr>
+<tr>
+  <td><strong>B: 并行 PMS</strong></td>
+  <td>独立运行 Android PMS 服务</td>
+  <td>完全兼容 Android</td>
+  <td>需移植 PMS（10万+行）；双系统不一致；桌面不可见</td>
+  <td>❌ 过重</td>
+</tr>
+<tr>
+  <td><strong>C: BMS 扩展 + APK 解析插件</strong></td>
+  <td>在 BMS 安装流程中增加 APK 分支</td>
+  <td>最小修改；统一管理；BMS 查询正常</td>
+  <td>需实现 AXML 解析器；BMS 需少量修改</td>
+  <td>✅ 选用</td>
+</tr>
+<tr>
+  <td><strong>D: 安装代理</strong></td>
+  <td>独立服务安装后向 BMS 注入记录</td>
+  <td>BMS 不修改</td>
+  <td>BMS 无注入接口；一致性风险</td>
+  <td>⚠️ 备选</td>
+</tr>
+</table>
+
+<div class="ok">
+<strong>选定方案 C：BMS 扩展 + APK 解析插件。</strong>在 BMS 的 BundleInstaller 中增加 APK 检测分支，
+当 .apk 文件进入安装流程时，调用 APK 解析插件（而非 HAP 解析器）解析 AndroidManifest.xml 并生成 InnerBundleInfo。
+同时扩展 OH installd 以支持 APK 特有的操作（dex2oat、Native 库提取、Android 数据目录创建）。
+</div>
+
+<h3>4.2.1 整体架构图</h3>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────┐
+│                        安装入口                                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐   │
+│  │ 文件管理器 │  │ hdc/adb  │  │ 应用商店  │  │ bm install CLI │   │
+│  └─────┬────┘  └─────┬────┘  └─────┬────┘  └──────┬────────┘   │
+│        └──────────┬──┴──────────┬──┘               │            │
+│                   ▼             ▼                   │            │
+│          IBundleInstaller.Install(path)  ◄──────────┘            │
+└───────────────────┬─────────────────────────────────────────────┘
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                BundleManagerService (BMS)                        │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ BundleInstaller: 检测包格式                                  │  │
+│  │   ├─ .hap → 标准 HAP 安装流程                                │  │
+│  │   └─ .apk → Android APK 安装分支 ──┐                        │  │
+│  └────────────────────────────────────┼───────────────────────┘  │
+│                                       ▼                          │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ <span class="tag tag-new">NEW</span> ApkBundleParser (APK 解析插件)                         │  │
+│  │   ├─ AXML Parser: 解析二进制 AndroidManifest.xml            │  │
+│  │   ├─ Metadata Mapper: Android 元数据 → OH InnerBundleInfo   │  │
+│  │   ├─ Permission Mapper: android.permission → ohos.permission │  │
+│  │   └─ Component Mapper: Activity/Service → Ability/Extension  │  │
+│  └─────────────────────┬──────────────────────────────────────┘  │
+│                        ▼                                         │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │ InnerBundleInfo (bundleType = APP_ANDROID)                  │  │
+│  │   ├─ ApplicationInfo { bundleName, codePath, isAndroidApp } │  │
+│  │   ├─ AbilityInfo[] (from Activities)                        │  │
+│  │   ├─ ExtensionAbilityInfo[] (from Services/Receivers)       │  │
+│  │   └─ HapModuleInfo { hapPath = APK path }                  │  │
+│  └─────────────────────┬──────────────────────────────────────┘  │
+│                        ▼                                         │
+│  ┌──────────────────────────┐  ┌──────────────────────────────┐  │
+│  │ 复用 BMS 标准后续流程：    │  │ <span class="tag tag-new">NEW</span> Android 专用安装步骤：   │  │
+│  │ · 权限注册               │  │ · APK 复制到安装目录          │  │
+│  │ · 数据库持久化            │  │ · Native 库提取               │  │
+│  │ · 安装事件通知            │  │ · dex2oat DEX 优化            │  │
+│  └──────────────────────────┘  │ · Android 数据目录创建        │  │
+│                                └──────────────────────────────┘  │
+└───────────────────┬─────────────────────────────────────────────┘
+                    │
+                    ▼ (应用启动时)
+┌─────────────────────────────────────────────────────────────────┐
+│                    foundation (AppMgrServiceInner)               │
+│                                                                  │
+│  BundleInfo.bundleType == APP_ANDROID ?                          │
+│    ├─ YES → 路由到 appspawn-x（发送 SpawnMsg + APK 路径）         │
+│    └─ NO  → 路由到标准 appspawn                                  │
+└─────────────────────────────────────────────────────────────────┘
+</div>
+
+<h2 id="ch4-3">4.3 Android App ↔ installd/PMS 接口适配到 OH</h2>
+
+<p>以下分析 Android App 与 installd/PMS 的每类接口，以及在 OH 系统中的适配策略：</p>
+
+<h3>4.3.1 PMS 接口适配（App → PackageManagerAdapter → BMS）</h3>
+
+<div class="card">
+<table>
+<tr><th>Android IPackageManager 方法</th><th>适配策略</th><th>OH 对应</th><th>转换要点</th></tr>
+<tr><td><code>getPackageInfo(pkg, flags)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.GetBundleInfo()</td>
+<td>BundleInfo → PackageInfo：拆分 abilityInfos 为 activities/services/receivers/providers</td></tr>
+<tr><td><code>getApplicationInfo(pkg, flags)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.GetApplicationInfo()</td>
+<td>OH ApplicationInfo → Android ApplicationInfo：映射 codePath/dataDir/uid</td></tr>
+<tr><td><code>getInstalledPackages(flags)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.GetBundleInfos()</td>
+<td>遍历所有 BundleInfo，逐个转换为 PackageInfo</td></tr>
+<tr><td><code>resolveIntent(intent, flags)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.QueryAbilityInfos(want)</td>
+<td>Intent → Want (IntentWantConverter)，AbilityInfo → ResolveInfo</td></tr>
+<tr><td><code>queryIntentActivities(intent)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.QueryAbilityInfos(want)</td>
+<td>同上，返回 List&lt;ResolveInfo&gt;</td></tr>
+<tr><td><code>getActivityInfo(component)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.QueryAbilityInfo(want)</td>
+<td>ComponentName → Want，AbilityInfo → ActivityInfo</td></tr>
+<tr><td><code>checkPermission(perm, pkg)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>AccessTokenKit.VerifyPermission()</td>
+<td>权限名映射 android.permission.* → ohos.permission.*</td></tr>
+<tr><td><code>getPackageUid(pkg)</code></td>
+<td><span class="tag tag-bridged">BRIDGED</span></td>
+<td>BMS.GetUidByBundleName()</td>
+<td>直接映射</td></tr>
+<tr><td><code>checkSignatures(pkg1, pkg2)</code></td>
+<td><span class="tag tag-stub">STUB</span></td>
+<td>—</td>
+<td>Phase 1 返回 SIGNATURE_MATCH（Android 签名信息存储在本地）</td></tr>
+<tr><td><code>hasSystemFeature(feature)</code></td>
+<td><span class="tag tag-stub">STUB</span></td>
+<td>SysCap 查询</td>
+<td>Android feature → OH SysCap 映射表</td></tr>
+</table>
+</div>
+
+<h3>4.3.2 installd 接口适配</h3>
+
+<p>Android App 不直接调用 installd。installd 被 PMS 内部使用。因此适配重点是在 OH BMS 安装 APK 时，
+正确调用 OH installd 的扩展方法完成 Android 特有操作：</p>
+
+<div class="card">
+<table>
+<tr><th>Android installd 操作</th><th>OH 适配方式</th><th>说明</th></tr>
+<tr><td><code>createAppData()</code><br>创建 /data/data/{pkg}/</td>
+<td>OH installd <code>CreateBundleDataDir()</code> + 额外创建 Android 目录</td>
+<td>在 OH 标准数据目录之外，额外创建 Android 风格的子目录 (cache/databases/shared_prefs/files)</td></tr>
+<tr><td><code>dexopt()</code><br>DEX → OAT 优化</td>
+<td><span class="tag tag-new">NEW</span> OH installd 新增 <code>DexOptAndroid()</code></td>
+<td>调用交叉编译的 dex2oat 工具，而非方舟 AOT 编译器</td></tr>
+<tr><td><code>extractNativeLibs()</code><br>提取 .so 文件</td>
+<td>OH installd <code>ExtractModuleFiles()</code> 扩展</td>
+<td>从 APK 的 lib/{abi}/ 路径提取（HAP 是 libs/），需适配路径差异</td></tr>
+<tr><td><code>destroyAppData()</code><br>删除数据目录</td>
+<td>OH installd <code>RemoveBundleDataDir()</code></td>
+<td>同时删除 Android 风格的额外目录</td></tr>
+<tr><td><code>moveCompleteApp()</code><br>跨卷迁移</td>
+<td><span class="tag tag-stub">STUB</span></td>
+<td>Phase 1 不支持跨卷迁移</td></tr>
+<tr><td><code>mergeProfiles()</code><br>Profile 合并</td>
+<td><span class="tag tag-stub">STUB</span></td>
+<td>Phase 1 不支持 PGO</td></tr>
+</table>
+</div>
+
+<h2 id="ch4-4">4.4 OH installd 增强设计</h2>
+
+<p>OH installd 需要新增以下方法以支持 Android APK 安装：</p>
+
+<h3>4.4.1 新增 IPC 方法</h3>
+
+<table>
+<tr><th>方法码</th><th>方法</th><th>参数</th><th>说明</th></tr>
+<tr><td>90</td><td><code>CreateAndroidDataDir</code></td>
+<td>bundleName, uid, gid, targetSdkVersion</td>
+<td>创建 Android 风格数据目录：cache/code_cache/databases/files/shared_prefs/lib</td></tr>
+<tr><td>91</td><td><code>ExtractApkNativeLibs</code></td>
+<td>apkPath, targetDir, primaryAbi</td>
+<td>从 APK ZIP 的 lib/{abi}/ 提取 .so 文件到指定目录</td></tr>
+<tr><td>92</td><td><code>DexOptAndroid</code></td>
+<td>apkPath, oatDir, uid, instructionSet, compilerFilter</td>
+<td>fork + exec dex2oat 编译 DEX → OAT</td></tr>
+<tr><td>93</td><td><code>RemoveAndroidDataDir</code></td>
+<td>bundleName</td>
+<td>删除 Android 数据目录</td></tr>
+<tr><td>94</td><td><code>VerifyApkSignature</code></td>
+<td>apkPath, expectedCertHash</td>
+<td>验证 APK V1/V2 签名有效性</td></tr>
+</table>
+
+<h3>4.4.2 InstalldHostImpl 扩展实现</h3>
+
+<pre><code>// installd_host_impl_android.cpp — Android APK 专用 installd 扩展
+
+ErrCode InstalldHostImpl::CreateAndroidDataDir(
+        const std::string&amp; bundleName, int32_t uid, int32_t gid,
+        int32_t targetSdkVersion) {
+    std::string baseDir = "/data/app/el2/0/android/" + bundleName;
+
+    // 创建 Android 风格子目录
+    const std::vector&lt;std::pair&lt;std::string, mode_t&gt;&gt; dirs = {
+        {"",              0771},
+        {"/cache",        0771},
+        {"/code_cache",   0771},
+        {"/databases",    0771},
+        {"/files",        0771},
+        {"/shared_prefs", 0771},
+        {"/lib",          0755},
+    };
+
+    for (const auto&amp; [sub, mode] : dirs) {
+        std::string path = baseDir + sub;
+        OHOS::ForceCreateDirectory(path);
+        chmod(path.c_str(), mode);
+        chown(path.c_str(), uid, gid);
+    }
+
+    // 外部存储目录
+    std::string extDir = "/data/app/el2/0/android_ext/" + bundleName;
+    OHOS::ForceCreateDirectory(extDir);
+    chown(extDir.c_str(), uid, /* sdcard_rw gid */);
+
+    return ERR_OK;
+}
+
+ErrCode InstalldHostImpl::DexOptAndroid(
+        const std::string&amp; apkPath, const std::string&amp; oatDir,
+        int32_t uid, const std::string&amp; isa,
+        const std::string&amp; compilerFilter) {
+    // 构建 dex2oat 参数
+    std::string oatFile = oatDir + "/base.odex";
+    std::vector&lt;std::string&gt; args = {
+        "/system/android/bin/dex2oat",
+        "--dex-file=" + apkPath,
+        "--oat-file=" + oatFile,
+        "--instruction-set=" + isa,
+        "--compiler-filter=" + compilerFilter,
+        "--boot-image=/system/android/framework/boot.art",
+        "--android-root=/system/android",
+    };
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        setuid(uid);
+        // 构建 argv
+        std::vector&lt;const char*&gt; argv;
+        for (auto&amp; a : args) argv.push_back(a.c_str());
+        argv.push_back(nullptr);
+        execv(argv[0], const_cast&lt;char**&gt;(argv.data()));
+        _exit(127);
+    }
+    int status;
+    waitpid(pid, &amp;status, 0);
+    return (WIFEXITED(status) &amp;&amp; WEXITSTATUS(status) == 0) ? ERR_OK : ERR_APPEXECFWK_INSTALLD_DEXOPT_FAILED;
+}</code></pre>
+
+<h2 id="ch4-5">4.5 OH BMS 增强设计</h2>
+
+<h3>4.5.1 BundleType 扩展</h3>
+
+<pre><code>// bundle_constants.h — 新增 Android 应用类型
+enum class BundleType : uint32_t {
+    APP = 0,               // OH 应用
+    ATOMIC_SERVICE = 1,    // 原子化服务
+    SHARED = 2,            // 共享包
+    APP_SERVICE = 3,       // 应用服务
+    APP_ANDROID = 10,      // ← 新增：Android 应用
+};</code></pre>
+
+<h3>4.5.2 BundleInstaller 安装分支</h3>
+
+<pre><code>// bundle_installer.cpp — 安装入口增加 APK 检测
+ErrCode BundleInstaller::ProcessBundleInstall(const std::string&amp; bundlePath, ...) {
+    if (EndsWith(bundlePath, ".apk")) {
+        // Android APK 安装分支
+        return ProcessApkInstall(bundlePath, installParam, statusReceiver);
+    }
+    // 标准 HAP 安装流程
+    return ProcessHapInstall(bundlePath, installParam, statusReceiver);
+}
+
+ErrCode BundleInstaller::ProcessApkInstall(const std::string&amp; apkPath, ...) {
+    // 1. 解析 AndroidManifest.xml (AXML)
+    ApkManifestParser::ManifestData manifest;
+    if (!ApkManifestParser::Parse(apkPath, manifest)) {
+        return ERR_APPEXECFWK_INSTALL_INVALID_APK;
+    }
+
+    // 2. APK 签名验证
+    auto installd = DelayedSingleton&lt;InstalldClient&gt;::GetInstance();
+    installd-&gt;VerifyApkSignature(apkPath, "");
+
+    // 3. 版本检查（如果是更新）
+    CheckVersionForUpdate(manifest.packageName, manifest.versionCode);
+
+    // 4. 复制 APK 到安装目录
+    std::string installDir = "/data/app/android/" + manifest.packageName;
+    installd-&gt;Mkdir(installDir, 0755, uid, gid);
+    installd-&gt;CopyFile(apkPath, installDir + "/base.apk");
+
+    // 5. 提取 Native 库
+    installd-&gt;ExtractApkNativeLibs(apkPath, installDir + "/lib", primaryAbi);
+
+    // 6. DEX 优化
+    installd-&gt;DexOptAndroid(installDir + "/base.apk",
+                            installDir + "/oat/arm64",
+                            uid, "arm64", "speed");
+
+    // 7. 创建 Android 数据目录
+    installd-&gt;CreateAndroidDataDir(manifest.packageName, uid, gid,
+                                    manifest.targetSdkVersion);
+
+    // 8. 构建 InnerBundleInfo 并注册到 BMS
+    InnerBundleInfo bundleInfo = ApkBundleParser::Build(manifest, installDir);
+    bundleDataMgr_-&gt;AddInnerBundleInfo(manifest.packageName, bundleInfo);
+
+    // 9. 发送安装事件
+    SendCommonEvent(CommonEventConstants::BUNDLE_ADDED, manifest.packageName);
+
+    return ERR_OK;
+}</code></pre>
+
+<h3>4.5.3 AppMgrService 启动路由增强</h3>
+
+<pre><code>// app_mgr_service_inner.cpp — 根据 bundleType 路由到 appspawn-x
+void AppMgrServiceInner::StartProcess(const BundleInfo&amp; bundleInfo, ...) {
+    if (bundleInfo.applicationInfo.bundleType == BundleType::APP_ANDROID) {
+        // Android 应用 → 路由到 appspawn-x
+        SpawnMsg msg;
+        msg.bundleName = bundleInfo.bundleName;
+        msg.uid = bundleInfo.uid;
+        msg.gid = bundleInfo.gid;
+        msg.apkPath = bundleInfo.applicationInfo.codePath;
+        msg.nativeLibPaths = bundleInfo.hapModuleInfos[0].nativeLibraryPath;
+        msg.targetClass = "android.app.ActivityThread";
+        msg.targetSdkVersion = bundleInfo.applicationInfo.apiTargetVersion;
+        androidSpawnClient_-&gt;Send(msg);
+    } else {
+        // OH 应用 → 标准 appspawn
+        standardSpawnClient_-&gt;Send(...);
+    }
+}</code></pre>
+
+<h2 id="ch4-6">4.6 APK 解析器设计</h2>
+
+<h3>4.6.1 AXML 二进制格式</h3>
+
+<p>APK 中的 AndroidManifest.xml 使用 Android 特有的二进制 XML 格式（AXML），需要专门的解析器：</p>
+
+<table>
+<tr><th>块类型</th><th>Chunk ID</th><th>说明</th></tr>
+<tr><td>文件头</td><td>0x00080003</td><td>AXML 文件标识 + 总长度</td></tr>
+<tr><td>字符串池</td><td>0x001C0001</td><td>所有字符串的 UTF-8/UTF-16 编码表</td></tr>
+<tr><td>资源 ID 表</td><td>0x00080180</td><td>属性名 → Android 资源 ID 映射</td></tr>
+<tr><td>XML 开始元素</td><td>0x00100102</td><td>元素标签 + 属性列表</td></tr>
+<tr><td>XML 结束元素</td><td>0x00100103</td><td>元素标签结束</td></tr>
+</table>
+
+<div class="info">
+<strong>实现策略：</strong>Phase 1 可直接使用 AOSP 中的 <code>androidfw/ResourceTypes.h</code> 的
+<code>ResXMLParser</code>，该代码已随 ART 运行时交叉编译到 OH 系统。
+无需从零实现 AXML 解析器。
+</div>
+
+<h3>4.6.2 ApkManifestParser 类设计</h3>
+
+<pre><code>// apk_manifest_parser.h — 完整类定义
+class ApkManifestParser {
+public:
+    // ===== 解析结果数据结构 =====
+
+    struct IntentFilterData {
+        std::vector&lt;std::string&gt; actions;      // &lt;action android:name="..."&gt;
+        std::vector&lt;std::string&gt; categories;   // &lt;category android:name="..."&gt;
+        struct UriData { std::string scheme, host, path, type; };
+        std::vector&lt;UriData&gt; dataSpecs;        // &lt;data android:scheme/host/path/mimeType&gt;
+    };
+
+    struct ActivityData {
+        std::string name;              // 全限定类名 (android:name)
+        std::string label;             // android:label
+        int32_t launchMode = 0;        // 0=standard, 1=singleTop, 2=singleTask, 3=singleInstance
+        int32_t screenOrientation = -1;// android:screenOrientation
+        bool exported = false;         // android:exported
+        std::string taskAffinity;      // android:taskAffinity
+        std::string permission;        // android:permission
+        int32_t theme = 0;             // android:theme (资源 ID)
+        std::vector&lt;IntentFilterData&gt; intentFilters;
+    };
+
+    struct ServiceData {
+        std::string name;
+        bool exported = false;
+        std::string permission;
+        std::vector&lt;IntentFilterData&gt; intentFilters;
+    };
+
+    struct ReceiverData {
+        std::string name;
+        bool exported = false;
+        std::string permission;
+        std::vector&lt;IntentFilterData&gt; intentFilters;
+    };
+
+    struct ProviderData {
+        std::string name;
+        std::string authorities;       // android:authorities (分号分隔)
+        bool exported = false;
+        std::string readPermission;
+        std::string writePermission;
+    };
+
+    struct PermissionData {
+        std::string name;
+        int32_t protectionLevel = 0;   // 0=normal, 1=dangerous, 2=signature
+    };
+
+    struct ManifestData {
+        // &lt;manifest&gt; 属性
+        std::string packageName;
+        int32_t versionCode = 0;
+        std::string versionName;
+        int32_t minSdkVersion = 0;
+        int32_t targetSdkVersion = 0;
+        std::string sharedUserId;
+
+        // &lt;application&gt; 属性
+        std::string appClassName;      // android:name
+        std::string appLabel;
+        bool debuggable = false;
+        bool extractNativeLibs = true;
+
+        // 四大组件
+        std::vector&lt;ActivityData&gt; activities;
+        std::vector&lt;ServiceData&gt; services;
+        std::vector&lt;ReceiverData&gt; receivers;
+        std::vector&lt;ProviderData&gt; providers;
+
+        // 权限
+        std::vector&lt;std::string&gt; usesPermissions;
+        std::vector&lt;PermissionData&gt; permissionDeclarations;
+    };
+
+    // 从 APK ZIP 中提取并解析 AndroidManifest.xml
+    static bool Parse(const std::string&amp; apkPath, ManifestData&amp; outData);
+
+private:
+    static bool ParseAXML(const uint8_t* data, size_t size, ManifestData&amp; outData);
+    static bool ParseStringPool(const uint8_t* chunk, std::vector&lt;std::string&gt;&amp; strings);
+};</code></pre>
+
+<h3>4.6.3 APK → InnerBundleInfo 映射</h3>
+
+<table>
+<tr><th>Android 元素</th><th>OH 映射目标</th><th>映射规则</th></tr>
+<tr><td>manifest.package</td><td>BundleInfo.bundleName</td><td>直接映射（如 com.example.app）</td></tr>
+<tr><td>manifest.versionCode</td><td>BundleInfo.versionCode</td><td>直接映射</td></tr>
+<tr><td>uses-sdk.targetSdkVersion</td><td>ApplicationInfo.apiTargetVersion</td><td>直接映射</td></tr>
+<tr><td>activity 元素</td><td>AbilityInfo (type=PAGE)</td><td>类名 + "Ability" 后缀（与 IntentWantConverter 一致）</td></tr>
+<tr><td>service 元素</td><td>ExtensionAbilityInfo (type=SERVICE)</td><td>直接映射类名</td></tr>
+<tr><td>receiver 元素</td><td>ExtensionAbilityInfo (type=STATICSUBSCRIBER)</td><td>直接映射类名</td></tr>
+<tr><td>provider 元素</td><td>ExtensionAbilityInfo (type=DATASHARE)</td><td>authorities → URI 映射</td></tr>
+<tr><td>intent-filter</td><td>AbilityInfo.skillUri</td><td>action → IntentWantConverter.mapAction(), category → entity</td></tr>
+<tr><td>uses-permission</td><td>RequestPermission</td><td>权限名映射 android.permission.* → ohos.permission.*</td></tr>
+<tr><td>application.name</td><td>ApplicationInfo.name</td><td>Application 类名</td></tr>
+<tr><td>整个 APK</td><td>单个 HapModuleInfo (moduleName="entry")</td><td>单 APK = 单模块</td></tr>
+</table>
+
+<h3>4.6.3 权限映射表</h3>
+
+<table>
+<tr><th>Android 权限</th><th>OH 权限</th></tr>
+<tr><td>android.permission.INTERNET</td><td>ohos.permission.INTERNET</td></tr>
+<tr><td>android.permission.CAMERA</td><td>ohos.permission.CAMERA</td></tr>
+<tr><td>android.permission.READ_CONTACTS</td><td>ohos.permission.READ_CONTACTS</td></tr>
+<tr><td>android.permission.WRITE_EXTERNAL_STORAGE</td><td>ohos.permission.WRITE_MEDIA</td></tr>
+<tr><td>android.permission.ACCESS_FINE_LOCATION</td><td>ohos.permission.APPROXIMATELY_LOCATION</td></tr>
+<tr><td>android.permission.RECORD_AUDIO</td><td>ohos.permission.MICROPHONE</td></tr>
+<tr><td>android.permission.READ_PHONE_STATE</td><td>ohos.permission.GET_TELEPHONY_STATE</td></tr>
+<tr><td>android.permission.VIBRATE</td><td>ohos.permission.VIBRATE</td></tr>
+<tr><td>android.permission.WAKE_LOCK</td><td>ohos.permission.RUNNING_LOCK</td></tr>
+<tr><td>其他 android.permission.*</td><td>ohos.permission.android.*（透传加前缀）</td></tr>
+</table>
+
+<h3>4.6.6 Activity → AbilityInfo 逐字段映射</h3>
+
+<table>
+<tr><th>OH AbilityInfo 字段</th><th>Android ActivityData 来源</th><th>映射规则</th></tr>
+<tr><td>name</td><td>activity.name</td><td>取简单类名 + "Ability" 后缀（与 IntentWantConverter.mapClassToAbilityName 一致）</td></tr>
+<tr><td>bundleName</td><td>manifest.package</td><td>直接映射</td></tr>
+<tr><td>moduleName</td><td>固定</td><td>"entry"</td></tr>
+<tr><td>type</td><td>固定</td><td>AbilityType::PAGE</td></tr>
+<tr><td>launchMode</td><td>activity.launchMode</td><td>standard(0)/singleTop(1) → STANDARD, singleTask(2)/singleInstance(3) → SINGLETON</td></tr>
+<tr><td>orientation</td><td>activity.screenOrientation</td><td>portrait(1) → PORTRAIT, landscape(0) → LANDSCAPE, unspecified(-1) → UNSPECIFIED</td></tr>
+<tr><td>visible (exported)</td><td>activity.exported</td><td>直接映射</td></tr>
+<tr><td>codePath</td><td>APK 安装路径</td><td>/data/app/android/{pkg}/base.apk</td></tr>
+<tr><td>srcLanguage</td><td>固定</td><td>"java"</td></tr>
+<tr><td>skillUri</td><td>intent-filter</td><td>见下方 Intent-filter 映射</td></tr>
+</table>
+
+<div class="note">
+<strong>命名一致性：</strong>AbilityInfo.name 的命名规则必须与 <code>IntentWantConverter.mapClassToAbilityName()</code> 完全一致。
+例如 <code>com.example.MainActivity</code> → <code>MainActivityAbility</code>。
+这确保安装时 BMS 注册的 Ability 名称，与运行时 Intent→Want 转换使用的 Ability 名称相同。
+</div>
+
+<h3>4.6.7 Intent-filter → Skills 映射</h3>
+
+<table>
+<tr><th>Android IntentFilter 元素</th><th>OH Skills 字段</th><th>映射规则</th></tr>
+<tr><td><code>&lt;action android:name="..."&gt;</code></td><td>actions[]</td><td>通过 IntentWantConverter.mapAction() 转换：<br>ACTION_MAIN → ohos.want.action.home<br>ACTION_VIEW → ohos.want.action.viewData<br>ACTION_SEND → ohos.want.action.sendData</td></tr>
+<tr><td><code>&lt;category android:name="..."&gt;</code></td><td>entities[]</td><td>CATEGORY_DEFAULT → entity.system.default<br>CATEGORY_LAUNCHER → entity.system.home<br>CATEGORY_BROWSABLE → entity.system.browsable</td></tr>
+<tr><td><code>&lt;data android:scheme="..."&gt;</code></td><td>uris[].scheme</td><td>直接映射（http/https/content/file 等）</td></tr>
+<tr><td><code>&lt;data android:host="..."&gt;</code></td><td>uris[].host</td><td>直接映射</td></tr>
+<tr><td><code>&lt;data android:path="..."&gt;</code></td><td>uris[].path</td><td>直接映射</td></tr>
+<tr><td><code>&lt;data android:mimeType="..."&gt;</code></td><td>uris[].type</td><td>直接映射（image/*、text/plain 等）</td></tr>
+</table>
+
+<div class="info">
+<strong>MAIN/LAUNCHER 识别：</strong>如果 Activity 的 intent-filter 同时包含 <code>ACTION_MAIN</code> 和
+<code>CATEGORY_LAUNCHER</code>，则该 Activity 是应用入口，对应的 AbilityInfo 应标记为桌面可见
+（skills 包含 <code>ohos.want.action.home</code> + <code>entity.system.home</code>），
+使 OH 桌面能够显示该应用图标。
+</div>
+
+<h3>4.6.8 ApkBundleParser::Build() — 完整映射代码</h3>
+
+<pre><code>// apk_bundle_parser.cpp — 核心映射函数
+InnerBundleInfo ApkBundleParser::Build(
+        const ApkManifestParser::ManifestData&amp; manifest,
+        const std::string&amp; installDir) {
+
+    InnerBundleInfo bundleInfo;
+
+    // 1. ApplicationInfo
+    ApplicationInfo appInfo;
+    appInfo.name = manifest.appClassName.empty()
+                   ? manifest.packageName : manifest.appClassName;
+    appInfo.bundleName = manifest.packageName;
+    appInfo.versionCode = manifest.versionCode;
+    appInfo.versionName = manifest.versionName;
+    appInfo.codePath = installDir + "/base.apk";
+    appInfo.dataDir = "/data/app/el2/0/android/" + manifest.packageName;
+    appInfo.isSystemApp = false;
+    appInfo.bundleType = BundleType::APP_ANDROID;
+    appInfo.process = manifest.packageName;
+    appInfo.apiTargetVersion = manifest.targetSdkVersion;
+    bundleInfo.SetApplicationInfo(appInfo);
+
+    // 2. HapModuleInfo（单 APK = 单模块 "entry"）
+    HapModuleInfo moduleInfo;
+    moduleInfo.name = "entry";
+    moduleInfo.moduleName = "entry";
+    moduleInfo.bundleName = manifest.packageName;
+    moduleInfo.hapPath = installDir + "/base.apk";
+    moduleInfo.nativeLibraryPath = installDir + "/lib/arm64-v8a";
+    moduleInfo.type = ModuleType::ENTRY;
+
+    // 3. Activities → AbilityInfos
+    for (const auto&amp; activity : manifest.activities) {
+        AbilityInfo abilityInfo;
+        abilityInfo.name = MapClassToAbilityName(activity.name);
+        abilityInfo.bundleName = manifest.packageName;
+        abilityInfo.moduleName = "entry";
+        abilityInfo.type = AbilityType::PAGE;
+        abilityInfo.launchMode = MapLaunchMode(activity.launchMode);
+        abilityInfo.orientation = MapOrientation(activity.screenOrientation);
+        abilityInfo.visible = activity.exported;
+        abilityInfo.codePath = installDir + "/base.apk";
+        abilityInfo.srcLanguage = "java";
+
+        // Intent-filter → Skills
+        for (const auto&amp; filter : activity.intentFilters) {
+            Skill skill;
+            for (const auto&amp; action : filter.actions)
+                skill.actions.push_back(MapAction(action));
+            for (const auto&amp; category : filter.categories)
+                skill.entities.push_back(MapCategory(category));
+            for (const auto&amp; data : filter.dataSpecs) {
+                SkillUri uri;
+                uri.scheme = data.scheme; uri.host = data.host;
+                uri.path = data.path;     uri.type = data.type;
+                skill.uris.push_back(uri);
+            }
+            abilityInfo.skills.push_back(skill);
+        }
+        moduleInfo.abilityInfos.push_back(abilityInfo);
+        bundleInfo.InsertAbilityInfo(abilityInfo);
+    }
+
+    // 4. Services → ExtensionAbilityInfos (SERVICE)
+    for (const auto&amp; service : manifest.services) {
+        ExtensionAbilityInfo extInfo;
+        extInfo.name = service.name;
+        extInfo.bundleName = manifest.packageName;
+        extInfo.type = ExtensionAbilityType::SERVICE;
+        extInfo.visible = service.exported;
+        bundleInfo.InsertExtensionInfo(extInfo);
+    }
+
+    // 5. BroadcastReceivers → ExtensionAbilityInfos (STATICSUBSCRIBER)
+    for (const auto&amp; receiver : manifest.receivers) {
+        ExtensionAbilityInfo extInfo;
+        extInfo.name = receiver.name;
+        extInfo.bundleName = manifest.packageName;
+        extInfo.type = ExtensionAbilityType::STATICSUBSCRIBER;
+        extInfo.visible = receiver.exported;
+        bundleInfo.InsertExtensionInfo(extInfo);
+    }
+
+    // 6. ContentProviders → ExtensionAbilityInfos (DATASHARE)
+    for (const auto&amp; provider : manifest.providers) {
+        ExtensionAbilityInfo extInfo;
+        extInfo.name = provider.name;
+        extInfo.bundleName = manifest.packageName;
+        extInfo.type = ExtensionAbilityType::DATASHARE;
+        extInfo.visible = provider.exported;
+        extInfo.uri = "datashare:///" + provider.authorities;
+        bundleInfo.InsertExtensionInfo(extInfo);
+    }
+
+    // 7. 权限映射
+    for (const auto&amp; perm : manifest.usesPermissions) {
+        RequestPermission reqPerm;
+        reqPerm.name = PermissionMapper::MapToOH(perm);
+        reqPerm.moduleName = "entry";
+        bundleInfo.AddRequestPermission(reqPerm);
+    }
+
+    bundleInfo.InsertModuleInfo(moduleInfo);
+    return bundleInfo;
+}</code></pre>
+
+<h2 id="ch4-7">4.7 安装入口与完整安装流程</h2>
+
+<h3>4.7.1 安装入口与触发方式</h3>
+
+<table>
+<tr><th>安装方式</th><th>入口</th><th>说明</th></tr>
+<tr><td>命令行安装</td><td><code>bm install -p /path/to/app.apk</code></td><td>OH 的 bm 工具，需扩展支持 .apk 后缀</td></tr>
+<tr><td>hdc 安装</td><td><code>hdc install /path/to/app.apk</code></td><td>类似 adb install，需扩展 hdc 命令</td></tr>
+<tr><td>文件管理器</td><td>点击 .apk 文件</td><td>文件管理器需注册 .apk 文件类型处理</td></tr>
+<tr><td>应用内安装</td><td>PackageInstaller Intent</td><td>需实现 Android PackageInstaller 适配（Phase 2）</td></tr>
+</table>
+
+<p>所有入口最终调用 BMS 的 <code>IBundleInstaller.Install()</code> 接口。
+BMS 在安装入口处检测文件后缀，.apk 文件进入 Android 安装分支。</p>
+
+<h3>4.7.2 安装流程时序图</h3>
+
+<div class="diagram">
+  用户/工具      BMS(BundleInstaller)    ApkManifestParser     InstalldClient      dex2oat
+     │                │                      │                    │                │
+     │  Install(.apk) │                      │                    │                │
+     ├───────────────►│                      │                    │                │
+     │                │ 1. 检测 .apk 后缀      │                    │                │
+     │                │                      │                    │                │
+     │                │ 2. 解析 AXML          │                    │                │
+     │                ├─────────────────────►│                    │                │
+     │                │  ManifestData         │                    │                │
+     │                │◄─────────────────────┤                    │                │
+     │                │                      │                    │                │
+     │                │ 3. VerifyApkSignature │                    │                │
+     │                ├──────────────────────────────────────────►│                │
+     │                │◄──────────────────────────────────────────┤                │
+     │                │                      │                    │                │
+     │                │ 4. CopyFile (APK)    │                    │                │
+     │                ├──────────────────────────────────────────►│                │
+     │                │                      │                    │                │
+     │                │ 5. ExtractApkNativeLibs                   │                │
+     │                ├──────────────────────────────────────────►│                │
+     │                │                      │                    │                │
+     │                │ 6. DexOptAndroid      │                    │                │
+     │                ├──────────────────────────────────────────►│                │
+     │                │                      │                    │  fork+exec     │
+     │                │                      │                    ├───────────────►│
+     │                │                      │                    │  .odex/.vdex   │
+     │                │                      │                    │◄───────────────┤
+     │                │◄──────────────────────────────────────────┤                │
+     │                │                      │                    │                │
+     │                │ 7. CreateAndroidDataDir                   │                │
+     │                ├──────────────────────────────────────────►│                │
+     │                │◄──────────────────────────────────────────┤                │
+     │                │                      │                    │                │
+     │                │ 8. Build InnerBundleInfo                  │                │
+     │                │    (bundleType=APP_ANDROID)               │                │
+     │                │ 9. BundleDataMgr.AddInnerBundleInfo       │                │
+     │                │ 10. SendCommonEvent(BUNDLE_ADDED)         │                │
+     │                │                      │                    │                │
+     │  安装完成       │                      │                    │                │
+     │◄───────────────┤                      │                    │                │
+</div>
+
+<h2 id="ch4-8">4.8 APK 文件部署与 Native 库提取</h2>
+
+<h3>4.8.1 ApkInstaller 类设计</h3>
+
+<pre><code>// apk_installer.h
+class ApkInstaller {
+public:
+    struct InstallResult {
+        bool success;
+        std::string errorMsg;
+        std::string installedApkPath;    // /data/app/android/{pkg}/base.apk
+        std::string nativeLibPath;       // /data/app/android/{pkg}/lib/arm64-v8a/
+        std::string oatDir;             // /data/app/android/{pkg}/oat/arm64/
+    };
+
+    // 执行 APK 文件部署（复制 + 提取 + 优化 + 目录创建）
+    InstallResult DeployApk(const std::string&amp; srcApkPath,
+                            const std::string&amp; packageName,
+                            int32_t uid, int32_t gid);
+
+private:
+    bool CreateInstallDirs(const std::string&amp; packageName);
+    bool CopyApk(const std::string&amp; src, const std::string&amp; dst);
+    bool ExtractNativeLibs(const std::string&amp; apkPath, const std::string&amp; libDir,
+                           const std::string&amp; primaryAbi);
+    bool RunDexOpt(const std::string&amp; apkPath, const std::string&amp; oatDir, int32_t uid);
+    bool SetPermissions(const std::string&amp; installDir, int32_t uid, int32_t gid);
+};</code></pre>
+
+<h3>4.8.2 Native 库 ABI 选择策略</h3>
+
+<pre><code>// ABI 优先级（ARM64 设备）
+static const std::vector&lt;std::string&gt; kSupportedAbis = {
+    "arm64-v8a",      // 优先：64 位 ARM
+    "armeabi-v7a",    // 回退：32 位 ARM
+    "armeabi"         // 遗留：ARMv5
+};
+
+std::string SelectPrimaryAbi(const std::string&amp; apkPath) {
+    ZipArchive zip(apkPath);
+    for (const auto&amp; abi : kSupportedAbis) {
+        std::string prefix = "lib/" + abi + "/";
+        if (zip.HasEntriesWithPrefix(prefix)) {
+            return abi;
+        }
+    }
+    return "";  // 无 Native 库
+}</code></pre>
+
+<h3>4.8.3 Native 库提取过程</h3>
+
+<ol>
+<li>扫描 APK ZIP 中 <code>lib/{abi}/</code> 目录</li>
+<li>选择设备支持的最佳 ABI（按 kSupportedAbis 优先级）</li>
+<li>提取所有 .so 文件到 <code>/data/app/android/{pkg}/lib/{abi}/</code></li>
+<li>设置文件权限（owner=uid, mode=0755）</li>
+<li>如果 AndroidManifest.xml 中 <code>extractNativeLibs=false</code>，则不提取，运行时直接从 APK 中加载（需 APK 页对齐）</li>
+</ol>
+
+<h2 id="ch4-9">4.9 DEX 优化 (dex2oat)</h2>
+
+<p>dex2oat 是 ART 工具链的一部分，需随 appspawn-x 一起交叉编译并部署到 OH 系统。</p>
+
+<table>
+<tr><th>场景</th><th>compiler-filter</th><th>耗时</th><th>运行时性能</th><th>磁盘占用</th></tr>
+<tr><td>首次安装</td><td>speed（全量 AOT）</td><td>10-60 秒</td><td>最佳</td><td>APK 的 2-5 倍</td></tr>
+<tr><td>后台优化</td><td>speed-profile（PGO）</td><td>中等</td><td>优</td><td>中等</td></tr>
+<tr><td>快速安装</td><td>quicken</td><td>较短</td><td>良</td><td>较小</td></tr>
+<tr><td>调试模式</td><td>verify（仅验证）</td><td>最短</td><td>最慢</td><td>最小</td></tr>
+</table>
+
+<div class="warn">
+<strong>dex2oat 依赖：</strong>dex2oat 依赖 boot image（boot.art / boot.oat）进行类预验证和内联优化。
+boot image 在 appspawn-x 首次启动时生成，路径为 <code>/system/android/framework/boot.art</code>。
+</div>
+
+<h2 id="ch4-10">4.10 目录结构与数据目录映射</h2>
+
+<h3>4.9.1 安装目录</h3>
+
+<pre><code>/data/app/android/                          # Android 应用安装根目录
+└── com.example.app/                        # 按 packageName 组织
+    ├── base.apk                            # APK 文件（只读）
+    ├── lib/                                # 提取的 Native 库
+    │   └── arm64-v8a/
+    │       └── libnative.so
+    └── oat/                                # DEX 优化产物
+        └── arm64/
+            ├── base.odex                   # AOT 编译的机器码
+            └── base.vdex                   # 验证后的 DEX</code></pre>
+
+<h3>4.9.2 数据目录映射</h3>
+
+<table>
+<tr><th>Android 路径（App 视角）</th><th>OH 实际路径</th><th>映射方式</th></tr>
+<tr><td>/data/data/{pkg}/</td><td>/data/app/el2/0/android/{pkg}/</td><td>mount --bind（sandbox 配置）</td></tr>
+<tr><td>/data/data/{pkg}/cache/</td><td>/data/app/el2/0/android/{pkg}/cache/</td><td>自动创建</td></tr>
+<tr><td>/data/data/{pkg}/databases/</td><td>/data/app/el2/0/android/{pkg}/databases/</td><td>自动创建</td></tr>
+<tr><td>/data/data/{pkg}/shared_prefs/</td><td>/data/app/el2/0/android/{pkg}/shared_prefs/</td><td>自动创建</td></tr>
+<tr><td>/data/data/{pkg}/files/</td><td>/data/app/el2/0/android/{pkg}/files/</td><td>自动创建</td></tr>
+<tr><td>/storage/emulated/0/Android/data/{pkg}/</td><td>/data/app/el2/0/android_ext/{pkg}/</td><td>mount --bind</td></tr>
+</table>
+
+<h2 id="ch4-11">4.11 签名验证</h2>
+
+<p>Android APK 支持多种签名方案。安装时需验证签名有效性，更新时需确保新旧签名一致：</p>
+
+<table>
+<tr><th>签名方案</th><th>说明</th><th>验证方式</th><th>Phase 1 支持</th></tr>
+<tr><td><strong>V1 (JAR Signing)</strong></td><td>传统 JAR 签名，逐文件哈希验证。META-INF/CERT.RSA + CERT.SF</td><td>逐文件 SHA-256 校验 + 证书链验证</td><td>✅ 支持</td></tr>
+<tr><td><strong>V2 (APK Signing v2)</strong></td><td>整包签名块，APK 中央目录前的签名数据。防篡改能力更强</td><td>整包内容摘要 + 签名块验证</td><td>✅ 支持</td></tr>
+<tr><td><strong>V3 (APK Signing v3)</strong></td><td>支持密钥轮换（Key Rotation）</td><td>在 V2 基础上增加 lineage 链</td><td>⚠️ 延后</td></tr>
+<tr><td><strong>V4 (Streaming Install)</strong></td><td>增量安装签名，支持部分 APK 验证</td><td>Merkle 树哈希</td><td>❌ 不支持</td></tr>
+</table>
+
+<div class="info">
+<strong>实现策略：</strong>签名验证逻辑复用 AOSP 中 <code>frameworks/base/core/java/android/util/apk/</code>
+下的 <code>ApkSignatureSchemeV2Verifier</code> 和 <code>ApkSigningBlockUtils</code>。
+这些代码是纯 Java 实现，可集成到适配层 Java 侧，在安装时由 BMS 通过 JNI 调用。
+也可在 installd 扩展的 <code>VerifyApkSignature()</code> 方法中通过 C++ 实现。
+</div>
+
+<h2 id="ch4-12">4.12 PackageManager 适配器设计</h2>
+
+<div class="diagram">
+Android App
+    │
+    │ context.getPackageManager().getPackageInfo("com.example.app", 0)
+    ▼
+PackageManager (客户端)
+    │
+    │ IPC: IPackageManager.getPackageInfo()
+    ▼
+PackageManagerAdapter (extends IPackageManager.Stub)      ← 新增适配器
+    │
+    │ native → JNI
+    ▼
+OH BMS Client (BundleMgrHelper)
+    │
+    │ IPC: IBundleMgr.GetBundleInfo()
+    ▼
+BundleManagerService
+    │
+    │ 查询 InnerBundleInfo 数据库
+    ▼
+返回 BundleInfo → PackageInfoBuilder 转换 → 返回 Android PackageInfo
+</div>
+
+<h3>4.10.1 PackageInfoBuilder — BundleInfo → PackageInfo 转换</h3>
+
+<pre><code>// PackageInfoBuilder.java — 将 OH BundleInfo 转换为 Android PackageInfo
+public class PackageInfoBuilder {
+    public static PackageInfo fromBundleInfo(String bundleInfoJson) {
+        PackageInfo pi = new PackageInfo();
+        JSONObject json = new JSONObject(bundleInfoJson);
+
+        pi.packageName = json.getString("name");
+        pi.versionCode = json.getInt("versionCode");
+        pi.versionName = json.getString("versionName");
+
+        // ApplicationInfo
+        pi.applicationInfo = new ApplicationInfo();
+        pi.applicationInfo.packageName = pi.packageName;
+        pi.applicationInfo.sourceDir = "/data/app/android/" + pi.packageName + "/base.apk";
+        pi.applicationInfo.dataDir = "/data/data/" + pi.packageName;
+        pi.applicationInfo.uid = json.optInt("uid", -1);
+        pi.applicationInfo.targetSdkVersion = json.optInt("maxSdkVersion", 33);
+
+        // AbilityInfos → ActivityInfo[] (还原 Ability 后缀)
+        JSONArray abilities = json.optJSONArray("abilityInfos");
+        if (abilities != null) {
+            pi.activities = new ActivityInfo[abilities.length()];
+            for (int i = 0; i &lt; abilities.length(); i++) {
+                JSONObject ab = abilities.getJSONObject(i);
+                ActivityInfo ai = new ActivityInfo();
+                String abilityName = ab.getString("name");
+                ai.name = IntentWantConverter.abilityNameToClassName(
+                    pi.packageName, abilityName);
+                ai.packageName = pi.packageName;
+                ai.exported = ab.optBoolean("visible", false);
+                pi.activities[i] = ai;
+            }
+        }
+
+        // 权限反向映射
+        JSONArray perms = json.optJSONArray("reqPermissions");
+        if (perms != null) {
+            pi.requestedPermissions = new String[perms.length()];
+            for (int i = 0; i &lt; perms.length(); i++) {
+                pi.requestedPermissions[i] =
+                    PermissionMapper.mapToAndroid(perms.getString(i));
+            }
+        }
+        return pi;
+    }
+}</code></pre>
+
+<h2 id="ch4-13">4.13 卸载与更新</h2>
+
+<h3>4.11.1 卸载流程</h3>
+<pre><code>BMS.Uninstall(bundleName)
+  │ bundleType == APP_ANDROID ?
+  │
+  ├─ 1. 停止应用进程（AppMgrService）
+  ├─ 2. installd.RemoveDir("/data/app/android/{pkg}/")       — 删除安装目录
+  ├─ 3. installd.RemoveAndroidDataDir(bundleName)             — 删除数据目录
+  ├─ 4. BundleDataMgr.RemoveInnerBundleInfo(bundleName)       — 数据库删除
+  ├─ 5. 撤销已授权权限
+  └─ 6. SendCommonEvent(BUNDLE_REMOVED)                       — 通知事件</code></pre>
+
+<h3>4.11.2 更新流程</h3>
+<ol>
+<li><strong>签名验证：</strong>新 APK 签名必须与已安装版本一致</li>
+<li><strong>版本检查：</strong>versionCode ≥ 已安装版本</li>
+<li><strong>停止旧进程</strong></li>
+<li><strong>替换文件：</strong>替换 base.apk、重新提取 Native 库、重新 dex2oat</li>
+<li><strong>保留数据目录</strong></li>
+<li><strong>更新 BMS 数据库</strong></li>
+<li><strong>发送 BUNDLE_UPDATED 事件</strong></li>
+</ol>
+
+<h2 id="ch4-14">4.14 与现有适配层的集成</h2>
+
+<h3>4.12.1 与 appspawn-x 的集成</h3>
+
+<p>APK 安装后的信息传递给 appspawn-x 的 SpawnMsg：</p>
+
+<table>
+<tr><th>SpawnMsg 字段</th><th>来源</th><th>示例值</th></tr>
+<tr><td>bundleName</td><td>BundleInfo.bundleName</td><td>com.example.app</td></tr>
+<tr><td>apkPath</td><td>ApplicationInfo.codePath</td><td>/data/app/android/com.example.app/base.apk</td></tr>
+<tr><td>nativeLibPaths</td><td>HapModuleInfo.nativeLibraryPath</td><td>/data/app/android/com.example.app/lib/arm64-v8a</td></tr>
+<tr><td>targetClass</td><td>固定</td><td>android.app.ActivityThread</td></tr>
+<tr><td>uid / gid</td><td>BMS 分配</td><td>由 OH UID 分配机制确定</td></tr>
+</table>
+
+<h3>4.12.2 与 IntentWantConverter 的一致性</h3>
+
+<p>APK 解析器的组件名映射必须与 IntentWantConverter 一致：</p>
+<ul>
+<li><strong>安装时：</strong><code>com.example.MainActivity</code> → AbilityInfo.name = <code>MainActivityAbility</code></li>
+<li><strong>运行时（Intent→Want）：</strong><code>IntentWantConverter.mapClassToAbilityName("MainActivity")</code> = <code>MainActivityAbility</code></li>
+<li><strong>反向（Want→Intent）：</strong><code>IntentWantConverter.abilityNameToClassName("MainActivityAbility")</code> = <code>MainActivity</code></li>
+</ul>
+
+<h3>4.12.3 与 BroadcastEventConverter 的集成</h3>
+
+<p>BroadcastEventConverter 映射表需补充安装事件：</p>
+
+<table>
+<tr><th>OH CommonEvent</th><th>Android Broadcast</th></tr>
+<tr><td>usual.event.BUNDLE_ADDED</td><td>android.intent.action.PACKAGE_ADDED</td></tr>
+<tr><td>usual.event.BUNDLE_REMOVED</td><td>android.intent.action.PACKAGE_REMOVED</td></tr>
+<tr><td>usual.event.BUNDLE_UPDATED</td><td>android.intent.action.PACKAGE_REPLACED</td></tr>
+</table>
+
+<h2 id="ch4-15">4.15 源码目录结构与文件清单</h2>
+
+<pre><code>D:\code\adapter\
+├── framework/package-manager/                  <span class="tag tag-new">NEW</span>   APK 安装与包管理子系统
+│   ├── java/
+│   │   ├── PackageManagerAdapter.java                   IPackageManager 适配器
+│   │   ├── PackageInfoBuilder.java                      BundleInfo → PackageInfo
+│   │   └── PermissionMapper.java                        权限名称映射 (Java)
+│   ├── jni/
+│   │   ├── oh_bundle_mgr_client.h/cpp                   BMS JNI 客户端
+│   │   ├── apk_manifest_parser.h/cpp                    AXML 二进制格式解析器
+│   │   ├── apk_bundle_parser.h/cpp                      ManifestData → InnerBundleInfo
+│   │   ├── apk_installer.h/cpp                          文件部署 + dex2oat 调用
+│   │   ├── permission_mapper.h/cpp                      权限映射 (C++)
+│   │   └── apk_signature_verifier.h/cpp                 APK V1/V2 签名验证
+│   └── BUILD.gn                                         OH 侧构建配置
+│
+├── framework/broadcast/java/
+│   └── BroadcastEventConverter.java            <span class="tag tag-mod">MOD</span>   补充安装事件映射
+│
+├── ohos_patches/bundle_framework/              <span class="tag tag-new">NEW</span>   OH BMS 补丁（镜像 OH 源码目录结构）
+│   ├── interfaces/inner_api/appexecfwk_base/include/
+│   │   └── bundle_constants.h.patch                     APP_ANDROID 枚举
+│   ├── services/bundlemgr/include/installd/
+│   │   └── installd_interface.h.patch                   新增 5 个 Android IPC 方法
+│   └── services/bundlemgr/src/
+│       ├── bundle_installer.cpp.patch                   APK 安装分支
+│       └── installd/
+│           └── installd_host_impl_android.cpp           Android 专用 installd 实现
+│
+├── ohos_patches/ability_rt/services/appmgr/    <span class="tag tag-mod">MOD</span>   OH AppMgr 补丁
+│   ├── src/
+│   │   └── app_mgr_service_inner.cpp.patch              APP_ANDROID 启动路由
+│   └── include/
+│       └── remote_client_manager.h.patch                appspawn-x 客户端支持
+</code></pre>
+
+<div class="card">
+<h4>文件清单</h4>
+<table>
+<tr><th>文件路径</th><th>类型</th><th>说明</th></tr>
+<tr><td>framework/package-manager/jni/apk_manifest_parser.h/cpp</td><td><span class="tag tag-new">NEW</span></td><td>核心：AXML 二进制格式解析，提取 AndroidManifest.xml 全部元数据</td></tr>
+<tr><td>framework/package-manager/jni/apk_bundle_parser.h/cpp</td><td><span class="tag tag-new">NEW</span></td><td>核心：ManifestData → InnerBundleInfo 映射（组件、权限、Intent-filter）</td></tr>
+<tr><td>framework/package-manager/jni/apk_installer.h/cpp</td><td><span class="tag tag-new">NEW</span></td><td>文件部署：APK 复制、Native 库提取、dex2oat 调用、目录创建</td></tr>
+<tr><td>framework/package-manager/jni/permission_mapper.h/cpp</td><td><span class="tag tag-new">NEW</span></td><td>Android ↔ OH 权限名称双向映射表</td></tr>
+<tr><td>framework/package-manager/jni/apk_signature_verifier.h/cpp</td><td><span class="tag tag-new">NEW</span></td><td>APK V1/V2 签名验证</td></tr>
+<tr><td>framework/package-manager/java/PackageManagerAdapter.java</td><td><span class="tag tag-new">NEW</span></td><td>IPackageManager 适配器，查询路由到 BMS</td></tr>
+<tr><td>framework/package-manager/java/PackageInfoBuilder.java</td><td><span class="tag tag-new">NEW</span></td><td>BundleInfo JSON → Android PackageInfo 构建</td></tr>
+<tr><td>framework/package-manager/java/PermissionMapper.java</td><td><span class="tag tag-new">NEW</span></td><td>权限映射（Java 侧，供 PackageInfoBuilder 使用）</td></tr>
+<tr><td>framework/package-manager/jni/oh_bundle_mgr_client.h/cpp</td><td><span class="tag tag-new">NEW</span></td><td>JNI：调用 OH BMS 查询接口</td></tr>
+<tr><td>framework/package-manager/BUILD.gn</td><td><span class="tag tag-new">NEW</span></td><td>OH 侧共享库构建配置（apk_installer）</td></tr>
+<tr><td>ohos_patches/bundle_framework/.../bundle_constants.h.patch</td><td><span class="tag tag-new">NEW</span></td><td>BundleType::APP_ANDROID = 10 枚举值</td></tr>
+<tr><td>ohos_patches/bundle_framework/.../bundle_installer.cpp.patch</td><td><span class="tag tag-new">NEW</span></td><td>BMS APK 安装分支逻辑</td></tr>
+<tr><td>ohos_patches/bundle_framework/.../installd_interface.h.patch</td><td><span class="tag tag-new">NEW</span></td><td>新增 5 个 Android 专用 installd IPC 方法</td></tr>
+<tr><td>ohos_patches/bundle_framework/.../installd_host_impl_android.cpp</td><td><span class="tag tag-new">NEW</span></td><td>OH installd 扩展实现：CreateAndroidDataDir、DexOptAndroid 等</td></tr>
+<tr><td>ohos_patches/ability_rt/.../app_mgr_service_inner.cpp.patch</td><td><span class="tag tag-mod">MOD</span></td><td>APP_ANDROID 类型启动路由到 appspawn-x</td></tr>
+<tr><td>ohos_patches/ability_rt/.../remote_client_manager.h.patch</td><td><span class="tag tag-mod">MOD</span></td><td>appspawn-x 客户端管理支持</td></tr>
+</table>
+</div>
+
+<footer>
+Android APK 在 OpenHarmony 系统上的安装设计 · v2.0 · 2026-03-16
+</footer>
+
+</div><!-- end container -->
+</body>
+</html>

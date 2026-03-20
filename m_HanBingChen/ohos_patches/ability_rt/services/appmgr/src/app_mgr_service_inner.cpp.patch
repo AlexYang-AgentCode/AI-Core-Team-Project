@@ -1,0 +1,33 @@
+--- a/ability_rt/services/appmgr/src/app_mgr_service_inner.cpp
++++ b/ability_rt/services/appmgr/src/app_mgr_service_inner.cpp
+@@ -xxx,6 +xxx,28 @@
+ void AppMgrServiceInner::StartProcess(
+         const BundleInfo& bundleInfo,
+         const std::string& processName,
+         int32_t uid, int32_t gid,
+         const sptr<IRemoteObject>& token) {
++
++    // Check if this is an Android application (APK)
++    if (bundleInfo.applicationInfo.bundleType == BundleType::APP_ANDROID) {
++        // Route to appspawn-x (Android process spawner with ART VM)
++        APP_LOGI("StartProcess: routing to appspawn-x for Android app: %{public}s",
++                 bundleInfo.name.c_str());
++
++        AppSpawnMsg msg;
++        msg.bundleName = bundleInfo.name;
++        msg.uid = uid;
++        msg.gid = gid;
++        msg.apkPath = bundleInfo.applicationInfo.codePath;
++        if (!bundleInfo.hapModuleInfos.empty()) {
++            msg.nativeLibPaths = bundleInfo.hapModuleInfos[0].nativeLibraryPath;
++        }
++        msg.targetClass = "android.app.ActivityThread";
++        msg.targetSdkVersion = bundleInfo.applicationInfo.apiTargetVersion;
++
++        androidSpawnClient_->Send(msg);
++        return;
++    }
++
++    // Standard OH application → standard appspawn
+     ...
+ }

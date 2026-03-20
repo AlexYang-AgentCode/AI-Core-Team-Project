@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOSP 14 最小化构建分析报告 — App 运行时裁剪方案</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+    --include: #2e7d32;
+    --exclude: #c62828;
+    --optional: #ef6c00;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(90deg, #e3f2fd, transparent); padding: 10px 16px; border-radius: 4px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #f0f7ff, transparent); padding: 6px 12px; border-radius: 0 4px 4px 0; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #1565c0, #00695c); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; font-size: 2.2em; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-include { background: var(--include); }
+  .tag-exclude { background: var(--exclude); }
+  .tag-optional { background: var(--optional); }
+  .tag-dep { background: #5c6bc0; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.78em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>AOSP 14 最小化构建分析报告</h1>
+  <p>面向 Android-OH 适配项目的 App 运行时裁剪方案</p>
+  <p>版本 1.1 | 2026年3月20日更新 | Adapter Team</p>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 分析背景与目标</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 分析背景</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 裁剪目标</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 服务器环境</a></li>
+    <li><a href="#ch2">2. AOSP 14 构建体系分析</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 AOSP 源码顶层结构</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 Framework 构建目标层次</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 客户端与服务端的天然分离</a></li>
+    <li><a href="#ch3">3. 模块裁剪分析</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 必须包含的模块</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 必须排除的模块</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 可选模块</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 裁剪总览图</a></li>
+    <li><a href="#ch4">4. 必需模块详细分析</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 Framework 客户端（frameworks/base/core）</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 ART 虚拟机（art/）</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 Java 核心库（libcore/）</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 C 运行时（bionic/）</a></li>
+    <li class="sub"><a href="#ch4-5">4.5 原生框架库（frameworks/native/）</a></li>
+    <li class="sub"><a href="#ch4-6">4.6 系统基础库（system/）</a></li>
+    <li class="sub"><a href="#ch4-7">4.7 预编译工具链（prebuilts/）</a></li>
+    <li><a href="#ch5">5. 排除模块详细分析</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 系统服务（frameworks/base/services/）</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 系统应用（packages/）</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 HAL 层（hardware/）</a></li>
+    <li><a href="#ch6">6. 适配层与 AOSP 的集成点</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 AOSP 源码修改点</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 适配层编译集成</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 app_process 与 appspawn-x 的关系</a></li>
+    <li><a href="#ch7">7. 构建策略</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 方案 A：模块级按需编译</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 方案 B：自定义 Product</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 方案对比与建议</a></li>
+    <li><a href="#ch8">8. 构建产物清单</a></li>
+    <li><a href="#ch9">9. 结论</a></li>
+    <li><a href="#ch10">10. 实际编译执行记录</a></li>
+    <li class="sub"><a href="#ch10-1">10.1 最终采用的构建方案</a></li>
+    <li class="sub"><a href="#ch10-2">10.2 源码同步情况</a></li>
+    <li class="sub"><a href="#ch10-3">10.3 编译过程中的关键修改</a></li>
+    <li class="sub"><a href="#ch10-4">10.4 编译产物</a></li>
+    <li class="sub"><a href="#ch10-5">10.5 经验总结</a></li>
+    <li class="sub"><a href="#ch10-6">10.6 编译配置与产出文件布局</a></li>
+    <li class="sub"><a href="#ch10-7">10.7 重新编译指南</a></li>
+    <li class="sub"><a href="#ch10-8">10.8 编译产物可部署性分析：Java 层 vs Native 层</a></li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch1">1. 分析背景与目标</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch1-1">1.1 分析背景</h2>
+
+<p>Android-OH 适配项目的核心架构是：在 OH 系统上运行 Android App，保留 Android Framework 客户端代码和 ART 虚拟机，但将系统服务替换为 OH 实现。因此需要编译一个<strong>仅包含 App 运行时的 AOSP 子集</strong>，不包含 system_server 及其承载的所有系统服务。</p>
+
+<p>本报告对 AOSP 14（android-14.0.0_r1）的源码结构和构建体系进行分析，明确哪些模块需要编译、哪些可以排除，并给出构建策略建议。</p>
+
+<h2 id="ch1-2">1.2 裁剪目标</h2>
+
+<div class="card">
+  <h4>需要保留（App 进程内运行）</h4>
+  <ul>
+    <li>ART 虚拟机 — Dex 字节码加载与执行、JIT/AOT 编译、GC、JNI</li>
+    <li>Framework 客户端代码 — ActivityThread、View 体系、Intent、所有 AIDL 生成的 Stub/Proxy 类</li>
+    <li>Framework 原生库 — libandroid_runtime（JNI 桥接）、Binder 客户端、Surface 客户端</li>
+    <li>Java 核心库 — java.lang.*、java.util.*、java.io.* 等</li>
+    <li>C 运行时 — libc、libm、动态链接器</li>
+    <li>系统资源 — framework-res.apk</li>
+  </ul>
+
+  <h4>需要排除（在 OH 系统中由 OH 服务替代）</h4>
+  <ul>
+    <li>system_server 进程及所有系统服务（AMS、WMS、PMS 等）</li>
+    <li>系统应用（SystemUI、Launcher、Settings 等）</li>
+    <li>HAL 服务层</li>
+  </ul>
+</div>
+
+<h2 id="ch1-3">1.3 服务器环境</h2>
+
+<p>分析基于以下云服务器环境（<code>oh-build</code>，1.95.175.212）：</p>
+
+<table>
+  <tr><th>项目</th><th>状态</th><th>详情</th></tr>
+  <tr><td>操作系统</td><td>✅</td><td>Ubuntu 20.04.6 LTS</td></tr>
+  <tr><td>CPU</td><td>✅</td><td>16 核</td></tr>
+  <tr><td>内存</td><td>✅</td><td>60 GB</td></tr>
+  <tr><td>磁盘</td><td>✅</td><td>493 GB（已用 95G，剩余 378G）</td></tr>
+  <tr><td>JDK</td><td>✅</td><td>OpenJDK 11.0.27</td></tr>
+  <tr><td>GCC/G++</td><td>✅</td><td>9.4.0</td></tr>
+  <tr><td>repo</td><td>✅</td><td>2.8</td></tr>
+  <tr><td>AOSP 源码</td><td>✅</td><td><code>/root/aosp</code>，android-14.0.0_r1</td></tr>
+  <tr><td>编译依赖</td><td>✅</td><td>libncurses, libssl, flex, bison, zip, zlib1g-dev 等全部就绪</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch2">2. AOSP 14 构建体系分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch2-1">2.1 AOSP 源码顶层结构</h2>
+
+<p>服务器上的 AOSP 14 源码位于 <code>/root/aosp/</code>，包含以下核心目录：</p>
+
+<div class="diagram">
+/root/aosp/
+├── art/                  # ART 虚拟机运行时
+├── bionic/               # Android C 运行时 (libc, libm, linker)
+├── build/                # 构建系统 (Soong/Blueprint)
+├── external/             # 第三方依赖库
+├── frameworks/           # Android Framework
+│   ├── base/             #   核心框架 (Java + JNI + 资源)
+│   └── native/           #   原生框架库 (Binder, Surface, Input)
+├── libcore/              # Java 核心库 (java.lang.*, java.util.*)
+├── libnativehelper/      # JNI 辅助库
+├── prebuilts/            # 预编译工具链 (Clang, JDK, SDK tools)
+└── system/               # 系统基础库 (libbase, liblog, libutils)
+</div>
+
+<h2 id="ch2-2">2.2 Framework 构建目标层次</h2>
+
+<p>AOSP 14 的 Framework 构建在 <code>frameworks/base/Android.bp</code> 中定义了清晰的层次结构：</p>
+
+<div class="card">
+  <table>
+    <tr><th>层次</th><th>构建目标</th><th>类型</th><th>说明</th></tr>
+    <tr>
+      <td>1</td>
+      <td><code>framework-core-sources</code></td>
+      <td>filegroup</td>
+      <td>核心源码集合：<code>core/java/</code> 下所有 <code>*.java</code> + <code>*.aidl</code> 文件，包含 android.app.*、android.view.*、android.content.*、android.os.* 等所有客户端 API</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>framework-non-updatable-sources</code></td>
+      <td>filegroup</td>
+      <td>聚合 framework-core-sources + 领域源码（graphics、telephony、media、wifi、location、opengl 等）+ 原生/HAL AIDL 接口</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>framework-minus-apex-defaults</code></td>
+      <td>java_defaults</td>
+      <td>编译配置：编译 framework-non-updatable-sources，启用 AIDL 处理（<code>generate_get_transaction_name: true</code>）</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>framework-minus-apex</code></td>
+      <td>java_library<br>(installable)</td>
+      <td><strong>实际的 framework.jar</strong>，安装到设备。使用 <code>stem: "framework"</code>。这就是<strong>客户端 Framework</strong>——不含任何系统服务代码</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>framework</code></td>
+      <td>java_library<br>(not installable)</td>
+      <td>编译时依赖目标：framework-minus-apex + framework-updatable-stubs。仅用于其他模块编译时引用</td>
+    </tr>
+  </table>
+</div>
+
+<div class="info">
+  <strong>关键发现：</strong><code>framework-minus-apex</code> 即为最终产物 <code>framework.jar</code>，它<strong>仅包含客户端代码</strong>。系统服务（services.jar）是完全独立的构建目标，定义在 <code>frameworks/base/services/Android.bp</code> 中。两者之间没有编译依赖关系。
+</div>
+
+<h2 id="ch2-3">2.3 客户端与服务端的天然分离</h2>
+
+<p>AOSP 14 的构建体系天然地将 App 运行时和系统服务分为两个独立的 JAR：</p>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        AOSP 14 构建目标                                  │
+│                                                                         │
+│  ┌─ 客户端 (App 进程内运行) ──────────────────────────────────────────┐  │
+│  │                                                                    │  │
+│  │  framework-minus-apex  ──→  framework.jar                          │  │
+│  │                                                                    │  │
+│  │  包含：                                                            │  │
+│  │  • android.app.* (ActivityThread, Application, Intent, ...)        │  │
+│  │  • android.view.* (View, ViewGroup, Window, Surface, ...)          │  │
+│  │  • android.content.* (ContentProvider, ContentResolver, ...)       │  │
+│  │  • android.os.* (Binder, IBinder, Parcel, Handler, Looper, ...)    │  │
+│  │  • 所有 AIDL 生成的 Stub/Proxy 类                                  │  │
+│  │  • com.android.internal.* (内部工具类)                              │  │
+│  │                                                                    │  │
+│  │  不包含：任何 *Service 实现类                                       │  │
+│  │                                                                    │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                         │
+│  ┌─ 服务端 (system_server 进程内运行) ── 本项目不需要 ────────────────┐  │
+│  │                                                                    │  │
+│  │  services  ──→  services.jar                                       │  │
+│  │                                                                    │  │
+│  │  包含：                                                            │  │
+│  │  • ActivityManagerService, WindowManagerService                     │  │
+│  │  • PackageManagerService, PowerManagerService                      │  │
+│  │  • SystemServer.java (入口)                                        │  │
+│  │  • services.core, services.accessibility, services.autofill, ...   │  │
+│  │                                                                    │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<div class="ok">
+  <strong>结论：</strong>AOSP 的构建体系已经为我们做了分离。编译 <code>framework-minus-apex</code> 即可获得仅含客户端代码的 framework.jar，无需任何裁剪工作。<code>services</code> 目标完全不需要编译。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch3">3. 模块裁剪分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch3-1">3.1 必须包含的模块</h2>
+
+<table>
+  <tr><th>模块</th><th>AOSP 路径</th><th>构建目标</th><th>产物</th><th>用途</th></tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> Framework 客户端</td>
+    <td><code>frameworks/base/core/</code></td>
+    <td><code>framework-minus-apex</code></td>
+    <td>framework.jar</td>
+    <td>所有客户端 API、AIDL Stub/Proxy、ActivityThread、View 体系</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> Framework JNI</td>
+    <td><code>frameworks/base/core/jni/</code></td>
+    <td><code>libandroid_runtime</code></td>
+    <td>libandroid_runtime.so</td>
+    <td>Framework Java↔Native 桥接（Surface JNI、Input JNI 等）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> Framework 资源</td>
+    <td><code>frameworks/base/core/res/</code></td>
+    <td><code>framework-res</code></td>
+    <td>framework-res.apk</td>
+    <td>系统主题、默认配置、字符串资源</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> ART 虚拟机</td>
+    <td><code>art/</code></td>
+    <td><code>libart</code>, <code>dex2oat</code></td>
+    <td>libart.so, dex2oat</td>
+    <td>Dex 执行、JIT/AOT 编译、GC、JNI 支持</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> Java 核心库</td>
+    <td><code>libcore/</code></td>
+    <td><code>core-oj</code>, <code>core-libart</code></td>
+    <td>core-oj.jar, core-libart.jar</td>
+    <td>java.lang.*, java.util.*, java.io.* 等标准 API</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> C 运行时</td>
+    <td><code>bionic/</code></td>
+    <td><code>libc</code>, <code>libm</code>, <code>linker</code></td>
+    <td>libc.so, libm.so, linker64</td>
+    <td>C 标准库、数学库、动态链接器</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> 原生框架库</td>
+    <td><code>frameworks/native/</code></td>
+    <td><code>libbinder</code>, <code>libui</code>, <code>libgui</code></td>
+    <td>libbinder.so, libui.so 等</td>
+    <td>Binder IPC 客户端、Surface/图形客户端、Input 客户端</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> 系统基础库</td>
+    <td><code>system/core/</code></td>
+    <td><code>libutils</code>, <code>liblog</code>, <code>libcutils</code></td>
+    <td>libutils.so, liblog.so 等</td>
+    <td>日志、工具函数、属性系统客户端</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> JNI 辅助库</td>
+    <td><code>libnativehelper/</code></td>
+    <td><code>libnativehelper</code></td>
+    <td>libnativehelper.so</td>
+    <td>JNI 注册与异常处理辅助</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> 预编译工具链</td>
+    <td><code>prebuilts/</code></td>
+    <td>—</td>
+    <td>clang, javac, aapt2 等</td>
+    <td>编译工具（不产出运行时产物）</td>
+  </tr>
+</table>
+
+<h2 id="ch3-2">3.2 必须排除的模块</h2>
+
+<table>
+  <tr><th>模块</th><th>AOSP 路径</th><th>排除原因</th></tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> 系统服务</td>
+    <td><code>frameworks/base/services/</code></td>
+    <td>AMS/WMS/PMS 等全部由 OH 系统服务替代</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> SystemServer 入口</td>
+    <td><code>frameworks/base/services/java/.../SystemServer.java</code></td>
+    <td>不存在 system_server 进程</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> SystemUI</td>
+    <td><code>frameworks/base/packages/SystemUI/</code></td>
+    <td>使用 OH SystemUI</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> Launcher</td>
+    <td><code>packages/apps/Launcher3/</code></td>
+    <td>使用 OH Launcher</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> Settings</td>
+    <td><code>packages/apps/Settings/</code></td>
+    <td>使用 OH 设置</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> 其他系统应用</td>
+    <td><code>packages/apps/*</code></td>
+    <td>不需要 Android 预装应用</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> HAL 实现</td>
+    <td><code>hardware/</code></td>
+    <td>使用 OH HDI/HAL</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> 内核</td>
+    <td><code>kernel/</code></td>
+    <td>使用 OH Linux 内核</td>
+  </tr>
+</table>
+
+<h2 id="ch3-3">3.3 可选模块</h2>
+
+<table>
+  <tr><th>模块</th><th>AOSP 路径</th><th>说明</th></tr>
+  <tr>
+    <td><span class="tag tag-optional">可选</span> 图形扩展</td>
+    <td><code>frameworks/base/graphics/</code></td>
+    <td>Canvas、Bitmap 等高级图形 API。多数 App 会用到，建议包含</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">可选</span> 媒体框架</td>
+    <td><code>frameworks/base/media/</code></td>
+    <td>MediaPlayer、AudioTrack 等。如需支持音视频 App 则包含</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">可选</span> OpenGL ES</td>
+    <td><code>frameworks/base/opengl/</code></td>
+    <td>OpenGL ES Java 绑定。游戏类 App 需要</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">可选</span> WebView</td>
+    <td><code>external/chromium-webview/</code></td>
+    <td>内嵌浏览器。Web 混合 App 需要，体积较大</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">可选</span> app_process</td>
+    <td><code>frameworks/base/cmds/app_process/</code></td>
+    <td>标准 App 进程入口。本项目被 appspawn-x 替代，但可用于调试对比</td>
+  </tr>
+</table>
+
+<div class="note">
+  <strong>注意：</strong>图形扩展（<code>graphics/</code>）和 OpenGL ES（<code>opengl/</code>）的源码已被 <code>framework-non-updatable-sources</code> filegroup 包含，编译 <code>framework-minus-apex</code> 时会自动包含，无需单独处理。
+</div>
+
+<h2 id="ch3-4">3.4 裁剪总览图</h2>
+
+<div class="diagram">
+/root/aosp/
+│
+├── ✅ art/                          # ART 虚拟机 — 必需
+│   ├── runtime/                     #   VM 核心
+│   ├── dex2oat/                     #   AOT 编译器
+│   ├── dalvikvm/                    #   VM 启动器
+│   ├── libdexfile/                  #   DEX 文件解析
+│   ├── libartbase/                  #   ART 基础库
+│   ├── libprofile/                  #   Profile 收集
+│   ├── openjdkjvm/                  #   JVM 接口
+│   └── sigchainlib/                 #   信号链处理
+│
+├── ✅ bionic/                       # C 运行时 — 必需
+│   ├── libc/                        #   C 标准库
+│   ├── libm/                        #   数学库
+│   ├── libdl/                       #   动态加载
+│   └── linker/                      #   动态链接器
+│
+├── ✅ libcore/                      # Java 核心库 — 必需
+│   ├── ojluni/                      #   OpenJDK 类 (java.lang.*, java.util.*)
+│   ├── dalvik/                      #   Dalvik 特有 API
+│   ├── luni/                        #   遗留支持
+│   └── json/, xml/                  #   JSON/XML 解析
+│
+├── ✅ libnativehelper/              # JNI 辅助库 — 必需
+│
+├── frameworks/
+│   ├── base/
+│   │   ├── ✅ core/                 # 客户端 Framework — 必需
+│   │   │   ├── java/                #   android.app.*, android.view.*, android.content.*
+│   │   │   │                        #   所有 AIDL 文件 (IActivityManager, IWindowManager, ...)
+│   │   │   │                        #   ActivityThread, Application, Intent, View, ...
+│   │   │   ├── jni/                 #   libandroid_runtime (JNI 桥接)
+│   │   │   └── res/                 #   framework-res.apk (系统资源)
+│   │   │
+│   │   ├── ✅ graphics/             # 图形库 — 自动包含
+│   │   ├── ✅ media/                # 媒体客户端 — 自动包含
+│   │   ├── ✅ opengl/               # OpenGL ES 绑定 — 自动包含
+│   │   ├── 🔶 cmds/app_process/     # 进程入口 — 可选 (被 appspawn-x 替代)
+│   │   │
+│   │   ├── ❌ services/             # 系统服务 — 排除
+│   │   │   ├── core/                #   AMS, WMS, PMS 等
+│   │   │   ├── accessibility/       #   无障碍服务
+│   │   │   ├── autofill/            #   自动填充服务
+│   │   │   └── java/.../SystemServer.java  # system_server 入口
+│   │   │
+│   │   └── ❌ packages/             # 系统应用 — 排除
+│   │       └── SystemUI/            #   SystemUI
+│   │
+│   └── ✅ native/                   # 原生框架库 — 必需
+│       ├── libs/binder/             #   Binder IPC 客户端
+│       ├── libs/gui/                #   Surface 客户端
+│       ├── libs/ui/                 #   图形 UI 基础
+│       └── libs/input/              #   Input 客户端
+│
+├── ✅ system/                       # 系统基础库 — 部分必需
+│   ├── core/                        #   libutils, liblog, libcutils, libbase
+│   └── logging/                     #   liblog
+│
+├── ✅ prebuilts/                    # 编译工具链 — 必需
+│   ├── clang/                       #   C/C++ 编译器
+│   ├── jdk/                         #   Java 编译器
+│   └── build-tools/                 #   aapt2, zipalign, d8
+│
+├── ✅ build/                        # 构建系统 — 必需
+│
+├── ❌ packages/                     # 预装应用 — 排除
+│   └── apps/ (Launcher3, Settings, ...)
+│
+├── ❌ hardware/                     # HAL — 排除
+│
+└── ❌ kernel/                       # 内核 — 排除
+
+图例: ✅ 必需   🔶 可选   ❌ 排除
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch4">4. 必需模块详细分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch4-1">4.1 Framework 客户端（frameworks/base/core）</h2>
+
+<p>这是适配项目最核心的依赖。<code>core/java/</code> 包含了 App 进程中运行的所有 Framework 代码：</p>
+
+<div class="card">
+  <h4>关键包（与适配层直接相关）</h4>
+  <table>
+    <tr><th>包名</th><th>关键文件</th><th>适配层关联</th></tr>
+    <tr>
+      <td><code>android.app</code></td>
+      <td>ActivityThread.java (369KB)<br>ActivityManager.java<br>ActivityTaskManager.java<br>Application.java</td>
+      <td>App 进程入口；适配器安装点（AOSP 修改）；适配层的 Stub 继承来源</td>
+    </tr>
+    <tr>
+      <td><code>android.app</code> (AIDL)</td>
+      <td>IActivityManager.aidl (249 methods)<br>IActivityTaskManager.aidl (95 methods)<br>IApplicationThread.aidl<br>IServiceConnection.aidl</td>
+      <td>生成 Stub 抽象类，适配器继承这些 Stub</td>
+    </tr>
+    <tr>
+      <td><code>android.view</code></td>
+      <td>View.java, ViewGroup.java<br>WindowManagerGlobal.java<br>ViewRootImpl.java<br>Surface.java</td>
+      <td>适配器安装点（AOSP 修改）；Surface 桥接的客户端入口</td>
+    </tr>
+    <tr>
+      <td><code>android.view</code> (AIDL)</td>
+      <td>IWindowManager.aidl (144 methods)<br>IWindowSession.aidl (42 methods)<br>IWindow.aidl</td>
+      <td>窗口适配器继承这些 Stub</td>
+    </tr>
+    <tr>
+      <td><code>android.content</code></td>
+      <td>Intent.java, ContentProvider.java<br>ContentResolver.java<br>IContentProvider.java</td>
+      <td>Intent↔Want 转换；ContentProvider 桥接</td>
+    </tr>
+    <tr>
+      <td><code>android.os</code></td>
+      <td>Binder.java, IBinder.java<br>Parcel.java, Bundle.java<br>Handler.java, Looper.java</td>
+      <td>IPC 基础设施；所有 Stub/Proxy 的基类</td>
+    </tr>
+  </table>
+
+  <h4>JNI 层（core/jni/）</h4>
+  <p><code>libandroid_runtime</code>（cc_library_shared）是 Framework 的 Java↔Native 桥接库，包含：</p>
+  <ul>
+    <li><code>android_app_ActivityThread.cpp</code> — ActivityThread 原生方法</li>
+    <li><code>android_view_Surface*.cpp</code> — Surface 相关 JNI</li>
+    <li><code>android_view_InputEventReceiver.cpp</code> — Input 事件接收</li>
+    <li><code>android_graphics_*.cpp</code> — 图形系统 JNI</li>
+    <li><code>AndroidRuntime.cpp</code> — ART VM 初始化和 JNI 注册入口</li>
+  </ul>
+
+  <h4>资源（core/res/）</h4>
+  <p>编译产出 <code>framework-res.apk</code>，包含系统默认主题、布局、字符串等。appspawn-x 预加载时需要此文件。</p>
+</div>
+
+<h2 id="ch4-2">4.2 ART 虚拟机（art/）</h2>
+
+<div class="card">
+  <table>
+    <tr><th>子目录</th><th>产物</th><th>说明</th></tr>
+    <tr><td><code>runtime/</code></td><td>libart.so</td><td>VM 核心：类加载、解释器、JIT 编译、GC、JNI 实现</td></tr>
+    <tr><td><code>dex2oat/</code></td><td>dex2oat</td><td>AOT 编译器：classes.dex → .odex/.vdex 本地机器码</td></tr>
+    <tr><td><code>dalvikvm/</code></td><td>dalvikvm64</td><td>VM 启动器（可选，appspawn-x 替代了启动路径）</td></tr>
+    <tr><td><code>libdexfile/</code></td><td>libdexfile.so</td><td>DEX 文件格式解析</td></tr>
+    <tr><td><code>libartbase/</code></td><td>libartbase.so</td><td>ART 基础工具库</td></tr>
+    <tr><td><code>openjdkjvm/</code></td><td>libopenjdkjvm.so</td><td>JVM 标准接口实现（JNI_CreateJavaVM 等）</td></tr>
+    <tr><td><code>sigchainlib/</code></td><td>libsigchain.so</td><td>信号链处理（确保 VM 信号处理正确）</td></tr>
+  </table>
+  <p><strong>dex2oat</strong> 在两个阶段使用：APK 安装时做 AOT 预编译；appspawn-x 预加载时处理 boot image。</p>
+</div>
+
+<h2 id="ch4-3">4.3 Java 核心库（libcore/）</h2>
+
+<div class="card">
+  <table>
+    <tr><th>子目录</th><th>产物</th><th>说明</th></tr>
+    <tr><td><code>ojluni/</code></td><td>core-oj.jar</td><td>OpenJDK 类：java.lang.*, java.util.*, java.io.*, java.net.*, java.nio.*, java.security.* 等</td></tr>
+    <tr><td><code>dalvik/</code></td><td>core-libart.jar</td><td>Dalvik/ART 特有 API：dalvik.system.*, dalvik.annotation.*</td></tr>
+    <tr><td><code>luni/</code></td><td>(合并到上述 jar)</td><td>遗留 Apache Harmony 兼容层</td></tr>
+    <tr><td><code>json/</code></td><td>core-oj.jar</td><td>org.json.* JSON 解析</td></tr>
+    <tr><td><code>xml/</code></td><td>core-oj.jar</td><td>XML 解析器</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-4">4.4 C 运行时（bionic/）</h2>
+
+<div class="card">
+  <p>Android 自有的 C 运行时实现，替代 glibc。所有 Native 代码（ART、Framework JNI、适配层 JNI）都依赖 bionic。</p>
+  <table>
+    <tr><th>库</th><th>说明</th></tr>
+    <tr><td><code>libc.so</code></td><td>C 标准库（malloc, pthread, stdio, socket 等）</td></tr>
+    <tr><td><code>libm.so</code></td><td>数学库（sin, cos, sqrt 等）</td></tr>
+    <tr><td><code>libdl.so</code></td><td>动态库加载（dlopen, dlsym）</td></tr>
+    <tr><td><code>linker64</code></td><td>动态链接器（程序启动时加载 .so 依赖）</td></tr>
+  </table>
+
+  <div class="warn">
+    <strong>交叉编译注意：</strong>当前适配项目目标平台为 ARM64（DAYU600 / ums9620）。bionic 需要针对 ARM64 交叉编译。AOSP 构建系统会根据 <code>lunch</code> 目标自动选择正确的 ABI。后续还需考虑 bionic 与 OH 系统的 libc（musl）的共存问题。
+  </div>
+</div>
+
+<h2 id="ch4-5">4.5 原生框架库（frameworks/native/）</h2>
+
+<div class="card">
+  <table>
+    <tr><th>库</th><th>路径</th><th>说明</th></tr>
+    <tr><td><code>libbinder.so</code></td><td><code>libs/binder/</code></td><td>Binder IPC 客户端实现。Framework 的 AIDL Proxy 通过此库与系统服务通信。适配层拦截点在 Java 层（Stub 继承），不经过 libbinder</td></tr>
+    <tr><td><code>libgui.so</code></td><td><code>libs/gui/</code></td><td>Surface/BufferQueue 客户端。ViewRootImpl 通过此库管理图形缓冲区。Surface 桥接需要此库</td></tr>
+    <tr><td><code>libui.so</code></td><td><code>libs/ui/</code></td><td>图形基础类型（GraphicBuffer, Fence, Region 等）</td></tr>
+    <tr><td><code>libinput.so</code></td><td><code>libs/input/</code></td><td>Input 事件处理客户端。InputEventBridge 需要此库</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-6">4.6 系统基础库（system/）</h2>
+
+<div class="card">
+  <table>
+    <tr><th>库</th><th>路径</th><th>说明</th></tr>
+    <tr><td><code>libutils.so</code></td><td><code>system/core/libutils/</code></td><td>RefBase、String8/16、Vector 等工具类。几乎所有 Native 代码都依赖</td></tr>
+    <tr><td><code>liblog.so</code></td><td><code>system/logging/liblog/</code></td><td>Android 日志系统（__android_log_print）</td></tr>
+    <tr><td><code>libcutils.so</code></td><td><code>system/core/libcutils/</code></td><td>属性系统客户端（property_get/set）、ashmem、atomic 操作等</td></tr>
+    <tr><td><code>libbase.so</code></td><td><code>system/libbase/</code></td><td>现代 C++ 工具库（logging, strings, file, result 等）</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-7">4.7 预编译工具链（prebuilts/）</h2>
+
+<div class="card">
+  <p>编译时使用，不产出运行时产物：</p>
+  <table>
+    <tr><th>工具</th><th>路径</th><th>用途</th></tr>
+    <tr><td>Clang/LLVM</td><td><code>prebuilts/clang/</code></td><td>C/C++ 交叉编译器（ARM64 目标）</td></tr>
+    <tr><td>JDK</td><td><code>prebuilts/jdk/</code></td><td>Java 编译（javac）</td></tr>
+    <tr><td>aapt2</td><td><code>prebuilts/build-tools/</code></td><td>Android 资源编译（生成 framework-res.apk）</td></tr>
+    <tr><td>d8/r8</td><td><code>prebuilts/build-tools/</code></td><td>Java → Dex 字节码转换</td></tr>
+    <tr><td>zipalign</td><td><code>prebuilts/build-tools/</code></td><td>APK 对齐优化</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch5">5. 排除模块详细分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch5-1">5.1 系统服务（frameworks/base/services/）</h2>
+
+<p><code>services/</code> 目录包含 system_server 进程中运行的所有系统服务。在适配项目中，这些服务全部由 OH 系统服务替代：</p>
+
+<div class="card">
+  <table>
+    <tr><th>Android 服务</th><th>services/ 子目录</th><th>OH 替代</th></tr>
+    <tr><td>ActivityManagerService</td><td><code>services/core/</code></td><td>AbilityManagerService (SA 180)</td></tr>
+    <tr><td>WindowManagerService</td><td><code>services/core/</code></td><td>SceneSessionManager (SA 4607)</td></tr>
+    <tr><td>PackageManagerService</td><td><code>services/core/</code></td><td>BundleManagerService (SA 401)</td></tr>
+    <tr><td>PowerManagerService</td><td><code>services/core/</code></td><td>PowerMgrService</td></tr>
+    <tr><td>InputManagerService</td><td><code>services/core/</code></td><td>MultimodalInput</td></tr>
+    <tr><td>SurfaceFlinger</td><td><code>frameworks/native/services/surfaceflinger/</code></td><td>RenderService</td></tr>
+    <tr><td>SystemServer.java</td><td><code>services/java/.../</code></td><td>不存在，由 OH foundation 管理</td></tr>
+  </table>
+  <p><strong>构建目标 <code>services</code> 完全不需要编译。</strong></p>
+</div>
+
+<h2 id="ch5-2">5.2 系统应用（packages/）</h2>
+
+<div class="card">
+  <p>所有预装系统应用均由 OH 对应应用替代：</p>
+  <ul>
+    <li><code>packages/apps/Launcher3/</code> → OH Launcher</li>
+    <li><code>frameworks/base/packages/SystemUI/</code> → OH SystemUI</li>
+    <li><code>packages/apps/Settings/</code> → OH Settings</li>
+    <li><code>packages/apps/Contacts/</code> → OH Contacts</li>
+    <li><code>packages/apps/Dialer/</code> → OH Dialer</li>
+    <li>其他所有 <code>packages/apps/*</code></li>
+  </ul>
+</div>
+
+<h2 id="ch5-3">5.3 HAL 层（hardware/）</h2>
+
+<div class="card">
+  <p>Android HAL（Hardware Abstraction Layer）由 OH 的 HDI（Hardware Device Interface）替代。包括：</p>
+  <ul>
+    <li>Graphics HAL (gralloc, HWC) → OH Graphics HDI</li>
+    <li>Audio HAL → OH Audio HDI</li>
+    <li>Camera HAL → OH Camera HDI</li>
+    <li>Sensors HAL → OH Sensors HDI</li>
+  </ul>
+  <p>不需要编译 <code>hardware/</code> 目录下的任何内容。</p>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch6">6. 适配层与 AOSP 的集成点</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch6-1">6.1 AOSP 源码修改点</h2>
+
+<p>适配项目需要修改 4 个 AOSP 源文件（通过 <code>aosp_patches/</code> 补丁管理）：</p>
+
+<div class="card">
+  <table>
+    <tr><th>文件</th><th>修改内容</th><th>作用</th></tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/app/<br>ActivityManager.java</code></td>
+      <td>在 <code>IActivityManagerSingleton.create()</code> 中插入 OH 环境检测</td>
+      <td>返回 <code>new ActivityManagerAdapter()</code></td>
+    </tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/app/<br>ActivityTaskManager.java</code></td>
+      <td>在 <code>IActivityTaskManagerSingleton.create()</code> 中插入 OH 环境检测</td>
+      <td>返回 <code>new ActivityTaskManagerAdapter()</code></td>
+    </tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/app/<br>ActivityThread.java</code></td>
+      <td>在 <code>getPackageManager()</code> 中插入 OH 环境检测</td>
+      <td>返回 <code>new PackageManagerAdapter()</code></td>
+    </tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/view/<br>WindowManagerGlobal.java</code></td>
+      <td>在 <code>getWindowManagerService()</code> 和 <code>getWindowSession()</code> 中插入 OH 环境检测</td>
+      <td>返回 <code>new WindowManagerAdapter()</code> / <code>new WindowSessionAdapter()</code></td>
+    </tr>
+  </table>
+  <p>这些修改全部位于 <code>frameworks/base/core/java/</code> 内，属于必须编译的模块范围，补丁可在编译前自动应用。</p>
+</div>
+
+<h2 id="ch6-2">6.2 适配层编译集成</h2>
+
+<p>适配层代码通过 <code>Android.bp</code> 集成到 AOSP 构建中：</p>
+
+<div class="card">
+  <table>
+    <tr><th>构建目标</th><th>类型</th><th>产物</th><th>依赖</th></tr>
+    <tr><td><code>liboh_adapter_bridge</code></td><td>cc_library_shared</td><td>liboh_adapter_bridge.so</td><td>libandroid_runtime, libnativehelper</td></tr>
+    <tr><td><code>oh-adapter-framework</code></td><td>java_library</td><td>oh-adapter-framework.jar</td><td>framework（编译时依赖）</td></tr>
+    <tr><td><code>OHAdapterHelloWorld</code></td><td>android_app</td><td>OHAdapterHelloWorld.apk</td><td>oh-adapter-framework, platform 签名</td></tr>
+  </table>
+  <p>适配层的 Java 代码（各 Adapter、Bridge、Converter）编译为 <code>oh-adapter-framework.jar</code>，依赖 <code>framework</code> 目标（获取 AIDL Stub 类）。</p>
+</div>
+
+<h2 id="ch6-3">6.3 app_process 与 appspawn-x 的关系</h2>
+
+<div class="card">
+  <p>标准 AOSP 中，App 进程由 Zygote fork 产生，入口为 <code>app_process64</code>（<code>frameworks/base/cmds/app_process/app_main.cpp</code>）。在适配项目中：</p>
+  <ul>
+    <li><code>app_process64</code> 被 <strong>appspawn-x</strong> 替代</li>
+    <li>appspawn-x 的 ART 初始化逻辑参考了 <code>app_main.cpp</code> 中的 <code>AndroidRuntime::start()</code></li>
+    <li><code>app_process64</code> 可作为可选编译目标，用于调试和对比验证</li>
+    <li>appspawn-x 本身通过 OH 构建系统（BUILD.gn）编译，不通过 AOSP 构建</li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch7">7. 构建策略</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch7-1">7.1 方案 A：模块级按需编译</h2>
+
+<div class="card">
+  <p>使用 AOSP 标准构建系统，仅编译所需模块：</p>
+
+<pre><code># 初始化构建环境
+source build/envsetup.sh
+lunch aosp_arm64-eng
+
+# 编译核心模块（依赖自动解析）
+m framework-minus-apex     # → framework.jar (客户端 Framework)
+m libandroid_runtime       # → libandroid_runtime.so (JNI 桥接)
+m framework-res            # → framework-res.apk (系统资源)
+m dex2oat                  # → dex2oat (AOT 编译器)
+
+# 适配层模块
+m liboh_adapter_bridge     # → liboh_adapter_bridge.so
+m oh-adapter-framework     # → oh-adapter-framework.jar
+
+# ART / bionic / libcore 作为依赖自动编译，无需显式指定</code></pre>
+
+  <h4>优点</h4>
+  <ul>
+    <li>简单直接，利用 AOSP 现有依赖解析</li>
+    <li>无需创建自定义 makefile</li>
+    <li>可快速验证</li>
+  </ul>
+
+  <h4>缺点</h4>
+  <ul>
+    <li>首次编译仍需较长时间（依赖链较长）</li>
+    <li>可能拉入不必要的依赖模块</li>
+    <li><code>lunch aosp_arm64-eng</code> 配置了完整设备产品，部分配置可能不适用</li>
+  </ul>
+</div>
+
+<h2 id="ch7-2">7.2 方案 B：自定义 Product</h2>
+
+<div class="card">
+  <p>创建最小化的 Product makefile，精确控制编译范围：</p>
+
+<pre><code># device/adapter/oh_adapter/AndroidProducts.mk
+PRODUCT_MAKEFILES := \
+    $(LOCAL_DIR)/oh_adapter.mk
+
+COMMON_LUNCH_CHOICES := \
+    oh_adapter-eng
+
+# device/adapter/oh_adapter/oh_adapter.mk
+$(call inherit-product, build/target/product/core_64_bit_only.mk)
+
+PRODUCT_NAME := oh_adapter
+PRODUCT_DEVICE := generic_arm64
+PRODUCT_BRAND := Android
+
+# 仅包含 App 运行时必需产物
+PRODUCT_PACKAGES += \
+    framework \
+    framework-res \
+    libandroid_runtime \
+    core-oj \
+    core-libart \
+    libart \
+    dex2oat \
+    oh-adapter-framework \
+    liboh_adapter_bridge
+
+# 不包含系统服务和系统应用
+PRODUCT_PACKAGES_REMOVE += \
+    SystemUI \
+    Launcher3 \
+    Settings</code></pre>
+
+  <h4>优点</h4>
+  <ul>
+    <li>精确控制编译范围，排除不需要的模块</li>
+    <li>编译速度更快（减少不必要的构建）</li>
+    <li>适合长期维护</li>
+    <li>可定义自己的 lunch target</li>
+  </ul>
+
+  <h4>缺点</h4>
+  <ul>
+    <li>需要理解 AOSP Product 构建体系</li>
+    <li>初始配置工作量较大</li>
+    <li>需要处理依赖链中的隐式产品配置</li>
+  </ul>
+</div>
+
+<h2 id="ch7-3">7.3 方案对比与建议</h2>
+
+<table>
+  <tr><th>维度</th><th>方案 A（按需编译）</th><th>方案 B（自定义 Product）</th></tr>
+  <tr><td>启动成本</td><td>低（直接可用）</td><td>中（需创建 mk 文件）</td></tr>
+  <tr><td>编译速度</td><td>中（可能拉入额外依赖）</td><td>快（精确控制范围）</td></tr>
+  <tr><td>可维护性</td><td>低（无集中配置）</td><td>高（产品定义集中管理）</td></tr>
+  <tr><td>可重复性</td><td>中（依赖手动指定目标）</td><td>高（lunch + make 即可）</td></tr>
+  <tr><td>适用阶段</td><td>早期验证</td><td>持续开发</td></tr>
+</table>
+
+<div class="ok">
+  <strong>建议：</strong>先用<strong>方案 A</strong> 快速验证编译流程和产物完整性，确认无误后再迁移到<strong>方案 B</strong> 建立正式的构建配置。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch8">8. 构建产物清单</h1>
+<!-- ================================================================ -->
+
+<p>最终需要从 AOSP 编译中获取的运行时产物：</p>
+
+<div class="card">
+  <h4>Java 产物</h4>
+  <table>
+    <tr><th>产物</th><th>来源模块</th><th>部署位置</th></tr>
+    <tr><td><code>framework.jar</code></td><td>framework-minus-apex</td><td>/system/framework/</td></tr>
+    <tr><td><code>framework-res.apk</code></td><td>framework-res</td><td>/system/framework/</td></tr>
+    <tr><td><code>core-oj.jar</code></td><td>core-oj</td><td>/apex/com.android.art/javalib/</td></tr>
+    <tr><td><code>core-libart.jar</code></td><td>core-libart</td><td>/apex/com.android.art/javalib/</td></tr>
+    <tr><td><code>oh-adapter-framework.jar</code></td><td>oh-adapter-framework</td><td>/system/framework/</td></tr>
+  </table>
+
+  <h4>Native 产物</h4>
+  <table>
+    <tr><th>产物</th><th>来源模块</th><th>说明</th></tr>
+    <tr><td><code>libart.so</code></td><td>art/runtime</td><td>ART 虚拟机核心</td></tr>
+    <tr><td><code>libandroid_runtime.so</code></td><td>frameworks/base/core/jni</td><td>Framework JNI 桥接</td></tr>
+    <tr><td><code>liboh_adapter_bridge.so</code></td><td>适配层</td><td>适配层 JNI</td></tr>
+    <tr><td><code>libbinder.so</code></td><td>frameworks/native</td><td>Binder IPC</td></tr>
+    <tr><td><code>libgui.so</code></td><td>frameworks/native</td><td>Surface 客户端</td></tr>
+    <tr><td><code>libui.so</code></td><td>frameworks/native</td><td>图形基础类型</td></tr>
+    <tr><td><code>libc.so</code>, <code>libm.so</code></td><td>bionic</td><td>C 运行时</td></tr>
+    <tr><td><code>libutils.so</code>, <code>liblog.so</code></td><td>system/core</td><td>系统工具库</td></tr>
+    <tr><td><code>libnativehelper.so</code></td><td>libnativehelper</td><td>JNI 辅助</td></tr>
+    <tr><td><code>linker64</code></td><td>bionic/linker</td><td>动态链接器</td></tr>
+  </table>
+
+  <h4>工具产物</h4>
+  <table>
+    <tr><th>产物</th><th>来源模块</th><th>说明</th></tr>
+    <tr><td><code>dex2oat</code></td><td>art/dex2oat</td><td>AOT 编译器（APK 安装时使用）</td></tr>
+    <tr><td><code>app_process64</code></td><td>cmds/app_process（可选）</td><td>调试用进程入口</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch9">9. 结论</h1>
+<!-- ================================================================ -->
+
+<div class="card">
+  <h4>核心结论</h4>
+  <ol>
+    <li><strong>AOSP 构建体系天然支持客户端/服务端分离</strong> — <code>framework.jar</code>（客户端）和 <code>services.jar</code>（服务端）是完全独立的构建目标，无需额外裁剪即可只编译客户端部分。</li>
+    <li><strong>编译范围明确</strong> — 需要编译 9 个核心模块（Framework 客户端、ART、libcore、bionic、原生框架库、系统基础库、JNI 辅助库、适配层、预编译工具链），排除系统服务、系统应用和 HAL 层。</li>
+    <li><strong>AOSP 修改点集中</strong> — 4 个源文件修改全部位于 <code>frameworks/base/core/java/</code> 内，属于必须编译的模块范围。</li>
+    <li><strong>服务器环境就绪</strong> — oh-build 服务器（16 核、60GB 内存、378GB 可用磁盘）完全满足编译需求。</li>
+    <li><strong>建议分两步走</strong> — 先用方案 A（模块级按需编译）快速验证，再迁移到方案 B（自定义 Product）建立正式构建流程。</li>
+  </ol>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch10">10. 实际编译执行记录</h1>
+<!-- ================================================================ -->
+
+<p><strong>执行日期：</strong>2026年3月20日 | <strong>执行方案：</strong>自定义 Product（方案 B）+ 按需同步</p>
+
+<h2 id="ch10-1">10.1 最终采用的构建方案</h2>
+
+<div class="card">
+  <p>最初计划先用方案 A 验证，但由于部分同步（partial sync）环境下 <code>aosp_arm64-eng</code> 产品配置引入了大量不必要的依赖（Virtualization、telephony、系统应用等），直接切换到<strong>方案 B（自定义 Product）</strong>，创建了最小化的 <code>oh_adapter</code> 产品。</p>
+
+<pre><code># 自定义产品文件位置
+device/adapter/oh_adapter/
+├── AndroidProducts.mk      # 定义 lunch target
+├── oh_adapter.mk           # 产品配置（最小化）
+└── BoardConfig.mk          # 板级配置（ARM64）
+
+# 构建命令
+export ALLOW_MISSING_DEPENDENCIES=true
+export BUILD_BROKEN_DISABLE_BAZEL=1
+source build/envsetup.sh
+lunch oh_adapter-eng
+m framework-minus-apex -j16</code></pre>
+</div>
+
+<h2 id="ch10-2">10.2 源码同步情况</h2>
+
+<div class="card">
+  <p>从最初的 30 个仓库扩展到 80+ 个仓库。以下是编译过程中额外同步的主要仓库：</p>
+  <table>
+    <tr><th>类别</th><th>仓库</th><th>用途</th></tr>
+    <tr><td>构建工具</td><td><code>prebuilts/go, prebuilts/bazel, prebuilts/r8, prebuilts/sdk, prebuilts/gradle-plugin, prebuilts/gcc/linux-x86/host, prebuilts/cmdline-tools, prebuilts/tools</code></td><td>Soong 构建系统引导、d8/r8 dex 编译器、SDK stubs、metalava 依赖、主机 C++ sysroot</td></tr>
+    <tr><td>构建依赖</td><td><code>external/golang-protobuf, starlark-go, go-cmp, spdx-tools, jarjar, jsr305, jsr330, fmtlib, expat, libpng, protobuf, zopfli, googletest, auto, escapevelocity, javapoet, kotlinc, jsoncpp, guava, ow2-asm, okhttp, okio, bouncycastle, error_prone, rappor, tagsoup, libphonenumber, apache-xml</code></td><td>Soong Go 依赖、Java 编译依赖、Native 编译依赖</td></tr>
+    <tr><td>系统库</td><td><code>system/sepolicy, system/apex, system/libhidl, system/libsysprop, system/libziparchive, system/tools/hidl, system/tools/xsdc, system/tools/aidl, system/tools/sysprop, system/hardware/interfaces, system/security, system/vold, system/update_engine, system/gsid, system/incremental_delivery, system/connectivity/wificond</code></td><td>APEX file_contexts、HIDL/AIDL 工具链、sysprop 运行时、系统 AIDL 接口</td></tr>
+    <tr><td>HAL 接口</td><td><code>hardware/interfaces, kernel/configs</code></td><td>HAL AIDL/HIDL 接口定义（Java stubs 编译需要）、VINTF 兼容性矩阵</td></tr>
+    <tr><td>模块框架</td><td><code>packages/modules/common, Bluetooth, Connectivity, Media, Wifi, StatsD, AdServices, AppSearch, ConfigInfrastructure, DeviceLock, HealthFitness, IPsec, OnDevicePersonalization, Permission, SdkExtensions, Scheduling, Uwb, Virtualization; packages/providers/MediaProvider; frameworks/libs/modules-utils, frameworks/libs/net, frameworks/av, frameworks/opt/net/wifi, frameworks/hardware/interfaces</code></td><td>AIDL 导出接口、module_lib stubs（framework-minus-apex 编译 classpath 依赖）</td></tr>
+    <tr><td>平台工具</td><td><code>tools/metalava, tools/platform-compat, test/app_compat/csuite</code></td><td>API stubs 生成、compat config 处理</td></tr>
+  </table>
+  <p><strong>磁盘占用：</strong>源码 + 编译输出约 132 GB（剩余 341 GB）</p>
+</div>
+
+<h2 id="ch10-3">10.3 编译过程中的关键修改</h2>
+
+<div class="card">
+  <h4>1. 自定义产品配置</h4>
+  <ul>
+    <li><code>oh_adapter.mk</code>: 继承 <code>core_64_bit_only.mk</code>，仅包含 <code>framework-minus-apex</code>、<code>framework-res</code>、<code>libandroid_runtime</code>、<code>dex2oat</code></li>
+    <li><code>ALLOW_MISSING_DEPENDENCIES := true</code>: 允许部分同步下的缺失依赖</li>
+    <li><code>BUILD_BROKEN_DISABLE_BAZEL := 1</code>（环境变量）: 禁用 Bazel 混合构建模式，避免部分同步下的 APEX 模块 panic</li>
+  </ul>
+
+  <h4>2. 禁用不需要的构建目标</h4>
+  <ul>
+    <li>清空 <code>frameworks/base/tests/</code>、<code>frameworks/base/services/</code>、<code>art/test/</code> 等目录下的 Android.bp</li>
+    <li>禁用 APEX 模块：conscrypt、art build/apex、frameworks/av/apex</li>
+    <li>禁用兼容性测试框架：<code>build/make/core/tasks/tools/compatibility.mk</code></li>
+    <li>禁用 API 文档生成：清空 <code>frameworks/base/api/ApiDocs.bp</code></li>
+    <li>移除 <code>api_versions_*</code> droidstubs（依赖 prebuilts/sdk 的 api-versions-jars）</li>
+  </ul>
+
+  <h4>3. API 检查绕过</h4>
+  <ul>
+    <li>从 <code>frameworks/base/api/StubLibraries.bp</code> 移除所有 <code>check_api</code> 块</li>
+    <li>在 <code>packages/modules/common/sdk/ModuleDefaults.bp</code> 中禁用 <code>api_lint</code></li>
+    <li>为所有模块 <code>java_sdk_library</code> 添加 <code>unsafe_ignore_missing_latest_api: true</code></li>
+  </ul>
+
+  <h4>4. 依赖修复</h4>
+  <ul>
+    <li><code>frameworks/base/libs/hwui/Android.bp</code>: 修复 <code>libarect</code> host 变体的 export_static_lib_headers 错误</li>
+    <li><code>frameworks/base/api/Android.bp</code>: 恢复完整 <code>combined_apis</code> bootclasspath，移除 <code>service-art</code> from system_server_classpath</li>
+    <li><code>frameworks/base/Android.bp</code>: 将 23 个模块 stubs 直接添加到 <code>framework-minus-apex-defaults</code> 的 <code>libs</code>（绕过未编译的 <code>framework-updatable-stubs-module_libs_api</code>）</li>
+    <li>添加 <code>framework-vcn-util-sources</code> filegroup 指向 <code>services/core/java/.../PersistableBundleUtils.java</code></li>
+    <li>添加 <code>cronet_aml_api_sources</code> 空 filegroup（Connectivity Cronet 依赖）</li>
+    <li>添加 <code>framework-virtualization.stubs.system</code> 空 stub（后被真实模块替代）</li>
+  </ul>
+</div>
+
+<h2 id="ch10-4">10.4 编译产物</h2>
+
+<div class="ok">
+  <table>
+    <tr><th>产物</th><th>路径</th><th>大小</th><th>状态</th></tr>
+    <tr><td><strong>framework.jar</strong></td><td><code>out/target/product/generic_arm64/system/framework/framework.jar</code></td><td>39 MB</td><td>✅ 已完成</td></tr>
+    <tr><td>framework-res.apk</td><td><code>out/soong/.intermediates/frameworks/base/core/res/...</code></td><td>—</td><td>✅ 已完成（aapt2 link 通过）</td></tr>
+    <tr><td>dex2oat</td><td>—</td><td>—</td><td>⏳ 待编译（ART 运行时）</td></tr>
+    <tr><td>libandroid_runtime.so</td><td>—</td><td>—</td><td>⏳ 待编译（JNI 桥接）</td></tr>
+    <tr><td>oh-adapter-framework.jar</td><td>—</td><td>—</td><td>⏳ 待编译（适配层）</td></tr>
+  </table>
+</div>
+
+<h2 id="ch10-5">10.5 经验总结</h2>
+
+<div class="card">
+  <ol>
+    <li><strong>部分同步编译 AOSP 的核心挑战不在于构建目标选择，而在于 Soong 全局扫描</strong> — Soong 会解析源码树中所有 Android.bp 文件并生成完整的 build.ninja，即使只编译单个目标。缺失的仓库会导致模块定义错误、nil pointer panic、依赖循环等问题。</li>
+    <li><strong><code>ALLOW_MISSING_DEPENDENCIES=true</code> 仅在 ninja 阶段生效</strong> — 它不能解决 Soong build.ninja 生成阶段的错误（如缺失模块类型、APEX panic、文件不存在等）。这些必须通过同步缺失仓库或禁用有问题的 bp 文件来解决。</li>
+    <li><strong>模块 stubs 是 framework.jar 编译的硬依赖</strong> — <code>framework-minus-apex</code> 虽然只包含非可更新的客户端代码，但其源码中大量引用了可更新模块的 API（如 <code>android.net.*</code>、<code>android.provider.MediaStore</code>、<code>android.health.connect.*</code> 等）。这些类定义来自各模块的 <code>stubs.module_lib</code> jar，必须出现在编译 classpath 上。</li>
+    <li><strong>API 兼容性检查是最大的阻碍之一</strong> — <code>check_api</code>、<code>api_lint</code>、<code>check_last_released_api</code> 在部分同步环境下极易失败（缺少 baseline 文件、API 变更检测误报等）。对于开发构建，全部禁用是最高效的做法。</li>
+    <li><strong>建议采用"渐进式同步"策略</strong> — 从最小集开始编译，根据错误信息按需同步缺失仓库，而非一次性同步完整 AOSP（~300GB）。最终同步了 80+ 个仓库（约 132GB），远小于完整 AOSP。</li>
+  </ol>
+</div>
+
+<h2 id="ch10-6">10.6 编译配置与产出文件布局</h2>
+
+<p>所有编译配置文件存放在 <code>/root/adapter/build/</code>，编译产出存放在 <code>/root/adapter/out/</code>。</p>
+
+<div class="card">
+  <h4>编译配置（<code>/root/adapter/build/</code>）</h4>
+<div class="diagram">
+/root/adapter/build/
+├── device/adapter/oh_adapter/           # 自定义 AOSP Product 定义
+│   ├── AndroidProducts.mk              #   注册 lunch target（oh_adapter-eng）
+│   ├── oh_adapter.mk                   #   产品配置：仅包含 App 运行时包
+│   └── BoardConfig.mk                  #   板级配置：ARM64, 无 kernel/recovery
+│
+├── aosp_build_patches/                  # AOSP 源码修改补丁（共 18 个）
+│   ├── frameworks_base.patch            #   核心：Android.bp（module stubs classpath）、
+│   │                                    #         api/Android.bp（combined_apis bootclasspath）、
+│   │                                    #         api/StubLibraries.bp（移除 check_api）、
+│   │                                    #         libs/hwui/Android.bp（libarect host fix）
+│   ├── frameworks_base_disabled.patch   #   禁用 ApiDocs.bp、RollbackTest、StagedInstallTest
+│   ├── art.patch                        #   service-art: unsafe_ignore + visibility 修复
+│   ├── build_make.patch                 #   禁用 compatibility.mk（CTS/VTS 测试框架）
+│   ├── external_conscrypt.patch         #   conscrypt: installable=false（避免重复安装）
+│   ├── external_icu.patch               #   core-icu4j: installable=false
+│   ├── modules_common.patch             #   ModuleDefaults.bp: api_lint disabled
+│   ├── modules_Bluetooth.patch          #   unsafe_ignore + 禁用测试 bp
+│   ├── modules_Connectivity.patch       #   unsafe_ignore + 禁用测试 bp
+│   ├── modules_Connectivity_tethering.patch # 添加 cronet_aml_api_sources 空 filegroup
+│   ├── modules_Wifi.patch               #   unsafe_ignore + 禁用测试 bp
+│   ├── modules_Media.patch              #   unsafe_ignore
+│   ├── modules_StatsD.patch             #   unsafe_ignore + 禁用测试 bp
+│   ├── modules_AdServices.patch         #   unsafe_ignore
+│   ├── modules_Scheduling.patch         #   unsafe_ignore
+│   ├── modules_Virtualization.patch     #   unsafe_ignore
+│   └── disabled_bp_files.txt            #   1309 个被禁用的测试/服务 Android.bp 文件列表
+│
+├── synced_repos.txt                     # 115 个已同步的 AOSP 仓库列表
+├── build_env.sh                         # 编译环境脚本（source 后使用）
+├── apply_patches.sh                     # 一键应用所有补丁
+├── save_build_config.sh                 # 导出当前编译配置到此目录
+├── Android.bp                           # 适配层 AOSP 构建定义（原有）
+└── README.txt                           # 使用说明
+</div>
+
+  <h4>编译产出（<code>/root/adapter/out/</code>）</h4>
+  <table>
+    <tr><th>文件</th><th>路径</th><th>大小</th><th>说明</th></tr>
+    <tr>
+      <td><strong>framework.jar</strong></td>
+      <td><code>out/java/framework.jar</code></td>
+      <td>39 MB</td>
+      <td>客户端 Framework JAR（<code>framework-minus-apex</code> 最终产物），安装到 <code>/system/framework/</code>，包含 ActivityThread、View 体系、所有 AIDL Stub/Proxy 类</td>
+    </tr>
+    <tr>
+      <td><strong>framework-classes.dex.jar</strong></td>
+      <td><code>out/java/framework-classes.dex.jar</code></td>
+      <td>38 MB</td>
+      <td>DEX 字节码版本，供 ART 虚拟机直接加载</td>
+    </tr>
+    <tr>
+      <td><strong>framework-res-package.jar</strong></td>
+      <td><code>out/res/framework-res-package.jar</code></td>
+      <td>33 MB</td>
+      <td>系统资源包（主题、默认配置、字符串），由 aapt2 编译生成</td>
+    </tr>
+  </table>
+
+  <h4>产出文件与 AOSP 构建目录的对应关系</h4>
+  <table>
+    <tr><th>适配层产出</th><th>AOSP 原始路径</th><th>构建目标</th></tr>
+    <tr><td><code>out/java/framework.jar</code></td><td><code>~/aosp/out/target/product/generic_arm64/system/framework/framework.jar</code></td><td><code>framework-minus-apex</code></td></tr>
+    <tr><td><code>out/java/framework-classes.dex.jar</code></td><td><code>~/aosp/out/soong/.intermediates/frameworks/base/framework-minus-apex/android_common/dex/classes.dex.jar</code></td><td>（dex 中间产物）</td></tr>
+    <tr><td><code>out/res/framework-res-package.jar</code></td><td><code>~/aosp/out/soong/.intermediates/frameworks/base/core/res/framework-res-package-jar/android_common/gen/framework-res-package.jar</code></td><td><code>framework-res</code></td></tr>
+  </table>
+</div>
+
+<h2 id="ch10-7">10.7 重新编译指南</h2>
+
+<div class="card">
+  <h4>场景一：已有编译环境，仅重新编译</h4>
+<pre><code># 加载编译环境
+source /root/adapter/build/build_env.sh
+
+# 编译 framework.jar 并自动收集产出到 /root/adapter/out/
+build_framework
+
+# 或手动执行
+cd /root/aosp
+export ALLOW_MISSING_DEPENDENCIES=true
+export BUILD_BROKEN_DISABLE_BAZEL=1
+source build/envsetup.sh
+lunch oh_adapter-eng
+m framework-minus-apex -j16</code></pre>
+
+  <h4>场景二：全新环境，从零开始</h4>
+<pre><code># 1. 同步 AOSP 源码（使用已记录的 115 个仓库）
+cd /root/aosp
+/usr/local/bin/repo-google sync \
+    $(cat /root/adapter/build/synced_repos.txt | tr '\n' ' ') \
+    -c --no-tags -j8
+
+# 2. 应用所有编译补丁（一次性操作）
+bash /root/adapter/build/apply_patches.sh
+
+# 3. 编译
+source /root/adapter/build/build_env.sh
+build_framework</code></pre>
+
+  <h4>场景三：修改 Framework 客户端代码后重新编译</h4>
+<pre><code># 应用适配层的 AOSP 补丁（OHEnvironment 环境检测插入点）
+cd /root/aosp/frameworks/base
+git apply /root/adapter/aosp_patches/frameworks/core/java/android/app/ActivityManager.java.patch
+git apply /root/adapter/aosp_patches/frameworks/core/java/android/app/ActivityTaskManager.java.patch
+git apply /root/adapter/aosp_patches/frameworks/core/java/android/app/ActivityThread.java.patch
+git apply /root/adapter/aosp_patches/frameworks/core/java/android/view/WindowManagerGlobal.java.patch
+
+# 重新编译（增量编译，仅重编修改的文件）
+source /root/adapter/build/build_env.sh
+build_framework</code></pre>
+
+  <h4>编译环境脚本提供的命令</h4>
+  <table>
+    <tr><th>命令</th><th>说明</th></tr>
+    <tr><td><code>setup_env</code></td><td>初始化 AOSP 编译环境（envsetup + lunch）</td></tr>
+    <tr><td><code>build_framework</code></td><td>编译 <code>framework-minus-apex</code> 并收集产出到 <code>/root/adapter/out/</code></td></tr>
+    <tr><td><code>build_all</code></td><td>编译所有目标（framework + res + runtime + dex2oat）</td></tr>
+    <tr><td><code>collect_outputs</code></td><td>仅收集已有编译产出到 <code>/root/adapter/out/</code>（不触发编译）</td></tr>
+  </table>
+</div>
+
+<div class="note">
+  <strong>关于增量编译：</strong>AOSP 构建系统（Soong + Ninja）支持增量编译。首次编译完成后，修改少量源文件再次执行 <code>m framework-minus-apex</code>，通常只需几十秒即可完成，无需全量重编。如需强制全量重编，先执行 <code>rm -rf out/soong/.intermediates/frameworks/base/framework-minus-apex</code> 清除中间产物。
+</div>
+
+<h2 id="ch10-8">10.8 编译产物可部署性分析：Java 层 vs Native 层</h2>
+
+<div class="warn">
+  <strong>核心结论：当前 AOSP 编译产物不能直接运行在 OH 系统上。</strong>Java/DEX 层（framework.jar）可直接部署，但 Native 层（.so）必须用 OH 工具链交叉重编。
+</div>
+
+<h3>问题本质：Bionic vs musl</h3>
+
+<p>Android 和 OpenHarmony 底层都是 Linux 内核 + ARM64 指令集，机器码本身是兼容的。但两者的<strong>用户态 ABI</strong> 不同——C 库符号表、动态链接器、TLS 机制各异，导致 Native 二进制不能互通：</p>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>AOSP 编译产物</th><th>OH 系统环境</th><th>是否兼容</th></tr>
+    <tr><td>目标三元组</td><td><code>aarch64-linux-android</code></td><td><code>aarch64-linux-ohos</code></td><td>❌ 不兼容</td></tr>
+    <tr><td>C 标准库</td><td>Bionic libc（<code>libc.so</code>）</td><td>musl libc（<code>libc.so</code>）</td><td>❌ 符号表不同</td></tr>
+    <tr><td>动态链接器</td><td><code>/system/bin/linker64</code></td><td><code>/system/lib/ld-musl-aarch64.so.1</code></td><td>❌ 完全不同</td></tr>
+    <tr><td>编译器</td><td>Android Clang</td><td>OH Clang</td><td>❌ sysroot 不同</td></tr>
+    <tr><td>Java/DEX 字节码</td><td>classes.dex（平台无关）</td><td>由 ART VM 解释/JIT</td><td>✅ 兼容</td></tr>
+  </table>
+</div>
+
+<h3>分层可部署性</h3>
+
+<div class="card">
+  <table>
+    <tr><th>层次</th><th>产物</th><th>能否直接部署到 OH</th><th>说明</th></tr>
+    <tr>
+      <td rowspan="3"><span class="tag tag-include">Java/DEX</span></td>
+      <td><code>framework.jar</code></td>
+      <td><strong>✅ 可以</strong></td>
+      <td>DEX 字节码与平台无关，在任何 ART VM 实例上都能运行</td>
+    </tr>
+    <tr>
+      <td><code>oh-adapter-framework.jar</code></td>
+      <td><strong>✅ 可以</strong></td>
+      <td>适配层 Java 代码，同为 DEX 字节码</td>
+    </tr>
+    <tr>
+      <td><code>framework-res-package.jar</code></td>
+      <td><strong>✅ 可以</strong></td>
+      <td>编译后的资源二进制格式，平台无关</td>
+    </tr>
+    <tr>
+      <td rowspan="4"><span class="tag tag-exclude">AOSP Native</span></td>
+      <td><code>libart.so</code></td>
+      <td><strong>❌ 不能</strong></td>
+      <td>链接 Bionic libc，OH 上无法被 musl 动态链接器加载</td>
+    </tr>
+    <tr>
+      <td><code>libandroid_runtime.so</code></td>
+      <td><strong>❌ 不能</strong></td>
+      <td>依赖 libart + Bionic，同上</td>
+    </tr>
+    <tr>
+      <td><code>libbinder.so</code>, <code>libgui.so</code></td>
+      <td><strong>❌ 不能</strong></td>
+      <td>链接 Bionic + Android 内核特有 Binder 驱动接口</td>
+    </tr>
+    <tr>
+      <td><code>linker64</code>, <code>libc.so</code></td>
+      <td><strong>❌ 不能</strong></td>
+      <td>Android 动态链接器/C 库，与 OH 的 musl 冲突</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><span class="tag tag-dep">OH Native</span></td>
+      <td><code>liboh_adapter_bridge.so</code></td>
+      <td><strong>✅（需 OH 编译）</strong></td>
+      <td>必须用 OH 工具链（BUILD.gn）编译，链接 OH IPC 库</td>
+    </tr>
+    <tr>
+      <td><code>appspawn-x</code></td>
+      <td><strong>✅（需 OH 编译）</strong></td>
+      <td>必须用 OH 工具链（BUILD.gn）编译，为 OH init 服务</td>
+    </tr>
+  </table>
+</div>
+
+<h3>当前 AOSP 编译产物的价值</h3>
+
+<div class="ok">
+  <ol>
+    <li><strong>Java 层可直接部署</strong> — <code>framework.jar</code>（39MB）包含完整的客户端 Framework DEX 字节码，可直接放入 OH 上运行的 ART VM 环境</li>
+    <li><strong>验证了最小化构建可行性</strong> — 确认 AOSP 14 可以只编译客户端 JAR，不需要 system_server 和系统应用</li>
+    <li><strong>为交叉编译提供了源码基线</strong> — 后续用 OH Clang 工具链重编 Native 层时，使用同一套已验证的 AOSP 源码</li>
+    <li><strong>确定了依赖范围</strong> — 明确了需要同步的 115 个 AOSP 仓库和所有编译配置修改</li>
+  </ol>
+</div>
+
+<h3>完整运行还需要的交叉编译产物</h3>
+
+<p>以下产物必须使用 <strong>OH Clang 工具链</strong>（<code>aarch64-linux-ohos</code> target）交叉编译 AOSP C++ 源码，使其链接 musl libc：</p>
+
+<div class="card">
+  <table>
+    <tr><th>产物</th><th>AOSP 源码</th><th>编译方式</th><th>核心难点</th></tr>
+    <tr>
+      <td><code>libart.so</code></td>
+      <td><code>art/runtime/</code></td>
+      <td>OH Clang 交叉编译</td>
+      <td>Bionic 专有 API 适配（system_properties、malloc、TLS 等）</td>
+    </tr>
+    <tr>
+      <td><code>libandroid_runtime.so</code></td>
+      <td><code>frameworks/base/core/jni/</code></td>
+      <td>OH Clang 交叉编译</td>
+      <td>依赖 libart + Surface/Input JNI 桥接</td>
+    </tr>
+    <tr>
+      <td><code>dex2oat</code></td>
+      <td><code>art/dex2oat/</code></td>
+      <td>OH Clang 交叉编译</td>
+      <td>依赖 libart + libdexfile</td>
+    </tr>
+    <tr>
+      <td><code>bionic_compat</code> 兼容层</td>
+      <td>新建适配代码</td>
+      <td>OH Clang 编译</td>
+      <td>将 Bionic 专有 API 转调到 OH API（sysparam 替代 system_properties 等）</td>
+    </tr>
+    <tr>
+      <td><code>liboh_adapter_bridge.so</code></td>
+      <td><code>framework/*/jni/</code></td>
+      <td>OH BUILD.gn</td>
+      <td>链接 OH IPC 库（libabilityms_proxy、libwms_proxy 等）</td>
+    </tr>
+    <tr>
+      <td><code>appspawn-x</code></td>
+      <td><code>framework/appspawn-x/</code></td>
+      <td>OH BUILD.gn</td>
+      <td>混合进程启动器，集成 OH 沙箱 + ART 初始化</td>
+    </tr>
+  </table>
+
+  <p style="margin-top:12px">交叉编译的详细方案见 <code>appspawn_x_design.html</code> 第 6.5 节《Android 运行时库交叉编译》。核心思路是：<strong>用 OH Clang 重编 AOSP C++ 源码</strong>，将 Bionic 专有 API（system_properties、android_mallopt 等）替换为 OH 等效实现（SystemGetParameter、musl malloc 等）。</p>
+</div>
+
+<h3>两阶段编译策略总结</h3>
+
+<div class="diagram">
+┌──────────────────────────────────────────────────────────────────────┐
+│                      两阶段编译策略                                    │
+│                                                                      │
+│  ┌─ 阶段一：AOSP 编译（已完成 ✅）──────────────────────────────────┐ │
+│  │                                                                  │ │
+│  │  工具链：AOSP Soong (Android Clang, javac, d8)                   │ │
+│  │  服务器：oh-build (x86_64 主机)                                   │ │
+│  │  目标：  aosp_arm64 (aarch64-linux-android)                      │ │
+│  │                                                                  │ │
+│  │  产出（可直接部署到 OH）：                                         │ │
+│  │    ✅ framework.jar          (39MB, DEX 字节码)                   │ │
+│  │    ✅ framework-res-package  (33MB, 编译后资源)                    │ │
+│  │    ✅ oh-adapter-framework   (待编译, DEX 字节码)                  │ │
+│  │                                                                  │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                              │                                        │
+│                              ▼ AOSP C++ 源码                          │
+│                                                                      │
+│  ┌─ 阶段二：OH 交叉编译（待执行）─────────────────────────────────┐  │
+│  │                                                                  │ │
+│  │  工具链：OH Clang (aarch64-linux-ohos) + BUILD.gn                │ │
+│  │  服务器：oh-build (x86_64 主机，交叉编译)                         │ │
+│  │  目标：  aarch64-linux-ohos (链接 musl libc)                     │ │
+│  │                                                                  │ │
+│  │  产出（可在 OH 上原生运行）：                                      │ │
+│  │    ⏳ libart.so              (ART VM 核心)                        │ │
+│  │    ⏳ libandroid_runtime.so  (Framework JNI)                     │ │
+│  │    ⏳ dex2oat                (AOT 编译器)                         │ │
+│  │    ⏳ bionic_compat.so       (Bionic API → OH API 转接)           │ │
+│  │    ⏳ liboh_adapter_bridge   (适配层 JNI → OH IPC)                │ │
+│  │    ⏳ appspawn-x             (混合进程启动器)                      │ │
+│  │                                                                  │ │
+│  └──────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  两阶段产出合并部署到 DAYU600：                                        │
+│    /system/framework/framework.jar        ← 阶段一                    │
+│    /system/framework/framework-res.apk    ← 阶段一                    │
+│    /system/lib64/libart.so                ← 阶段二                    │
+│    /system/lib64/libandroid_runtime.so    ← 阶段二                    │
+│    /system/lib64/liboh_adapter_bridge.so  ← 阶段二                    │
+│    /system/bin/appspawn-x                 ← 阶段二                    │
+└──────────────────────────────────────────────────────────────────────┘
+</div>
+
+<footer>
+  Android-OpenHarmony Adapter Project &mdash; AOSP 14 最小化构建分析报告 v1.1 &mdash; 2026年3月20日更新
+</footer>
+
+</div>
+</body>
+</html>

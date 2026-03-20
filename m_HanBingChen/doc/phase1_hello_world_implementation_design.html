@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>第一阶段 Hello World 实现设计 - Android-OH 适配层</title>
+<style>
+  @page { margin: 2cm; size: A4; }
+  body { font-family: "Microsoft YaHei", sans-serif; font-size: 12pt; line-height: 1.8; color: #333; max-width: 210mm; margin: 0 auto; padding: 2cm; }
+  h1 { font-size: 22pt; text-align: center; color: #1a1a2e; border-bottom: 3px solid #16213e; padding-bottom: 10px; }
+  h2 { font-size: 16pt; color: #16213e; border-bottom: 2px solid #0f3460; padding-bottom: 5px; margin-top: 30px; }
+  h3 { font-size: 14pt; color: #0f3460; margin-top: 20px; }
+  h4 { font-size: 12pt; color: #533483; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; }
+  th { background-color: #16213e; color: white; padding: 8px 10px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 6px 10px; vertical-align: top; }
+  tr:nth-child(even) { background-color: #f2f2f2; }
+  code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: Consolas, monospace; font-size: 10pt; }
+  pre { background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 5px; padding: 15px; overflow-x: auto; font-family: Consolas, monospace; font-size: 9pt; line-height: 1.5; }
+  .cover { text-align: center; page-break-after: always; padding-top: 100px; }
+  .cover h1 { font-size: 26pt; border: none; }
+  .cover .subtitle { font-size: 16pt; color: #555; margin-top: 20px; }
+  .cover .date { font-size: 14pt; color: #777; margin-top: 40px; }
+  .page-break { page-break-before: always; }
+  .highlight { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px 15px; margin: 15px 0; }
+  .success { background-color: #d4edda; border-left: 4px solid #28a745; padding: 10px 15px; margin: 15px 0; }
+  .info { background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 10px 15px; margin: 15px 0; }
+  .danger { background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 10px 15px; margin: 15px 0; }
+  .diagram { background-color: #f8f9fa; border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 15px 0; }
+  ul, ol { margin: 5px 0; }
+  .tag-bridged { background-color: #28a745; color: white; padding: 2px 8px; border-radius: 3px; font-size: 9pt; font-weight: bold; }
+  .tag-partial { background-color: #ffc107; color: #333; padding: 2px 8px; border-radius: 3px; font-size: 9pt; font-weight: bold; }
+  .tag-stub { background-color: #6c757d; color: white; padding: 2px 8px; border-radius: 3px; font-size: 9pt; font-weight: bold; }
+  .tag-ohonly { background-color: #17a2b8; color: white; padding: 2px 8px; border-radius: 3px; font-size: 9pt; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<!-- ==================== 封面 ==================== -->
+<div class="cover">
+  <h1>Android-OpenHarmony 适配层</h1>
+  <div class="subtitle">第一阶段 Hello World 实现设计文档</div>
+  <div class="subtitle" style="font-size:14pt; margin-top:10px;">从接口分析到代码实现</div>
+  <div class="date">2026年3月9日（更新）</div>
+  <div class="date" style="font-size:12pt; margin-top:20px;">源代码目录：D:\code\adapter\</div>
+</div>
+
+<!-- ==================== 目录 ==================== -->
+<h1>目录</h1>
+<ol>
+  <li>文档概述</li>
+  <li>Hello World 最小调用链分析
+    <ul>
+      <li>2.1 Android Hello World 应用启动全流程</li>
+      <li>2.2 涉及的系统服务 IPC 调用</li>
+      <li>2.3 最小适配接口集</li>
+    </ul>
+  </li>
+  <li>三大实现任务概述</li>
+  <li>任务一：C++ 层 — 连接真实 OH IPC
+    <ul>
+      <li>4.1 OHAbilityManagerClient — 能力管理客户端</li>
+      <li>4.2 OHAppMgrClient — 应用管理客户端</li>
+      <li>4.3 OHWindowManagerClient — 窗口管理客户端</li>
+      <li>4.4 JNI Bridge 扩展</li>
+    </ul>
+  </li>
+  <li>任务二：反向回调实现 — OH 系统 → Android 应用
+    <ul>
+      <li>5.1 AppSchedulerBridge — 应用启动回调</li>
+      <li>5.2 AbilitySchedulerBridge — 能力生命周期回调</li>
+      <li>5.3 LifecycleAdapter — 生命周期双向映射引擎</li>
+      <li>5.4 WindowCallbackBridge — 窗口事件回调</li>
+      <li>5.5 SessionStageBridge — 场景会话回调</li>
+    </ul>
+  </li>
+  <li>任务三：Surface / 渲染桥接
+    <ul>
+      <li>6.1 WindowSessionAdapter — 窗口会话适配</li>
+      <li>6.2 OH RSSurfaceNode 与 Android SurfaceControl 的桥接</li>
+    </ul>
+  </li>
+  <li>输入事件桥接 — OH MMI → Android InputChannel
+    <ul>
+      <li>7.1 输入事件管道架构</li>
+      <li>7.2 InputEventBridge — Java 层管理器</li>
+      <li>7.3 OHInputBridge — C++ 层实现</li>
+      <li>7.4 WindowSessionAdapter — InputChannel 集成</li>
+      <li>7.5 Hello World 应用增强</li>
+      <li>7.6 输入事件处理完整时序</li>
+      <li>7.7 OH PointerEvent → Android MotionEvent 映射</li>
+    </ul>
+  </li>
+  <li>辅助模块更新
+    <ul>
+      <li>8.1 IntentWantConverter — 新增 abilityNameToClassName</li>
+    </ul>
+  </li>
+  <li>Hello World 完整调用流程
+    <ul>
+      <li>9.1 应用启动与初始化</li>
+      <li>9.2 Activity 启动完整时序</li>
+      <li>9.3 窗口创建与首帧渲染</li>
+    </ul>
+  </li>
+  <li>数据结构与类型映射</li>
+  <li>文件清单与修改概要</li>
+</ol>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第一章 ==================== -->
+<h2>一、文档概述</h2>
+
+<p>本文档是 Android-OpenHarmony 适配层第一阶段（Hello World 可行性验证）的<strong>实现设计文档</strong>。
+在前期框架设计（见 <code>phase1_design.html</code>）和接口桥接设计（见 <code>interface_bridge_design.html</code>、<code>reverse_callback_bridge_design.html</code>）的基础上，
+本文档从"运行一个 Hello World 应用"这一具体目标出发，完成以下工作：</p>
+
+<ol>
+  <li><strong>最小接口集分析</strong>：分析 Android Hello World 应用的完整启动流程，识别必须适配的最小接口方法集合</li>
+  <li><strong>三大任务设计与实现</strong>：将实现工作分解为 C++ 真实 IPC、Java 反向回调、Surface 渲染桥接三个任务，详述每个任务的设计方案和代码实现</li>
+  <li><strong>端到端调用流程</strong>：描述从应用启动到首帧渲染的完整调用时序</li>
+</ol>
+
+<div class="success">
+<strong>实现状态：</strong>三大任务的代码已全部完成。本文档同步记录了所有已实现的代码及其设计考量。
+</div>
+
+<!-- ==================== 第二章 ==================== -->
+<div class="page-break"></div>
+<h2>二、Hello World 最小调用链分析</h2>
+
+<h3>2.1 Android Hello World 应用启动全流程</h3>
+
+<p>一个最简 Android Hello World 应用的启动涉及以下关键步骤：</p>
+
+<div class="diagram">
+<pre style="border:none; background:none; margin:0; padding:0;">
+                     Android App Process
+                           |
+         Application.onCreate()
+                           |
+                           v
+    ┌─────────────────────────────────────────────┐
+    │  1. 适配层初始化                               │
+    │     OHEnvironment.initialize()               │
+    │       → nativeInitialize() (IPC框架)          │
+    │       → nativeConnectToOHServices()           │
+    │         ├─ 连接 AbilityMgr (SA 180)           │
+    │         ├─ 连接 AppMgr     (SA 501)           │
+    │         └─ 连接 SceneSessionMgr (SA 4607)      │
+    │       → nativeAttachApplication()             │
+    │         └─ 注册 AppSchedulerHost 回调桩        │
+    └─────────────────────────────────────────────┘
+                           |
+                           v
+    ┌─────────────────────────────────────────────┐
+    │  2. OH 系统回调 → 启动 Ability                │
+    │     OH AbilityMgr → AppSchedulerHost          │
+    │       .ScheduleLaunchAbility(want, token)     │
+    │       → JNI → AppSchedulerBridge              │
+    │         .nativeOnScheduleLaunchAbility()       │
+    └─────────────────────────────────────────────┘
+    │  3. 构造 Android ClientTransaction             │
+    │     → LaunchActivityItem + ResumeActivityItem  │
+    │     → ApplicationThread.scheduleTransaction()  │
+    │     → ActivityThread.handleLaunchActivity()     │
+    │     → Activity.onCreate() + onStart()          │
+    └─────────────────────────────────────────────┘
+                           |
+                           v
+    ┌─────────────────────────────────────────────┐
+    │  4. 窗口创建与渲染                            │
+    │     Activity.onCreate()                       │
+    │       → setContentView(R.layout.xxx)          │
+    │       → ViewRootImpl.setView()                │
+    │       → WindowSessionAdapter.addToDisplay()   │
+    │         → nativeCreateSession()               │
+    │         → OH CreateAndConnectSpecificSession   │
+    │                                               │
+    │     ViewRootImpl.performTraversals()           │
+    │       → WindowSessionAdapter.relayout()       │
+    │         → nativeUpdateSessionRect()           │
+    │         → 创建 SurfaceControl (OH RSSurface)  │
+    │                                               │
+    │     ViewRootImpl.draw()                       │
+    │       → Canvas 渲染到 Surface                  │
+    │       → WindowSessionAdapter.finishDrawing()  │
+    │         → nativeNotifyDrawingCompleted()       │
+    └─────────────────────────────────────────────┘
+                           |
+                           v
+    ┌─────────────────────────────────────────────┐
+    │  5. OH 系统回调 → Activity 可见               │
+    │     OH → SessionStageBridge.onSetActive(true) │
+    │       → IWindow.dispatchAppVisibility(true)   │
+    │                                               │
+    │     OH → AbilitySchedulerBridge               │
+    │       .onScheduleAbilityTransaction(FOREGROUND)│
+    │       → LifecycleAdapter.onOHLifecycleCallback│
+    │       → ResumeActivityItem → Activity.onResume│
+    └─────────────────────────────────────────────┘
+</pre>
+</div>
+
+<h3>2.2 涉及的系统服务 IPC 调用</h3>
+
+<p>从上述流程中，提取出 Hello World 应用实际触发的系统服务 IPC 调用：</p>
+
+<h4>正向调用（App → OH 系统）</h4>
+
+<table>
+  <tr>
+    <th>#</th>
+    <th>Android API 调用</th>
+    <th>适配层方法</th>
+    <th>OH IPC 调用</th>
+    <th>必要性</th>
+  </tr>
+  <tr>
+    <td>F1</td>
+    <td>应用进程注册</td>
+    <td><code>OHAppMgrClient.attachApplication()</code></td>
+    <td><code>IAppMgr.AttachApplication()</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>F2</td>
+    <td><code>startActivity(Intent)</code></td>
+    <td><code>ActivityManagerAdapter.startActivity()</code><br><code>→ nativeStartAbility()</code></td>
+    <td><code>IAbilityManager.StartAbility(Want)</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>F3</td>
+    <td><code>WindowSession.addToDisplay()</code></td>
+    <td><code>WindowSessionAdapter.addToDisplay()</code><br><code>→ nativeCreateSession()</code></td>
+    <td><code>ISceneSessionMgr.CreateAndConnectSpecificSession()</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>F4</td>
+    <td><code>WindowSession.relayout()</code></td>
+    <td><code>WindowSessionAdapter.relayout()</code><br><code>→ nativeUpdateSessionRect()</code></td>
+    <td><code>ISession.UpdateSessionRect()</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>F5</td>
+    <td><code>WindowSession.finishDrawing()</code></td>
+    <td><code>WindowSessionAdapter.finishDrawing()</code><br><code>→ nativeNotifyDrawingCompleted()</code></td>
+    <td><code>ISessionStage.NotifyDrawingCompleted()</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>F6</td>
+    <td><code>WindowSession.remove()</code></td>
+    <td><code>WindowSessionAdapter.remove()</code><br><code>→ nativeDestroySession()</code></td>
+    <td><code>ISession.Disconnect()</code></td>
+    <td>必须</td>
+  </tr>
+</table>
+
+<h4>反向回调（OH 系统 → App）</h4>
+
+<table>
+  <tr>
+    <th>#</th>
+    <th>OH 回调方法</th>
+    <th>适配层桥接类</th>
+    <th>Android 侧行为</th>
+    <th>必要性</th>
+  </tr>
+  <tr>
+    <td>R1</td>
+    <td><code>IAppScheduler.ScheduleLaunchAbility()</code></td>
+    <td><code>AppSchedulerBridge.nativeOnScheduleLaunchAbility()</code></td>
+    <td>构造 <code>ClientTransaction</code> + <code>LaunchActivityItem</code>，触发 <code>Activity.onCreate()</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>R2</td>
+    <td><code>IAbilityScheduler.ScheduleAbilityTransaction()</code></td>
+    <td><code>AbilitySchedulerBridge.onScheduleAbilityTransaction()</code></td>
+    <td>通过 <code>LifecycleAdapter</code> 映射状态，派发 <code>ResumeActivityItem</code> 等</td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>R3</td>
+    <td><code>ISessionStage.SetActive()</code></td>
+    <td><code>SessionStageBridge.onSetActive()</code></td>
+    <td><code>IWindow.dispatchAppVisibility(true)</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>R4</td>
+    <td><code>IWindow-OH.UpdateWindowState()</code></td>
+    <td><code>WindowCallbackBridge.onUpdateWindowState()</code></td>
+    <td><code>IWindow.dispatchAppVisibility()</code></td>
+    <td>必须</td>
+  </tr>
+  <tr>
+    <td>R5</td>
+    <td><code>IWindow-OH.UpdateFocusStatus()</code></td>
+    <td><code>WindowCallbackBridge.onUpdateFocusStatus()</code></td>
+    <td><code>IWindow.windowFocusChanged()</code></td>
+    <td>推荐</td>
+  </tr>
+</table>
+
+<h3>2.3 最小适配接口集</h3>
+
+<div class="info">
+<strong>结论：</strong>运行 Hello World 应用至少需要适配 <strong>6 个正向方法</strong> + <strong>5 个反向回调方法</strong>，
+涉及 <strong>3 个 OH 系统服务</strong>（AbilityMgr SA 180、AppMgr SA 501、SceneSessionMgr SA 4607）。
+SceneSessionManager（ISceneSessionManager）继承自 IWindowManager，是其超集，无需单独连接旧版 WindowManagerService（SA 4606）。
+</div>
+
+<p>方法总计：</p>
+<ul>
+  <li>正向方向：6 个方法（跨 3 个 Java 适配器 + 1 个 C++ IPC 客户端）</li>
+  <li>反向方向：5 个方法（跨 3 个 Java Bridge 类 + 3 个 C++ Adapter Stub）</li>
+  <li>辅助模块：LifecycleAdapter（生命周期映射）、IntentWantConverter（Intent/Want 转换）</li>
+</ul>
+
+<!-- ==================== 第三章 ==================== -->
+<div class="page-break"></div>
+<h2>三、三大实现任务概述</h2>
+
+<p>基于最小接口集分析，将实现工作分解为三个任务：</p>
+
+<table>
+  <tr>
+    <th>任务</th>
+    <th>范围</th>
+    <th>核心目标</th>
+    <th>涉及文件</th>
+  </tr>
+  <tr>
+    <td><strong>任务一</strong><br>C++ 真实 IPC</td>
+    <td>C++ / JNI 层</td>
+    <td>将 Stub 模式替换为真实的 OH SystemAbilityManager 连接，实现真正的跨进程 IPC 调用</td>
+    <td>
+      <code>oh_ability_manager_client.h/cpp</code><br>
+      <code>oh_app_mgr_client.h/cpp</code><br>
+      <code>oh_window_manager_client.h/cpp</code> (新增)<br>
+      <code>oh_callback_handler.h/cpp</code><br>
+      <code>adapter_bridge.cpp</code><br>
+      <code>CMakeLists.txt</code>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>任务二</strong><br>反向回调实现</td>
+    <td>Java 层</td>
+    <td>在回调 Bridge 类中实现真实的 Android ClientTransaction 构造逻辑，使 OH 生命周期回调能驱动 Android Activity 生命周期</td>
+    <td>
+      <code>AppSchedulerBridge.java</code><br>
+      <code>AbilitySchedulerBridge.java</code><br>
+      <code>LifecycleAdapter.java</code><br>
+      <code>WindowCallbackBridge.java</code><br>
+      <code>SessionStageBridge.java</code>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>任务三</strong><br>Surface / 渲染桥接</td>
+    <td>Java + C++ 层</td>
+    <td>实现 WindowSessionAdapter 的窗口创建和布局方法，将 Android SurfaceControl 与 OH RSSurfaceNode 对接</td>
+    <td>
+      <code>WindowSessionAdapter.java</code><br>
+      <code>oh_window_manager_client.h/cpp</code><br>
+      <code>adapter_bridge.cpp</code> (JNI 方法)
+    </td>
+  </tr>
+  <tr>
+    <td><strong>任务四</strong><br>输入事件桥接</td>
+    <td>Java + C++ 层</td>
+    <td>建立 OH MMI → Android InputChannel 的输入事件管道，使触摸事件能从 OH 到达 Android View 层级</td>
+    <td>
+      <code>InputEventBridge.java</code> (新增)<br>
+      <code>oh_input_bridge.h/cpp</code> (新增)<br>
+      <code>WindowSessionAdapter.java</code><br>
+      <code>adapter_bridge.cpp</code><br>
+      <code>MainActivity.java</code>
+    </td>
+  </tr>
+</table>
+
+<div class="diagram">
+<pre style="border:none; background:none; margin:0; padding:0;">
+任务关系：
+
+  任务一 (C++ 真实 IPC)
+    │
+    ├── 提供 OH 系统服务连接能力
+    │   ├── AbilityMgr (SA 180)  ─── 启动 Ability
+    │   ├── AppMgr     (SA 501)  ─── 注册应用进程
+    │   └── SceneSessionMgr (SA 4607) ── 创建窗口会话
+    │
+    ├──────────────────────┐
+    v                      v
+  任务二 (反向回调)      任务三 (Surface 桥接)
+    │                      │
+    ├── OH 回调 Stub       ├── 窗口会话管理
+    │   注册到 OH 服务      │   (addToDisplay/relayout/
+    │                      │    finishDrawing/remove)
+    ├── 构造 Android       │
+    │   ClientTransaction  ├── SurfaceControl
+    │   驱动 Activity      │   ← OH RSSurfaceNode
+    │   生命周期            │
+    v                      v
+  ┌──────────────────────────┐
+  │  Hello World 应用运行    │
+  │  Activity 显示界面       │
+  └──────────────────────────┘
+</pre>
+</div>
+
+<!-- ==================== 第四章 ==================== -->
+<div class="page-break"></div>
+<h2>四、任务一：C++ 层 — 连接真实 OH IPC</h2>
+
+<div class="highlight">
+<strong>核心变更：</strong>将所有 OH IPC 客户端从 Stub 模式（日志打印）升级为通过 OH SystemAbilityManager 获取真实的系统服务代理对象，实现真正的跨进程 IPC 调用。
+</div>
+
+<h3>4.1 OHAbilityManagerClient — 能力管理客户端</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/activity/jni/oh_ability_manager_client.h/cpp</code></td></tr>
+  <tr><td>OH 目标服务</td><td>AbilityManagerService (SA ID = 180)</td></tr>
+  <tr><td>主要方法</td><td><code>connect()</code>, <code>startAbility()</code>, <code>connectAbility()</code>, <code>disconnectAbility()</code></td></tr>
+</table>
+
+<h4>连接机制</h4>
+
+<pre>
+// oh_ability_manager_client.cpp - connect()
+
+bool OHAbilityManagerClient::connect() {
+    auto samgr = OHOS::SystemAbilityManagerClient::GetInstance()
+                     .GetSystemAbilityManager();
+    if (samgr == nullptr) return false;
+
+    auto remoteObject = samgr->GetSystemAbility(ABILITY_MGR_SERVICE_ID); // 180
+    if (remoteObject == nullptr) return false;
+
+    proxy_ = OHOS::iface_cast&lt;OHOS::AAFwk::IAbilityManager&gt;(remoteObject);
+    return proxy_ != nullptr;
+}
+</pre>
+
+<h4>startAbility 实现</h4>
+
+<pre>
+// oh_ability_manager_client.cpp - startAbility()
+
+int OHAbilityManagerClient::startAbility(const WantParams&amp; want) {
+    if (proxy_ == nullptr) return -1;
+
+    // 构造 OH Want 对象
+    OHOS::AAFwk::Want ohWant;
+    OHOS::AppExecFwk::ElementName element("", want.bundleName, want.abilityName);
+    ohWant.SetElement(element);
+
+    if (!want.action.empty())
+        ohWant.SetAction(want.action);
+    if (!want.uri.empty())
+        ohWant.SetUri(want.uri);
+
+    // 调用真实的 OH IPC
+    int result = proxy_-&gt;StartAbility(ohWant);
+    return result;
+}
+</pre>
+
+<h3>4.2 OHAppMgrClient — 应用管理客户端</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/activity/jni/oh_app_mgr_client.h/cpp</code></td></tr>
+  <tr><td>OH 目标服务</td><td>AppManagerService (SA ID = 501)</td></tr>
+  <tr><td>主要方法</td><td><code>connect()</code>, <code>attachApplication()</code>, <code>notifyAppState()</code></td></tr>
+</table>
+
+<h4>关键设计：AppSchedulerAdapter 注册</h4>
+
+<p>
+<code>attachApplication()</code> 是适配层与 OH AppMgr 建立通信的关键。
+调用时，将本进程的 <code>AppSchedulerAdapter</code>（继承 OH <code>AppSchedulerHost</code>）注册到 OH AppMgr，
+OH 系统后续通过此 Stub 回调通知应用进程的生命周期事件。
+</p>
+
+<pre>
+// oh_app_mgr_client.cpp - attachApplication()
+
+bool OHAppMgrClient::attachApplication(int pid, int uid,
+                                        const std::string&amp; processName) {
+    if (proxy_ == nullptr) return false;
+
+    // 创建 AppSchedulerAdapter（OH AppSchedulerHost 子类）
+    // 它持有 JNI 上下文，在 OH 回调时调用 Java 层的 AppSchedulerBridge
+    appScheduler_ = new AppSchedulerAdapter(jvm_, appThread_, processName);
+
+    // 注册到 OH AppMgr
+    proxy_-&gt;AttachApplication(appScheduler_);
+    return true;
+}
+</pre>
+
+<h3>4.3 OHWindowManagerClient — 窗口管理客户端（新增）</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/window/jni/oh_window_manager_client.h/cpp</code> <strong>(新文件)</strong></td></tr>
+  <tr><td>OH 目标服务</td><td><strong>ISceneSessionManager</strong> (SA 4607, 系统单例) — 会话创建/销毁<br/>
+      <strong>ISession</strong> (每窗口代理) — 会话操作 (由 CreateAndConnect 返回)</td></tr>
+  <tr><td>主要方法</td><td><code>connect()</code>, <code>createSession()</code>, <code>updateSessionRect()</code>, <code>notifyDrawingCompleted()</code>, <code>destroySession()</code></td></tr>
+</table>
+
+<div class="highlight">
+<strong>关键架构：ISceneSessionManager vs ISession</strong><br/>
+<code>ISceneSessionManager</code>（SA 4607）是系统级单例，仅负责会话的<strong>创建</strong>（<code>CreateAndConnectSpecificSession</code>）
+和<strong>销毁</strong>（<code>DestroyAndDisconnectSpecificSession</code>）。<br/>
+<code>ISession</code> 是 <code>CreateAndConnectSpecificSession</code> 返回的<strong>每窗口代理</strong>，
+后续所有窗口操作（<code>UpdateSessionRect</code>、<code>DrawingCompleted</code>、<code>Foreground</code>、<code>Background</code>、<code>Disconnect</code> 等）
+均通过 ISession 进行，而非 ISceneSessionManager。
+</div>
+
+<div class="info">
+<strong>ISceneSessionManager 与 IWindowManager 的关系</strong><br/>
+OH WMS 有两个系统服务：
+<ul>
+  <li><strong>SA 4606</strong> — <code>WindowManagerService</code> 实现 <code>IWindowManager</code>（31 个方法：CreateWindow、RequestFocus、GetAvoidAreaByType 等基础窗口操作）</li>
+  <li><strong>SA 4607</strong> — <code>SceneSessionManager</code> 实现 <code>ISceneSessionManager</code>（继承 IWindowManager 全部 31 个方法 + 新增 15 个会话管理方法）</li>
+</ul>
+<code>ISceneSessionManager : public IWindowManager</code> — 是 IWindowManager 的<strong>超集</strong>。
+OH 客户端通过 <code>SceneBoardJudgement::IsSceneBoardEnabled()</code> 运行时选择连接哪个服务，
+现代 OH 系统默认启用 SceneBoard，走 SA 4607 路径。<br/><br/>
+<strong>对 Android 适配层的结论：只需连接 SA 4607（ISceneSessionManager），无需单独适配 SA 4606（IWindowManager）。</strong>
+ISceneSessionManager 已覆盖全部 IWindowManager 方法，且 <code>CreateAndConnectSpecificSession</code> 是创建窗口会话的唯一入口。
+</div>
+
+<h4>OHWindowSession 数据结构</h4>
+
+<pre>
+// oh_window_manager_client.h
+
+struct OHWindowSession {
+    int32_t sessionId = -1;        // OH 窗口会话 ID
+    int32_t surfaceNodeId = -1;    // OH RSSurfaceNode ID（用于渲染）
+    int32_t displayId = 0;         // 显示器 ID
+    int32_t width = 0;             // 窗口宽度
+    int32_t height = 0;            // 窗口高度
+    bool valid = false;            // 会话是否有效
+};
+
+// SessionEntry — 内部会话记录，保存 ISession 代理
+struct SessionEntry {
+    int32_t sessionId;
+    int64_t surfaceNodeId;
+    sptr&lt;ISession&gt; sessionProxy;       // 每窗口 ISession 代理（关键！）
+    sptr&lt;SessionStageAdapter&gt; stageAdapter;
+    sptr&lt;WindowCallbackAdapter&gt; windowAdapter;
+};
+</pre>
+
+<h4>createSession 实现</h4>
+
+<p><code>createSession()</code> 通过 <strong>ISceneSessionManager</strong>（系统单例）创建窗口会话，
+同时注册 <code>SessionStageAdapter</code> 和 <code>WindowCallbackAdapter</code> 两个反向回调桩。
+创建成功后，<strong>保存返回的 ISession 代理</strong>用于后续每窗口操作。</p>
+
+<pre>
+// oh_window_manager_client.cpp - createSession()
+
+OHWindowSession OHWindowManagerClient::createSession(...) {
+    // 创建反向回调桩
+    auto stageAdapter = new SessionStageAdapter(jvm, androidWindow);
+    auto windowAdapter = new WindowCallbackAdapter(jvm, androidWindow);
+
+    // 通过系统单例 ISceneSessionManager 创建会话
+    auto ssmInterface = iface_cast&lt;ISceneSessionManager&gt;(ssmProxy_);
+    sptr&lt;ISession&gt; session = nullptr;   // ← 接收返回的每窗口代理
+    int32_t persistentId = 0;
+
+    auto ret = ssmInterface-&gt;CreateAndConnectSpecificSession(
+        stageAdapter, windowAdapter, sessionInfo,
+        session,      // 输出：ISession 每窗口代理
+        token, windowProperty, persistentId);
+
+    // 保存 ISession 代理到 SessionEntry
+    sessions_[sessionId] = {sessionId, surfaceNodeId,
+                            session,   // ← 存储以供后续使用
+                            stageAdapter, windowAdapter};
+    return result;
+}
+</pre>
+
+<h4>每窗口操作 — 使用 ISession（非 ISceneSessionManager）</h4>
+
+<pre>
+// updateSessionRect — 通过 ISession 代理
+int OHWindowManagerClient::updateSessionRect(int32_t sessionId, ...) {
+    auto sessionProxy = sessions_[sessionId].sessionProxy;  // ISession
+    return sessionProxy-&gt;UpdateSessionRect(rect, reason);   // ← ISession 方法
+}
+
+// notifyDrawingCompleted — 通过 ISession 代理
+int OHWindowManagerClient::notifyDrawingCompleted(int32_t sessionId) {
+    auto sessionProxy = sessions_[sessionId].sessionProxy;  // ISession
+    return sessionProxy-&gt;DrawingCompleted();                // ← ISession 方法
+}
+
+// destroySession — ISession.Disconnect() + SSM.DestroyAndDisconnect()
+void OHWindowManagerClient::destroySession(int32_t sessionId) {
+    sessionProxy-&gt;Disconnect();                             // ← ISession：断开
+    ssmInterface-&gt;DestroyAndDisconnectSpecificSession(id);  // ← SSM：清理记录
+}
+</pre>
+
+<h3>4.4 JNI Bridge 扩展</h3>
+
+<p>在 <code>adapter_bridge.cpp</code> 中新增了窗口管理相关的 JNI 方法：</p>
+
+<table>
+  <tr>
+    <th>JNI 方法</th>
+    <th>Java 类</th>
+    <th>C++ 实现</th>
+  </tr>
+  <tr>
+    <td><code>nativeCreateSession()</code></td>
+    <td><code>WindowSessionAdapter</code></td>
+    <td>调用 <code>OHWindowManagerClient.createSession()</code>，返回 <code>int[5]</code>（sessionId, surfaceNodeId, displayId, width, height）</td>
+  </tr>
+  <tr>
+    <td><code>nativeUpdateSessionRect()</code></td>
+    <td><code>WindowSessionAdapter</code></td>
+    <td>调用 <code>OHWindowManagerClient.updateSessionRect()</code></td>
+  </tr>
+  <tr>
+    <td><code>nativeNotifyDrawingCompleted()</code></td>
+    <td><code>WindowSessionAdapter</code></td>
+    <td>调用 <code>OHWindowManagerClient.notifyDrawingCompleted()</code></td>
+  </tr>
+  <tr>
+    <td><code>nativeDestroySession()</code></td>
+    <td><code>WindowSessionAdapter</code></td>
+    <td>调用 <code>OHWindowManagerClient.destroySession()</code></td>
+  </tr>
+  <tr>
+    <td><code>nativeGetSurfaceNodeId()</code></td>
+    <td><code>WindowSessionAdapter</code></td>
+    <td>返回指定会话的 OH RSSurfaceNode ID</td>
+  </tr>
+</table>
+
+<!-- ==================== 第五章 ==================== -->
+<div class="page-break"></div>
+<h2>五、任务二：反向回调实现 — OH 系统 → Android 应用</h2>
+
+<div class="highlight">
+<strong>核心机制：</strong>当 OH 系统服务通过 C++ Stub（如 AppSchedulerHost）回调应用进程时，
+C++ 层通过 JNI 调用 Java 层的 Bridge 类静态方法，Bridge 类构造 Android <code>ClientTransaction</code>
+并交给 <code>ActivityThread</code> 执行，从而驱动 Android Activity 的生命周期。
+</div>
+
+<div class="diagram">
+<pre style="border:none; background:none; margin:0; padding:0;">
+OH 系统服务                   C++ Adapter Stub           JNI            Java Bridge
+     │                            │                      │                  │
+     │  ScheduleLaunchAbility()   │                      │                  │
+     ├───────────────────────────→│                      │                  │
+     │                            │  CallStaticMethod()  │                  │
+     │                            ├─────────────────────→│                  │
+     │                            │                      │  nativeOnSchedule│
+     │                            │                      │  LaunchAbility() │
+     │                            │                      ├─────────────────→│
+     │                            │                      │                  │
+     │                            │                      │  ActivityThread   │
+     │                            │                      │  .scheduleTransaction()
+     │                            │                      │  (ClientTransaction +
+     │                            │                      │   LaunchActivityItem +
+     │                            │                      │   ResumeActivityItem)
+     │                            │                      │         │
+     │                            │                      │         v
+     │                            │                      │  Activity.onCreate()
+     │                            │                      │  Activity.onStart()
+     │                            │                      │  Activity.onResume()
+</pre>
+</div>
+
+<h3>5.1 AppSchedulerBridge — 应用启动回调</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/callback/AppSchedulerBridge.java</code></td></tr>
+  <tr><td>OH 接口</td><td><code>IAppScheduler</code>（34 个方法）</td></tr>
+  <tr><td>Android 目标</td><td><code>IApplicationThread</code>（进程级生命周期管理）</td></tr>
+</table>
+
+<h4>关键方法：nativeOnScheduleLaunchAbility()</h4>
+
+<p>这是 Hello World 运行最关键的方法。当 OH AbilityMgr 决定启动一个 Ability 时，
+通过 AppSchedulerHost 回调此方法。该方法在 Java 侧构造完整的 Android Activity 启动事务。</p>
+
+<pre>
+// AppSchedulerBridge.java
+
+public static void nativeOnScheduleLaunchAbility(
+        String abilityName, String bundleName,
+        int abilityType, int token) {
+
+    // 1. 获取 ActivityThread 和 ApplicationThread
+    ActivityThread activityThread = ActivityThread.currentActivityThread();
+    IApplicationThread appThread = activityThread.getApplicationThread();
+
+    // 2. 创建 Activity token
+    IBinder activityToken = new Binder();
+
+    // 3. OH abilityName → Android className 转换
+    String className = IntentWantConverter.abilityNameToClassName(abilityName);
+    String packageName = bundleName; // Phase 1: 直通映射
+
+    // 4. 构造 Intent
+    Intent intent = new Intent();
+    intent.setComponent(new ComponentName(packageName, className));
+
+    // 5. 构造 ActivityInfo
+    ActivityInfo info = new ActivityInfo();
+    info.packageName = packageName;
+    info.name = className;
+    info.applicationInfo = activityThread.getApplication().getApplicationInfo();
+
+    // 6. 构造 ClientTransaction
+    ClientTransaction transaction = ClientTransaction.obtain(appThread, activityToken);
+    transaction.addCallback(LaunchActivityItem.obtain(
+        intent, info, new Configuration(), null, null, 0, null, null));
+    transaction.setLifecycleStateRequest(ResumeActivityItem.obtain(true));
+
+    // 7. 注册 token 映射
+    LifecycleAdapter.getInstance().registerActivityToken(token, activityToken);
+
+    // 8. 派发事务 → 触发 Activity.onCreate + onResume
+    appThread.scheduleTransaction(transaction);
+}
+</pre>
+
+<div class="danger">
+<strong>语义鸿沟：</strong>OH 的 Ability 启动是一个单步操作（ScheduleLaunchAbility），
+而 Android 的 Activity 启动需要构造包含 LaunchActivityItem + ResumeActivityItem 的 ClientTransaction。
+Bridge 方法必须补全 Android 侧所需的 ActivityInfo、Configuration 等上下文。
+</div>
+
+<h3>5.2 AbilitySchedulerBridge — 能力生命周期回调</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/callback/AbilitySchedulerBridge.java</code></td></tr>
+  <tr><td>OH 接口</td><td><code>IAbilityScheduler</code>（35 个方法）</td></tr>
+  <tr><td>Android 目标</td><td><code>IApplicationThread.scheduleTransaction()</code></td></tr>
+</table>
+
+<h4>OH 生命周期状态映射</h4>
+
+<table>
+  <tr>
+    <th>OH 状态常量</th>
+    <th>OH 含义</th>
+    <th>映射 Android 状态</th>
+    <th>ClientTransaction Item</th>
+  </tr>
+  <tr>
+    <td><code>INITIAL (0)</code></td>
+    <td>初始 / 销毁</td>
+    <td>DESTROYED</td>
+    <td><code>DestroyActivityItem</code></td>
+  </tr>
+  <tr>
+    <td><code>INACTIVE (2)</code></td>
+    <td>创建完成</td>
+    <td>STARTED</td>
+    <td>（作为 resume 序列的一部分处理）</td>
+  </tr>
+  <tr>
+    <td><code>BACKGROUND_NEW (4)</code></td>
+    <td>后台</td>
+    <td>STOPPED</td>
+    <td><code>StopActivityItem</code></td>
+  </tr>
+  <tr>
+    <td><code>FOREGROUND_NEW (5)</code></td>
+    <td>前台</td>
+    <td>RESUMED</td>
+    <td><code>ResumeActivityItem</code></td>
+  </tr>
+</table>
+
+<h4>onScheduleAbilityTransaction 实现</h4>
+
+<pre>
+// AbilitySchedulerBridge.java
+
+public void onScheduleAbilityTransaction(String wantJson, int targetState,
+                                          boolean isNewWant) {
+    // 映射 OH 状态到 LifecycleAdapter 常量
+    int ohState;
+    switch (targetState) {
+        case OH_ABILITY_STATE_FOREGROUND_NEW: // 5
+            ohState = LifecycleAdapter.OH_STATE_FOREGROUND_NEW;
+            break;
+        case OH_ABILITY_STATE_BACKGROUND_NEW: // 4
+            ohState = LifecycleAdapter.OH_STATE_BACKGROUND_NEW;
+            break;
+        case OH_ABILITY_STATE_INACTIVE: // 2
+            ohState = LifecycleAdapter.OH_STATE_INACTIVE;
+            break;
+        case OH_ABILITY_STATE_INITIAL: // 0
+        default:
+            ohState = LifecycleAdapter.OH_STATE_INITIAL;
+            break;
+    }
+
+    // 委托给 LifecycleAdapter 处理映射与派发
+    LifecycleAdapter.getInstance().onOHLifecycleCallback(0, ohState);
+}
+</pre>
+
+<h3>5.3 LifecycleAdapter — 生命周期双向映射引擎</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/converter/LifecycleAdapter.java</code></td></tr>
+  <tr><td>模式</td><td>单例</td></tr>
+  <tr><td>职责</td><td>OH 4 状态 ↔ Android 6 状态的双向映射 + ClientTransaction 派发</td></tr>
+</table>
+
+<h4>状态映射表</h4>
+
+<div class="diagram">
+<pre style="border:none; background:none; margin:0; padding:0;">
+Android 生命周期                          OH 生命周期
+
+  CREATED (1) ───┐
+                  ├──→ INACTIVE (1)      ← onCreate 完成
+  STARTED (2) ───┘
+
+  RESUMED (3) ────────→ FOREGROUND (2)   ← 前台可见
+
+  PAUSED (4) ─────────→ FOREGROUND (2)   ← OH 无 pause 对应，保持前台
+
+  STOPPED (5) ────────→ BACKGROUND (4)   ← 后台
+
+  DESTROYED (6) ──────→ INITIAL (0)      ← 销毁
+</pre>
+</div>
+
+<h4>dispatchAndroidLifecycle 核心实现</h4>
+
+<pre>
+// LifecycleAdapter.java - dispatchAndroidLifecycle()
+
+private void dispatchAndroidLifecycle(int token, int androidState) {
+    ActivityThread activityThread = ActivityThread.currentActivityThread();
+    IApplicationThread appThread = activityThread.getApplicationThread();
+    IBinder activityToken = getActivityToken(token);
+
+    ClientTransaction transaction = ClientTransaction.obtain(appThread, activityToken);
+
+    switch (androidState) {
+        case ANDROID_STATE_RESUMED:
+            transaction.setLifecycleStateRequest(
+                ResumeActivityItem.obtain(true /* isForward */));
+            break;
+        case ANDROID_STATE_PAUSED:
+            transaction.setLifecycleStateRequest(
+                PauseActivityItem.obtain());
+            break;
+        case ANDROID_STATE_STOPPED:
+            transaction.setLifecycleStateRequest(
+                StopActivityItem.obtain(0 /* configChanges */));
+            break;
+        case ANDROID_STATE_DESTROYED:
+            transaction.setLifecycleStateRequest(
+                DestroyActivityItem.obtain(false, 0));
+            break;
+    }
+
+    appThread.scheduleTransaction(transaction);
+}
+</pre>
+
+<h3>5.4 WindowCallbackBridge — 窗口事件回调</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/callback/WindowCallbackBridge.java</code></td></tr>
+  <tr><td>OH 接口</td><td><code>IWindow-OH</code>（26 个方法）</td></tr>
+  <tr><td>Android 目标</td><td><code>IWindow-Android</code>（窗口状态通知）</td></tr>
+</table>
+
+<h4>已实现的回调方法</h4>
+
+<table>
+  <tr>
+    <th>OH 方法</th>
+    <th>状态</th>
+    <th>Android 目标方法</th>
+  </tr>
+  <tr>
+    <td><code>UpdateWindowState(state)</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(state == 1)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifyForeground()</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(true)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifyBackground()</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(false)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifyForegroundInteractiveStatus(interactive)</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(interactive)</code></td>
+  </tr>
+  <tr>
+    <td><code>UpdateFocusStatus(focused)</code></td>
+    <td><span class="tag-partial">PARTIAL</span></td>
+    <td><code>IWindow.windowFocusChanged(focused, false)</code></td>
+  </tr>
+</table>
+
+<h4>dispatchAppVisibility / dispatchWindowFocusChanged 实现</h4>
+
+<p>两个 dispatch 方法均采用「类型检查 + 反射回退」的双保险策略：</p>
+
+<pre>
+// WindowCallbackBridge.java
+
+private void dispatchAppVisibility(boolean visible) {
+    if (mIWindow != null) {
+        try {
+            mIWindow.dispatchAppVisibility(visible);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Failed to dispatch app visibility", e);
+        }
+    } else {
+        // 反射回退路径
+        try {
+            Method method = mAndroidWindow.getClass()
+                .getMethod("dispatchAppVisibility", boolean.class);
+            method.invoke(mAndroidWindow, visible);
+        } catch (Exception e) {
+            Log.e(TAG, "Reflection fallback failed", e);
+        }
+    }
+}
+</pre>
+
+<h3>5.5 SessionStageBridge — 场景会话回调</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/callback/SessionStageBridge.java</code></td></tr>
+  <tr><td>OH 接口</td><td><code>ISessionStage</code>（94 个方法）</td></tr>
+  <tr><td>Android 目标</td><td><code>IWindow-Android</code>（窗口事件）+ <code>IApplicationThread</code>（部分生命周期）</td></tr>
+</table>
+
+<h4>已实现的回调方法</h4>
+
+<table>
+  <tr>
+    <th>OH 方法</th>
+    <th>状态</th>
+    <th>Android 行为</th>
+  </tr>
+  <tr>
+    <td><code>SetActive(active)</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(active)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifySessionForeground()</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(true)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifySessionBackground()</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(false)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifyWindowVisibility(visible)</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(visible)</code></td>
+  </tr>
+  <tr>
+    <td><code>NotifyForegroundInteractiveStatus(interactive)</code></td>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td><code>IWindow.dispatchAppVisibility(interactive)</code></td>
+  </tr>
+</table>
+
+<!-- ==================== 第六章 ==================== -->
+<div class="page-break"></div>
+<h2>六、任务三：Surface / 渲染桥接</h2>
+
+<div class="highlight">
+<strong>核心挑战：</strong>Android 的 <code>SurfaceControl</code> 与 OH 的 <code>RSSurfaceNode</code> 是两套独立的渲染表面管理体系。
+需要在 <code>WindowSessionAdapter</code> 中将二者对接，使 Android 应用的绘制内容能够显示在 OH 合成器的渲染树中。
+</div>
+
+<h3>6.1 WindowSessionAdapter — 窗口会话适配</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/client/WindowSessionAdapter.java</code></td></tr>
+  <tr><td>Android 接口</td><td><code>IWindowSession</code>（42 个方法）</td></tr>
+  <tr><td>OH 目标</td><td><code>ISession</code>（每窗口操作）+ <code>ISceneSessionManager</code>（仅创建/销毁）</td></tr>
+</table>
+
+<h4>新增 native 方法声明</h4>
+
+<pre>
+// WindowSessionAdapter.java
+
+private static native int[] nativeCreateSession(
+    Object androidWindow, String windowName,
+    int windowType, int displayId,
+    int requestedWidth, int requestedHeight);
+
+private static native int nativeUpdateSessionRect(
+    int sessionId, int x, int y, int width, int height);
+
+private static native int nativeNotifyDrawingCompleted(int sessionId);
+
+private static native void nativeDestroySession(int sessionId);
+
+private static native long nativeGetSurfaceNodeId(int sessionId);
+</pre>
+
+<h4>addToDisplay() 实现</h4>
+
+<pre>
+// WindowSessionAdapter.java - addToDisplay()
+
+public int addToDisplay(IWindow window, WindowManager.LayoutParams attrs,
+        int viewVisibility, int layerStackId, int requestedVisibleTypes,
+        InputChannel outInputChannel, InsetsState insetsState,
+        InsetsSourceControl.Array activeControls, Rect attachedFrame,
+        float[] sizeCompatScale) throws RemoteException {
+
+    String windowName = attrs.getTitle() != null
+        ? attrs.getTitle().toString() : "AndroidWindow";
+    int width = attrs.width > 0 ? attrs.width : 1080;
+    int height = attrs.height > 0 ? attrs.height : 2340;
+
+    // 调用 native 创建 OH 窗口会话
+    int[] sessionInfo = nativeCreateSession(
+        window.asBinder(), windowName,
+        attrs.type, layerStackId, width, height);
+    // sessionInfo: [sessionId, surfaceNodeId, displayId, width, height]
+
+    if (sessionInfo == null || sessionInfo[0] &lt; 0) return -1;
+
+    // 缓存会话信息，后续 relayout/finishDrawing/remove 使用
+    mSessionMap.put(window.asBinder(), sessionInfo);
+
+    // 创建 InputChannel 对，用于输入事件传递
+    if (outInputChannel != null) {
+        InputChannel clientChannel = InputEventBridge.getInstance()
+            .createInputChannelPair(window.asBinder(), sessionInfo[0], windowName);
+        clientChannel.transferTo(outInputChannel);
+    }
+
+    // 初始化输出参数
+    if (insetsState != null) insetsState.set(new InsetsState());
+    if (sizeCompatScale != null) sizeCompatScale[0] = 1.0f;
+
+    return 0;
+}
+</pre>
+
+<h4>relayout() 实现</h4>
+
+<pre>
+// WindowSessionAdapter.java - relayout()
+
+public int relayout(IWindow window, WindowManager.LayoutParams attrs,
+        int requestedWidth, int requestedHeight, int viewVisibility,
+        int flags, int seq, int lastSyncSeqId, ClientWindowFrames outFrames,
+        MergedConfiguration outMergedConfiguration, SurfaceControl outSurfaceControl,
+        InsetsState insetsState, InsetsSourceControl.Array activeControls,
+        Bundle bundle) throws RemoteException {
+
+    int[] sessionInfo = mSessionMap.get(window.asBinder());
+    if (sessionInfo == null) return -1;
+
+    int sessionId = sessionInfo[0];
+    int width = requestedWidth > 0 ? requestedWidth : sessionInfo[3];
+    int height = requestedHeight > 0 ? requestedHeight : sessionInfo[4];
+
+    // 1. 更新 OH 会话矩形
+    nativeUpdateSessionRect(sessionId, 0, 0, width, height);
+
+    // 2. 填充输出帧信息
+    if (outFrames != null) {
+        Rect frame = new Rect(0, 0, width, height);
+        outFrames.frame.set(frame);
+        outFrames.displayFrame.set(frame);
+        outFrames.parentFrame.set(frame);
+    }
+
+    // 3. 填充 MergedConfiguration
+    if (outMergedConfiguration != null) {
+        Configuration config = new Configuration();
+        config.screenWidthDp = width * 160 / 320;
+        config.screenHeightDp = height * 160 / 320;
+        config.densityDpi = 320;
+        outMergedConfiguration.setOverrideConfiguration(config);
+    }
+
+    // 4. 创建 SurfaceControl（关联 OH RSSurfaceNode）
+    if (outSurfaceControl != null) {
+        long surfaceNodeId = nativeGetSurfaceNodeId(sessionId);
+        SurfaceControl sc = new SurfaceControl.Builder()
+            .setName("OH_Surface_" + sessionId)
+            .setBufferSize(width, height)
+            .build();
+        outSurfaceControl.copyFrom(sc, "OH_relayout");
+    }
+
+    return 0;
+}
+</pre>
+
+<h4>finishDrawing() / remove() 实现</h4>
+
+<pre>
+// WindowSessionAdapter.java
+
+public void finishDrawing(IWindow window,
+        SurfaceControl.Transaction postDrawTransaction,
+        int seqId) throws RemoteException {
+    int[] sessionInfo = mSessionMap.get(window.asBinder());
+    if (sessionInfo != null) {
+        nativeNotifyDrawingCompleted(sessionInfo[0]);
+    }
+}
+
+public void remove(IWindow window) throws RemoteException {
+    InputEventBridge.getInstance().destroyInputChannel(window.asBinder());
+    int[] sessionInfo = mSessionMap.remove(window.asBinder());
+    if (sessionInfo != null) {
+        nativeDestroySession(sessionInfo[0]);
+    }
+}
+</pre>
+
+<h3>6.2 OH RSSurfaceNode 与 Android SurfaceControl 的桥接</h3>
+
+<div class="diagram">
+<pre style="border:none; background:none; margin:0; padding:0;">
+Android App                 适配层                    OH 系统
+    │                         │                         │
+    │  ViewRootImpl           │                         │
+    │  .setView()             │                         │
+    │     │                   │                         │
+    │     v                   │                         │
+    │  addToDisplay()────────→│  nativeCreateSession()  │
+    │                         ├────────────────────────→│
+    │                         │  CreateAndConnect...()  │
+    │                         │                         │
+    │                         │←────────────────────────│
+    │                         │  sessionId + surfaceNodeId
+    │                         │                         │
+    │  performTraversals()    │                         │
+    │     │                   │                         │
+    │     v                   │                         │
+    │  relayout()────────────→│  nativeUpdateSessionRect│
+    │                         ├────────────────────────→│
+    │                         │  UpdateSessionRect()    │
+    │                         │                         │
+    │  ┌──────────────────┐   │                         │
+    │  │outSurfaceControl │←──│  SurfaceControl.Builder │
+    │  │  (Android渲染目标)│   │  .setName("OH_xxx")    │
+    │  └────────┬─────────┘   │  .setBufferSize(w,h)   │
+    │           │             │        ↕                │
+    │           │             │  OH RSSurfaceNode       │
+    │           │             │  (surfaceNodeId)        │
+    │           v             │                         │
+    │  Canvas.drawXxx()       │                         │
+    │  (绘制到 Surface)       │                         │
+    │           │             │                         │
+    │           v             │                         │
+    │  finishDrawing()───────→│  nativeNotifyDrawing    │
+    │                         │  Completed()            │
+    │                         ├────────────────────────→│
+    │                         │  NotifyDrawingCompleted │
+    │                         │                         │
+    │                         │           OH 合成器开始  │
+    │                         │           合成显示内容    │
+</pre>
+</div>
+
+<div class="info">
+<strong>关键说明：</strong>当前阶段 <code>SurfaceControl</code> 由标准 Builder 创建。后续阶段需要实现
+共享内存（SharedBuffer）机制，使 Android Canvas 的渲染结果直接写入 OH RSSurfaceNode 的 buffer，
+实现零拷贝渲染。这是性能优化的关键路径。
+</div>
+
+<!-- ==================== 第七章 (新增) ==================== -->
+<div class="page-break"></div>
+<h2>七、任务四：输入事件桥接 — OH MMI → Android InputChannel</h2>
+
+<div class="highlight">
+<strong>新增任务（Hello World 增强）：</strong>在 Hello World 应用中增加一个"Change Color"按钮，
+点击按钮改变"Hello World!"文本的字体颜色。此功能的目的是打通 OH 到 Android 的完整输入事件处理流程，
+验证触摸事件能从 OH 输入子系统正确传递到 Android View 层级。
+</div>
+
+<h3>7.1 输入事件管道架构</h3>
+
+<p>Android 的输入事件通过 <code>InputChannel</code>（基于 socketpair）从系统侧传递到应用侧。
+在标准 Android 中，<code>InputDispatcher</code>（system_server 进程）通过 <code>InputPublisher</code>
+向 InputChannel 的 server 端写入 <code>InputMessage</code>，
+<code>ViewRootImpl</code> 的 <code>WindowInputEventReceiver</code> 从 client 端读取，
+然后分发到 View 层级。</p>
+
+<p>在适配层中，没有 Android 的 InputDispatcher。取而代之的是 OH 的 MultiModal Input (MMI) 框架。
+适配层需要：</p>
+<ol>
+  <li>在 <code>addToDisplay()</code> 时创建 Android <code>InputChannel</code> 对，client 端给 ViewRootImpl</li>
+  <li>保留 server 端，由 <code>InputEventBridge</code> 管理</li>
+  <li>当 OH MMI 向窗口投递触摸事件时，在 native 层转换为 Android <code>InputMessage</code> 格式</li>
+  <li>通过 <code>InputPublisher</code>（或直接写入 server fd）投递给 ViewRootImpl</li>
+</ol>
+
+<div class="diagram">
+<pre style="border:none; background:none; margin:0; padding:0;">
+用户触摸屏幕
+     │
+     v
+OH MMI Framework (MultiModal Input)
+     │
+     v
+OH 输入事件通道 (eventFd)    ←── 在 CreateAndConnectSpecificSession 时建立
+     │
+     v
+┌─────────────────────────────────────────────┐
+│  OHInputBridge (C++ native)                 │
+│                                             │
+│  monitorOHInputEvents() [监控线程]           │
+│    ├── poll(ohInputFd)                      │
+│    ├── 读取 OH PointerEvent                  │
+│    └── 转换为 Android InputMessage           │
+│                                             │
+│  writeMotionEvent(serverFd, ...)            │
+│    ├── 构造 InputMessage 结构体              │
+│    │   (header + MotionEventBody)            │
+│    └── send(serverFd, &amp;msg, sizeof(msg))    │
+└───────────────────┬─────────────────────────┘
+                    │ Android InputChannel (socketpair)
+                    │
+      server fd ────┘         client fd ──────┐
+      (适配层写入)                              │
+                                               v
+                              ┌──────────────────────────────┐
+                              │  ViewRootImpl                │
+                              │                              │
+                              │  WindowInputEventReceiver    │
+                              │    .onInputEvent(event)      │
+                              │         │                    │
+                              │         v                    │
+                              │  DecorView                   │
+                              │    .dispatchTouchEvent()     │
+                              │         │                    │
+                              │         v                    │
+                              │  Button.onTouchEvent()       │
+                              │    → onClick()               │
+                              │    → 改变 Hello World 颜色   │
+                              └──────────────────────────────┘
+</pre>
+</div>
+
+<h3>7.2 InputEventBridge — Java 层管理器</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/converter/InputEventBridge.java</code> <strong>(新文件)</strong></td></tr>
+  <tr><td>模式</td><td>单例</td></tr>
+  <tr><td>职责</td><td>管理每个窗口的 InputChannel 对，注册 server 端到 native 层</td></tr>
+</table>
+
+<h4>核心方法</h4>
+
+<table>
+  <tr>
+    <th>方法</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td><code>createInputChannelPair(windowToken, sessionId, name)</code></td>
+    <td>创建 InputChannel socketpair，将 server 端注册到 native <code>OHInputBridge</code>，返回 client 端</td>
+  </tr>
+  <tr>
+    <td><code>destroyInputChannel(windowToken)</code></td>
+    <td>释放 InputChannel 资源，注销 native 端</td>
+  </tr>
+  <tr>
+    <td><code>nativeRegisterInputChannel(sessionId, serverChannel)</code></td>
+    <td>JNI：将 server 端 fd 注册到 C++ <code>OHInputBridge</code></td>
+  </tr>
+  <tr>
+    <td><code>nativeUnregisterInputChannel(sessionId)</code></td>
+    <td>JNI：注销并清理 native 端资源</td>
+  </tr>
+</table>
+
+<h4>关键实现</h4>
+
+<pre>
+// InputEventBridge.java - createInputChannelPair()
+
+public InputChannel createInputChannelPair(IBinder windowToken, int sessionId,
+                                            String windowName) {
+    String channelName = windowName + " (OH session " + sessionId + ")";
+    InputChannel[] channels = InputChannel.openInputChannelPair(channelName);
+
+    // channels[0] = server (适配层写入端)
+    // channels[1] = client (ViewRootImpl 读取端)
+    InputChannel serverChannel = channels[0];
+    InputChannel clientChannel = channels[1];
+
+    mServerChannels.put(sessionId, serverChannel);
+    mWindowSessionMap.put(windowToken, sessionId);
+
+    // 将 server channel 的 fd 注册到 native InputPublisher
+    nativeRegisterInputChannel(sessionId, serverChannel);
+
+    return clientChannel;
+}
+</pre>
+
+<h3>7.3 OHInputBridge — C++ 层实现</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/window/jni/oh_input_bridge.h/cpp</code> <strong>(新文件)</strong></td></tr>
+  <tr><td>模式</td><td>单例</td></tr>
+  <tr><td>职责</td><td>管理 server 端 fd 和 InputPublisher，转换并投递触摸事件</td></tr>
+</table>
+
+<h4>核心数据结构</h4>
+
+<pre>
+// oh_input_bridge.h
+
+struct SessionInput {
+    int serverFd = -1;      // Android server-side InputChannel fd
+    int ohInputFd = -1;     // OH 输入事件 fd
+    uint32_t seq = 0;       // InputPublisher 序列号
+};
+</pre>
+
+<h4>InputMessage 写入</h4>
+
+<p>native 层直接构造 Android <code>InputMessage</code> 结构体并通过 <code>send()</code> 写入 server fd。
+消息格式必须与 AOSP <code>InputConsumer::consume()</code> 的解析逻辑匹配。</p>
+
+<pre>
+// oh_input_bridge.cpp - writeMotionEvent()
+
+int OHInputBridge::writeMotionEvent(int fd, uint32_t seq, int32_t action,
+                                     float x, float y,
+                                     int64_t downTime, int64_t eventTime) {
+    struct {
+        InputMessageHeader header;
+        MotionEventBody body;
+    } msg;
+    memset(&amp;msg, 0, sizeof(msg));
+
+    msg.header.type = INPUT_MSG_TYPE_MOTION; // 2
+    msg.header.seq = seq;
+
+    msg.body.source = AINPUT_SOURCE_TOUCHSCREEN;
+    msg.body.action = action;
+    msg.body.downTime = downTime;
+    msg.body.eventTime = eventTime;
+
+    // 单指触摸
+    msg.body.pointerCount = 1;
+    msg.body.pointerProperties.id = 0;
+    msg.body.pointerProperties.toolType = AMOTION_EVENT_TOOL_TYPE_FINGER;
+    msg.body.pointerCoords.bits = AXIS_X_BIT | AXIS_Y_BIT | AXIS_PRESSURE_BIT;
+    msg.body.pointerCoords.values[0] = x;     // X
+    msg.body.pointerCoords.values[1] = y;     // Y
+    msg.body.pointerCoords.values[2] = 1.0f;  // PRESSURE
+
+    // Identity transform
+    msg.body.dsdx = 1.0f;
+    msg.body.dsdy = 1.0f;
+
+    ssize_t written = send(fd, &amp;msg, sizeof(msg), MSG_DONTWAIT | MSG_NOSIGNAL);
+    return (written &gt; 0) ? 0 : -errno;
+}
+</pre>
+
+<h4>OH 输入事件监控线程</h4>
+
+<p><code>monitorOHInputEvents()</code> 在后台线程中 poll OH 输入 fd，读取 OH PointerEvent，
+转换为 Android MotionEvent 参数，调用 <code>injectTouchEvent()</code> 写入 Android InputChannel。</p>
+
+<pre>
+// oh_input_bridge.cpp - 监控线程核心逻辑
+
+void OHInputBridge::monitorOHInputEvents() {
+    while (monitoring_) {
+        // 收集所有有效的 OH 输入 fd
+        std::vector&lt;pollfd&gt; fds;
+        // ...
+
+        int ret = poll(fds.data(), fds.size(), 100 /* ms */);
+        if (ret &lt;= 0) continue;
+
+        for (size_t i = 0; i &lt; fds.size(); i++) {
+            if (fds[i].revents &amp; POLLIN) {
+                // 读取 OH MMI 事件
+                uint8_t buf[4096];
+                ssize_t n = read(fds[i].fd, buf, sizeof(buf));
+                // Phase 2: 解析 OH 事件格式并调用 injectTouchEvent()
+            }
+        }
+    }
+}
+</pre>
+
+<h3>7.4 WindowSessionAdapter — InputChannel 集成</h3>
+
+<p>在 <code>addToDisplay()</code> 中新增 InputChannel 创建逻辑：</p>
+
+<pre>
+// WindowSessionAdapter.java - addToDisplay() 中新增
+
+// 创建 InputChannel 对，用于输入事件传递
+// client 端给 ViewRootImpl，server 端由 InputEventBridge 管理
+if (outInputChannel != null) {
+    InputChannel clientChannel = InputEventBridge.getInstance()
+            .createInputChannelPair(window.asBinder(), sessionInfo[0], windowName);
+    clientChannel.transferTo(outInputChannel);
+}
+</pre>
+
+<p>在 <code>remove()</code> 中新增 InputChannel 清理：</p>
+
+<pre>
+// WindowSessionAdapter.java - remove() 中新增
+
+InputEventBridge.getInstance().destroyInputChannel(window.asBinder());
+</pre>
+
+<h3>7.5 Hello World 应用增强</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>app/java/com/example/helloworld/MainActivity.java</code></td></tr>
+  <tr><td>变更</td><td>新增 "Hello World!" 大号文本 + "Change Color" 按钮</td></tr>
+</table>
+
+<h4>UI 变更</h4>
+
+<ul>
+  <li>新增 <code>mHelloText</code>：36sp 字号的 "Hello World!" 文本，居中显示</li>
+  <li>新增 "Change Color (Input Event Test)" 按钮，点击后循环切换文本颜色</li>
+  <li>颜色列表：BLACK → RED → BLUE → GREEN → MAGENTA → ORANGE → CYAN → PURPLE</li>
+  <li>每次点击会在状态栏显示 "[INPUT OK] Color → XXX"，确认输入事件管道正常工作</li>
+</ul>
+
+<h4>关键代码</h4>
+
+<pre>
+// MainActivity.java
+
+private static final int[] COLORS = {
+    Color.BLACK, Color.RED, Color.BLUE, Color.GREEN,
+    Color.MAGENTA, Color.rgb(255, 128, 0), Color.CYAN, Color.rgb(128, 0, 255)
+};
+
+// Button onClick: 验证完整的输入事件管道
+// OH MMI → OH Input Channel → OHInputBridge → InputPublisher
+// → Android InputChannel → ViewRootImpl → View hierarchy → Button.onClick
+btnChangeColor.setOnClickListener(v -> {
+    mColorIndex = (mColorIndex + 1) % COLORS.length;
+    mHelloText.setTextColor(COLORS[mColorIndex]);
+});
+</pre>
+
+<h3>7.6 输入事件处理完整时序</h3>
+
+<table>
+  <tr>
+    <th>步骤</th>
+    <th>方向</th>
+    <th>组件</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>OH</td>
+    <td>OH MMI Framework</td>
+    <td>用户触摸屏幕，OH 输入子系统检测触摸事件</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>OH→适配层</td>
+    <td>OH Input Channel (eventFd)</td>
+    <td>MMI 通过窗口关联的输入通道投递 PointerEvent</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>C++</td>
+    <td><code>OHInputBridge.monitorOHInputEvents()</code></td>
+    <td>监控线程 poll 到 OH 输入事件，读取 PointerEvent</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>C++</td>
+    <td><code>OHInputBridge.injectTouchEvent()</code></td>
+    <td>转换 OH PointerEvent → Android MotionEvent 参数</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>C++</td>
+    <td><code>OHInputBridge.writeMotionEvent()</code></td>
+    <td>构造 InputMessage 结构体，send() 到 server fd</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>适配层→Android</td>
+    <td>Android InputChannel (socketpair)</td>
+    <td>数据从 server fd 传输到 client fd</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td>Android</td>
+    <td><code>ViewRootImpl.WindowInputEventReceiver</code></td>
+    <td>Looper 监控 client fd，触发 <code>onInputEvent()</code></td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>Android</td>
+    <td><code>View.dispatchTouchEvent()</code></td>
+    <td>触摸事件沿 View 树分发：DecorView → LinearLayout → Button</td>
+  </tr>
+  <tr>
+    <td>9</td>
+    <td>Android</td>
+    <td><code>Button.performClick()</code></td>
+    <td>ACTION_DOWN + ACTION_UP 序列触发 click 事件</td>
+  </tr>
+  <tr>
+    <td>10</td>
+    <td>App</td>
+    <td><code>OnClickListener.onClick()</code></td>
+    <td>"Hello World!" 文本颜色改变，管道验证成功</td>
+  </tr>
+</table>
+
+<h3>7.7 OH PointerEvent → Android MotionEvent 映射</h3>
+
+<table>
+  <tr>
+    <th>OH PointerEvent 字段</th>
+    <th>Android MotionEvent 字段</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td><code>action (DOWN/UP/MOVE)</code></td>
+    <td><code>action (ACTION_DOWN=0 / ACTION_UP=1 / ACTION_MOVE=2)</code></td>
+    <td>1:1 映射</td>
+  </tr>
+  <tr>
+    <td><code>pointerId</code></td>
+    <td><code>PointerProperties.id</code></td>
+    <td>指针标识</td>
+  </tr>
+  <tr>
+    <td><code>displayX / displayY</code></td>
+    <td><code>PointerCoords.values[AXIS_X / AXIS_Y]</code></td>
+    <td>触摸坐标（窗口空间）</td>
+  </tr>
+  <tr>
+    <td><code>pressure</code></td>
+    <td><code>PointerCoords.values[AXIS_PRESSURE]</code></td>
+    <td>压力值 (0.0~1.0)</td>
+  </tr>
+  <tr>
+    <td><code>actionTime</code></td>
+    <td><code>eventTime (ns)</code></td>
+    <td>事件时间戳</td>
+  </tr>
+  <tr>
+    <td><code>sourceType = TOUCHSCREEN</code></td>
+    <td><code>source = AINPUT_SOURCE_TOUCHSCREEN (0x1002)</code></td>
+    <td>输入源</td>
+  </tr>
+  <tr>
+    <td><code>toolType = FINGER</code></td>
+    <td><code>PointerProperties.toolType = TOOL_TYPE_FINGER (1)</code></td>
+    <td>工具类型</td>
+  </tr>
+</table>
+
+<!-- ==================== 第八章 ==================== -->
+<div class="page-break"></div>
+<h2>八、辅助模块更新</h2>
+
+<h3>8.1 IntentWantConverter — 新增 abilityNameToClassName</h3>
+
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>文件</td><td><code>framework/java/com/android/adapter/converter/IntentWantConverter.java</code></td></tr>
+  <tr><td>变更类型</td><td>新增 public 方法</td></tr>
+</table>
+
+<p>原有的 <code>mapAbilityToClassName()</code> 是 private 方法，仅在 <code>wantToIntent()</code> 内部使用。
+反向回调桥接类 <code>AppSchedulerBridge.nativeOnScheduleLaunchAbility()</code> 需要将 OH abilityName 转换为 Android className，
+因此新增了 public 包装方法：</p>
+
+<pre>
+// IntentWantConverter.java
+
+/**
+ * Public API: convert OH abilityName to Android className.
+ * Used by reverse callback bridges (e.g., AppSchedulerBridge).
+ */
+public static String abilityNameToClassName(String abilityName) {
+    return mapAbilityToClassName(abilityName);
+}
+
+// 内部实现：移除 "Ability" 后缀
+private static String mapAbilityToClassName(String abilityName) {
+    if (abilityName.endsWith("Ability")) {
+        return abilityName.substring(0, abilityName.length() - "Ability".length());
+    }
+    return abilityName;
+}
+</pre>
+
+<p>转换示例：</p>
+<table>
+  <tr><th>OH abilityName</th><th>Android className</th></tr>
+  <tr><td><code>MainActivityAbility</code></td><td><code>MainActivity</code></td></tr>
+  <tr><td><code>SecondActivityAbility</code></td><td><code>SecondActivity</code></td></tr>
+  <tr><td><code>SettingsAbility</code></td><td><code>Settings</code></td></tr>
+  <tr><td><code>SomeService</code>（无 Ability 后缀）</td><td><code>SomeService</code>（原样返回）</td></tr>
+</table>
+
+<!-- ==================== 第八章 ==================== -->
+<div class="page-break"></div>
+<h2>九、Hello World 完整调用流程</h2>
+
+<h3>9.1 应用启动与初始化</h3>
+
+<table>
+  <tr>
+    <th>步骤</th>
+    <th>调用方</th>
+    <th>方法</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>Android</td>
+    <td><code>HelloWorldApplication.onCreate()</code></td>
+    <td>Application 启动入口</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>Java</td>
+    <td><code>OHEnvironment.initialize()</code></td>
+    <td>初始化适配层</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>JNI</td>
+    <td><code>nativeInitialize()</code></td>
+    <td>初始化 OH IPC 框架（<code>IPCSkeleton::SetCallingIdentity</code>）</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>JNI</td>
+    <td><code>nativeConnectToOHServices()</code></td>
+    <td>连接三个 OH 系统服务（SA 180, 501, 4607）</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>C++</td>
+    <td><code>OHAbilityManagerClient.connect()</code></td>
+    <td>获取 AbilityManager 代理</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>C++</td>
+    <td><code>OHAppMgrClient.connect()</code></td>
+    <td>获取 AppMgr 代理</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td>C++</td>
+    <td><code>OHWindowManagerClient.connect()</code></td>
+    <td>获取 SceneSessionManager 代理（SA 4607）</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>JNI</td>
+    <td><code>nativeAttachApplication()</code></td>
+    <td>向 OH AppMgr 注册应用进程，同时注册 <code>AppSchedulerHost</code> 回调桩</td>
+  </tr>
+</table>
+
+<h3>9.2 Activity 启动完整时序</h3>
+
+<table>
+  <tr>
+    <th>步骤</th>
+    <th>方向</th>
+    <th>调用方法</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>OH→App</td>
+    <td><code>AppSchedulerHost.ScheduleLaunchAbility()</code></td>
+    <td>OH AbilityMgr 通过注册的 Stub 回调</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>C++→Java</td>
+    <td><code>JNI CallStaticMethod → AppSchedulerBridge.nativeOnScheduleLaunchAbility()</code></td>
+    <td>C++ 通过 JNI 调用 Java 静态方法</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>Java</td>
+    <td><code>IntentWantConverter.abilityNameToClassName()</code></td>
+    <td>OH abilityName → Android className</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>Java</td>
+    <td><code>ClientTransaction.obtain() + LaunchActivityItem + ResumeActivityItem</code></td>
+    <td>构造 Android 生命周期事务</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>Java</td>
+    <td><code>LifecycleAdapter.registerActivityToken(ohToken, activityToken)</code></td>
+    <td>建立 OH → Android token 映射</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>Java</td>
+    <td><code>ApplicationThread.scheduleTransaction()</code></td>
+    <td>派发事务到 ActivityThread 主线程</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td>Android</td>
+    <td><code>ActivityThread.handleLaunchActivity()</code></td>
+    <td>创建 Activity 实例</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>Android</td>
+    <td><code>Activity.onCreate() → setContentView()</code></td>
+    <td>应用代码执行，设置布局</td>
+  </tr>
+  <tr>
+    <td>9</td>
+    <td>Android</td>
+    <td><code>Activity.onStart() → Activity.onResume()</code></td>
+    <td>Activity 进入 RESUMED 状态</td>
+  </tr>
+</table>
+
+<h3>9.3 窗口创建与首帧渲染</h3>
+
+<table>
+  <tr>
+    <th>步骤</th>
+    <th>方向</th>
+    <th>调用方法</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>Android</td>
+    <td><code>ViewRootImpl.setView()</code></td>
+    <td>Activity 的 DecorView 附加到窗口系统</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>App→OH</td>
+    <td><code>WindowSessionAdapter.addToDisplay()</code><br><code>→ nativeCreateSession()</code></td>
+    <td>创建 OH 窗口会话，注册 SessionStageAdapter + WindowCallbackAdapter</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>OH→App</td>
+    <td><code>SessionStageBridge.onSetActive(true)</code></td>
+    <td>OH 通知窗口激活，触发 <code>dispatchAppVisibility(true)</code></td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>Android</td>
+    <td><code>ViewRootImpl.performTraversals()</code></td>
+    <td>首次 measure / layout / draw 序列</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>App→OH</td>
+    <td><code>WindowSessionAdapter.relayout()</code><br><code>→ nativeUpdateSessionRect()</code></td>
+    <td>更新 OH 会话矩形，创建 SurfaceControl（关联 RSSurfaceNode）</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td>Android</td>
+    <td><code>ViewRootImpl.draw()</code></td>
+    <td>Canvas 绘制 "Hello World" 内容到 Surface</td>
+  </tr>
+  <tr>
+    <td>7</td>
+    <td>App→OH</td>
+    <td><code>WindowSessionAdapter.finishDrawing()</code><br><code>→ nativeNotifyDrawingCompleted()</code></td>
+    <td>通知 OH 绘制完成，OH 合成器开始合成显示</td>
+  </tr>
+  <tr>
+    <td>8</td>
+    <td>OH</td>
+    <td>OH RenderService 合成</td>
+    <td>"Hello World" 界面显示在屏幕上</td>
+  </tr>
+</table>
+
+<!-- ==================== 第九章 ==================== -->
+<div class="page-break"></div>
+<h2>十、数据结构与类型映射</h2>
+
+<h3>10.1 OH Want ↔ Android Intent</h3>
+
+<table>
+  <tr>
+    <th>Android Intent 字段</th>
+    <th>OH Want 字段</th>
+    <th>转换方法</th>
+  </tr>
+  <tr>
+    <td><code>component.packageName</code></td>
+    <td><code>bundleName</code></td>
+    <td>直通（Phase 1）</td>
+  </tr>
+  <tr>
+    <td><code>component.className</code></td>
+    <td><code>abilityName</code></td>
+    <td>添加/移除 "Ability" 后缀</td>
+  </tr>
+  <tr>
+    <td><code>action</code></td>
+    <td><code>action</code></td>
+    <td>映射表（ACTION_MAIN → ohos.want.action.home 等）</td>
+  </tr>
+  <tr>
+    <td><code>data</code> (URI)</td>
+    <td><code>uri</code></td>
+    <td>直通</td>
+  </tr>
+  <tr>
+    <td><code>extras</code> (Bundle)</td>
+    <td><code>parameters</code> (JSON)</td>
+    <td><code>bundleToJson()</code> / <code>jsonToBundle()</code></td>
+  </tr>
+</table>
+
+<h3>10.2 OH 生命周期状态 ↔ Android 生命周期状态</h3>
+
+<table>
+  <tr>
+    <th>OH 常量</th>
+    <th>OH 值</th>
+    <th>Android 常量</th>
+    <th>Android 值</th>
+    <th>ClientTransaction Item</th>
+  </tr>
+  <tr>
+    <td><code>OH_STATE_INITIAL</code></td>
+    <td>0</td>
+    <td><code>DESTROYED</code></td>
+    <td>6</td>
+    <td><code>DestroyActivityItem</code></td>
+  </tr>
+  <tr>
+    <td><code>OH_STATE_INACTIVE</code></td>
+    <td>1</td>
+    <td><code>STARTED</code></td>
+    <td>2</td>
+    <td>（resume 序列的一部分）</td>
+  </tr>
+  <tr>
+    <td><code>OH_STATE_FOREGROUND_NEW</code></td>
+    <td>2</td>
+    <td><code>RESUMED</code></td>
+    <td>3</td>
+    <td><code>ResumeActivityItem</code></td>
+  </tr>
+  <tr>
+    <td><code>OH_STATE_BACKGROUND_NEW</code></td>
+    <td>4</td>
+    <td><code>STOPPED</code></td>
+    <td>5</td>
+    <td><code>StopActivityItem</code></td>
+  </tr>
+</table>
+
+<h3>10.3 OH 窗口会话信息</h3>
+
+<table>
+  <tr>
+    <th>字段</th>
+    <th>类型</th>
+    <th>JNI 返回数组索引</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td><code>sessionId</code></td>
+    <td>int</td>
+    <td>[0]</td>
+    <td>OH 窗口会话唯一标识</td>
+  </tr>
+  <tr>
+    <td><code>surfaceNodeId</code></td>
+    <td>int</td>
+    <td>[1]</td>
+    <td>OH RSSurfaceNode ID，用于渲染表面关联</td>
+  </tr>
+  <tr>
+    <td><code>displayId</code></td>
+    <td>int</td>
+    <td>[2]</td>
+    <td>显示器 ID</td>
+  </tr>
+  <tr>
+    <td><code>width</code></td>
+    <td>int</td>
+    <td>[3]</td>
+    <td>窗口宽度（像素）</td>
+  </tr>
+  <tr>
+    <td><code>height</code></td>
+    <td>int</td>
+    <td>[4]</td>
+    <td>窗口高度（像素）</td>
+  </tr>
+</table>
+
+<h3>10.4 OH AvoidArea → Android Insets 映射</h3>
+
+<table>
+  <tr>
+    <th>OH AvoidAreaType</th>
+    <th>Android InsetsSource</th>
+    <th>用途</th>
+  </tr>
+  <tr>
+    <td><code>TYPE_SYSTEM</code></td>
+    <td><code>STATUS_BAR</code></td>
+    <td>状态栏区域</td>
+  </tr>
+  <tr>
+    <td><code>TYPE_NAVIGATION</code></td>
+    <td><code>NAVIGATION_BAR</code></td>
+    <td>导航栏区域</td>
+  </tr>
+  <tr>
+    <td><code>TYPE_CUTOUT</code></td>
+    <td><code>DISPLAY_CUTOUT</code></td>
+    <td>刘海屏区域</td>
+  </tr>
+  <tr>
+    <td><code>TYPE_KEYBOARD</code></td>
+    <td><code>IME</code></td>
+    <td>输入法区域</td>
+  </tr>
+</table>
+
+<h3>10.5 OH PointerEvent → Android InputMessage</h3>
+
+<table>
+  <tr>
+    <th>InputMessage 字段</th>
+    <th>值 / 来源</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td><code>header.type</code></td>
+    <td><code>2</code> (INPUT_MSG_TYPE_MOTION)</td>
+    <td>固定为 MotionEvent 类型</td>
+  </tr>
+  <tr>
+    <td><code>header.seq</code></td>
+    <td>递增序列号</td>
+    <td>用于 InputConsumer 的 finished 确认</td>
+  </tr>
+  <tr>
+    <td><code>body.source</code></td>
+    <td><code>0x1002</code> (AINPUT_SOURCE_TOUCHSCREEN)</td>
+    <td>触摸屏输入源</td>
+  </tr>
+  <tr>
+    <td><code>body.action</code></td>
+    <td><code>0/1/2</code> (DOWN/UP/MOVE)</td>
+    <td>从 OH PointerEvent.action 映射</td>
+  </tr>
+  <tr>
+    <td><code>body.pointerCount</code></td>
+    <td><code>1</code></td>
+    <td>单指触摸（Phase 1）</td>
+  </tr>
+  <tr>
+    <td><code>body.pointerCoords.bits</code></td>
+    <td><code>AXIS_X | AXIS_Y | AXIS_PRESSURE</code></td>
+    <td>设置有效的坐标轴位掩码</td>
+  </tr>
+  <tr>
+    <td><code>body.pointerCoords.values[0..2]</code></td>
+    <td><code>x, y, pressure</code></td>
+    <td>从 OH PointerEvent 坐标映射</td>
+  </tr>
+  <tr>
+    <td><code>body.dsdx / dsdy</code></td>
+    <td><code>1.0</code></td>
+    <td>单位矩阵变换（无缩放）</td>
+  </tr>
+</table>
+
+<!-- ==================== 第十一章 ==================== -->
+<div class="page-break"></div>
+<h2>十一、文件清单与修改概要</h2>
+
+<h3>11.1 C++ / JNI 层文件</h3>
+
+<table>
+  <tr>
+    <th>文件</th>
+    <th>变更类型</th>
+    <th>概要</th>
+  </tr>
+  <tr>
+    <td><code>activity/jni/oh_ability_manager_client.h</code></td>
+    <td>修改</td>
+    <td>添加 <code>OHOS::sptr&lt;IAbilityManager&gt; proxy_</code> 成员，<code>getProxy()</code> 方法</td>
+  </tr>
+  <tr>
+    <td><code>activity/jni/oh_ability_manager_client.cpp</code></td>
+    <td>重写</td>
+    <td>通过 SystemAbilityManager 连接 SA 180，实现真实 <code>StartAbility</code> IPC</td>
+  </tr>
+  <tr>
+    <td><code>activity/jni/oh_app_mgr_client.h</code></td>
+    <td>重写</td>
+    <td>添加 JNI 感知的 <code>attachApplication</code> 重载，AppSchedulerAdapter 成员</td>
+  </tr>
+  <tr>
+    <td><code>activity/jni/oh_app_mgr_client.cpp</code></td>
+    <td>重写</td>
+    <td>连接 SA 501，创建 AppSchedulerAdapter 并注册到 AppMgr</td>
+  </tr>
+  <tr>
+    <td><code>window/jni/oh_window_manager_client.h</code></td>
+    <td><strong>新增</strong></td>
+    <td>OHWindowSession 数据结构，窗口会话管理 API</td>
+  </tr>
+  <tr>
+    <td><code>window/jni/oh_window_manager_client.cpp</code></td>
+    <td><strong>新增</strong></td>
+    <td>连接 SA 4607 (SceneSessionManager)，实现 <code>createSession</code>/<code>updateSessionRect</code>/<code>destroySession</code></td>
+  </tr>
+  <tr>
+    <td><code>core/jni/oh_callback_handler.h/cpp</code></td>
+    <td>重写</td>
+    <td>管理真实 Adapter Stub，提供各 Stub 的访问器方法</td>
+  </tr>
+  <tr>
+    <td><code>window/jni/oh_input_bridge.h</code></td>
+    <td><strong>新增</strong></td>
+    <td>输入事件桥接头文件，OHInputBridge 单例，SessionInput 结构体</td>
+  </tr>
+  <tr>
+    <td><code>window/jni/oh_input_bridge.cpp</code></td>
+    <td><strong>新增</strong></td>
+    <td>InputMessage 构造与写入，OH 输入 fd 监控线程，事件注入 API</td>
+  </tr>
+  <tr>
+    <td><code>core/jni/adapter_bridge.cpp</code></td>
+    <td>重写</td>
+    <td>新增窗口管理 JNI 方法（5个）+ 输入桥接 JNI 方法（3个），OH IPC 初始化</td>
+  </tr>
+  <tr>
+    <td><code>core/jni/CMakeLists.txt</code></td>
+    <td>修改</td>
+    <td>添加 <code>oh_window_manager_client.cpp</code> 和 <code>oh_input_bridge.cpp</code></td>
+  </tr>
+</table>
+
+<h3>11.2 Java 层文件</h3>
+
+<table>
+  <tr>
+    <th>文件</th>
+    <th>变更类型</th>
+    <th>概要</th>
+  </tr>
+  <tr>
+    <td><code>LifecycleAdapter.java</code></td>
+    <td>修改</td>
+    <td>实现 <code>dispatchAndroidLifecycle()</code>：构造 ClientTransaction + 生命周期 Item；新增 Activity token 管理</td>
+  </tr>
+  <tr>
+    <td><code>IntentWantConverter.java</code></td>
+    <td>修改</td>
+    <td>新增 public <code>abilityNameToClassName()</code> 方法</td>
+  </tr>
+  <tr>
+    <td><code>InputEventBridge.java</code></td>
+    <td><strong>新增</strong></td>
+    <td>管理 InputChannel 对，注册 server 端到 native OHInputBridge</td>
+  </tr>
+  <tr>
+    <td><code>bridge/WindowSessionAdapter.java</code></td>
+    <td>修改</td>
+    <td>实现 <code>addToDisplay</code>（含 InputChannel 创建）/<code>relayout</code>/<code>finishDrawing</code>/<code>remove</code></td>
+  </tr>
+  <tr>
+    <td><code>bridge/callback/AppSchedulerBridge.java</code></td>
+    <td>修改</td>
+    <td>新增 <code>nativeOnScheduleLaunchAbility()</code> 静态方法：构造 ClientTransaction + LaunchActivityItem，触发 Activity 创建</td>
+  </tr>
+  <tr>
+    <td><code>bridge/callback/AbilitySchedulerBridge.java</code></td>
+    <td>修改</td>
+    <td><code>onScheduleAbilityTransaction()</code> 实现 OH 状态 → Android 状态映射，通过 LifecycleAdapter 派发</td>
+  </tr>
+  <tr>
+    <td><code>bridge/callback/WindowCallbackBridge.java</code></td>
+    <td>修改</td>
+    <td>新增 <code>dispatchAppVisibility()</code>/<code>dispatchWindowFocusChanged()</code> 方法；5 个回调方法接入真实派发</td>
+  </tr>
+  <tr>
+    <td><code>bridge/callback/SessionStageBridge.java</code></td>
+    <td>修改</td>
+    <td>新增 <code>dispatchAppVisibility()</code>；5 个回调方法接入真实派发</td>
+  </tr>
+</table>
+
+<h3>11.3 应用层文件</h3>
+
+<table>
+  <tr>
+    <th>文件</th>
+    <th>变更类型</th>
+    <th>概要</th>
+  </tr>
+  <tr>
+    <td><code>app/java/.../MainActivity.java</code></td>
+    <td>修改</td>
+    <td>新增 "Hello World!" 大号文本 + "Change Color" 按钮（输入事件管道验证）</td>
+  </tr>
+  <tr>
+    <td><code>app/res/layout/activity_main.xml</code></td>
+    <td>修改</td>
+    <td>同步更新备用 XML 布局，新增 hello_text 和 btn_change_color</td>
+  </tr>
+</table>
+
+<h3>11.4 C++ Adapter Stub 文件（已有，本次未修改）</h3>
+
+<table>
+  <tr>
+    <th>文件</th>
+    <th>OH 基类</th>
+    <th>方法数</th>
+    <th>说明</th>
+  </tr>
+  <tr>
+    <td><code>app_scheduler_adapter.h/cpp</code></td>
+    <td><code>AppSchedulerHost</code></td>
+    <td>34</td>
+    <td>应用级回调，通过 JNI 调用 <code>AppSchedulerBridge</code></td>
+  </tr>
+  <tr>
+    <td><code>ability_scheduler_adapter.h/cpp</code></td>
+    <td><code>AbilitySchedulerStub</code></td>
+    <td>35</td>
+    <td>能力级回调，通过 JNI 调用 <code>AbilitySchedulerBridge</code></td>
+  </tr>
+  <tr>
+    <td><code>window_callback_adapter.h/cpp</code></td>
+    <td><code>WindowStub</code></td>
+    <td>26</td>
+    <td>窗口回调，通过 JNI 调用 <code>WindowCallbackBridge</code></td>
+  </tr>
+  <tr>
+    <td><code>session_stage_adapter.h/cpp</code></td>
+    <td><code>SessionStageStub</code></td>
+    <td>94</td>
+    <td>场景会话回调，通过 JNI 调用 <code>SessionStageBridge</code></td>
+  </tr>
+  <tr>
+    <td><code>window_manager_agent_adapter.h/cpp</code></td>
+    <td><code>WindowManagerAgentStub</code></td>
+    <td>19</td>
+    <td>窗口管理器代理回调</td>
+  </tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>附录：方法分类标签说明</h2>
+
+<table>
+  <tr>
+    <th>标签</th>
+    <th>含义</th>
+    <th>Hello World 阶段要求</th>
+  </tr>
+  <tr>
+    <td><span class="tag-bridged">BRIDGED</span></td>
+    <td>已建立完整的 OH ↔ Android 桥接通路</td>
+    <td>核心方法必须实现</td>
+  </tr>
+  <tr>
+    <td><span class="tag-partial">PARTIAL</span></td>
+    <td>部分实现，存在语义差异或功能缺失</td>
+    <td>非关键路径可延后</td>
+  </tr>
+  <tr>
+    <td><span class="tag-stub">STUB</span></td>
+    <td>OH 无对应概念，返回安全默认值</td>
+    <td>不影响 Hello World</td>
+  </tr>
+  <tr>
+    <td><span class="tag-ohonly">OH_ONLY</span></td>
+    <td>OH 特有功能，Android 无对应概念</td>
+    <td>可忽略</td>
+  </tr>
+</table>
+
+</body>
+</html>

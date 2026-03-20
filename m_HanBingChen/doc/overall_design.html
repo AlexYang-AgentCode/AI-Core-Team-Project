@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android-OpenHarmony 适配层总体设计方案</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(90deg, #e3f2fd, transparent); padding: 10px 16px; border-radius: 4px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #f0f7ff, transparent); padding: 6px 12px; border-radius: 0 4px 4px 0; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #0d47a1, #1565c0, #00695c); color: white; padding: 50px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; font-size: 2.2em; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-bridged { background: var(--bridged); }
+  .tag-stub { background: var(--stub); }
+  .tag-partial { background: var(--partial); }
+  .tag-ohonly { background: var(--ohonly); }
+  .tag-new { background: #00695c; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.78em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .toc .sub2 { padding-left: 48px; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .layer { border: 2px solid var(--primary); border-radius: 8px; padding: 16px; margin: 8px 0; background: #f8fbff; }
+  .layer-title { font-weight: 700; color: var(--primary-dark); margin-bottom: 8px; font-size: 1.05em; }
+  .phase-card { background: var(--card-bg); border: 2px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 12px 0; position: relative; }
+  .phase-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 8px 0 0 8px; }
+  .phase-1::before { background: #4caf50; }
+  .phase-2::before { background: #2196f3; }
+  .phase-3::before { background: #ff9800; }
+  .phase-4::before { background: #9c27b0; }
+  .doc-ref { background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 6px; padding: 8px 14px; margin: 8px 0; font-size: 0.9em; }
+  .doc-ref a { color: #7b1fa2; text-decoration: none; }
+  .doc-ref a:hover { text-decoration: underline; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Android-OpenHarmony 适配层总体设计方案</h1>
+  <p>在 OpenHarmony 系统上运行 Android App 的完整适配层架构设计</p>
+  <p>版本 1.0 | 2026年3月18日 | Adapter Team</p>
+</div>
+
+<!-- ================================================================ -->
+<!-- 目录 -->
+<!-- ================================================================ -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 项目概述</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 项目背景与目标</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 核心设计理念</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 全局统计数据</a></li>
+    <li><a href="#ch2">2. 总体架构</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 系统架构全景图</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 分层架构</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 适配层核心组件</a></li>
+    <li class="sub"><a href="#ch2-4">2.4 代码目录结构</a></li>
+    <li><a href="#ch3">3. 可行性分析与接口映射</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 Android 与 OH 系统服务对比</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 接口可行性分析结论</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 正向接口映射（多对多）</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 反向回调映射</a></li>
+    <li><a href="#ch4">4. 正向桥接设计</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 桥接模式：类继承</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 四大适配器</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 安装机制：AOSP 源码修改</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 Intent &harr; Want 转换</a></li>
+    <li class="sub"><a href="#ch4-5">4.5 生命周期映射</a></li>
+    <li><a href="#ch5">5. 反向回调桥接设计</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 回调方向与线程模型</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 六大回调适配器</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 两层架构：C++ Stub + Java Bridge</a></li>
+    <li><a href="#ch6">6. 图形与窗口系统桥接</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 窗口管理适配</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 Surface / 图形缓冲区桥接</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 输入事件桥接</a></li>
+    <li><a href="#ch7">7. 四大组件适配</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 Activity &harr; Ability 适配</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 Service &harr; ServiceExtensionAbility 适配</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 BroadcastReceiver &harr; CommonEventService 适配</a></li>
+    <li class="sub"><a href="#ch7-4">7.4 ContentProvider &harr; DataShareExtensionAbility 适配</a></li>
+    <li><a href="#ch8">8. 任务管理适配</a></li>
+    <li class="sub"><a href="#ch8-1">8.1 Android Task 与 OH Mission 差异</a></li>
+    <li class="sub"><a href="#ch8-2">8.2 Mission 内置 Ability 栈方案</a></li>
+    <li><a href="#ch9">9. 进程管理：appspawn-x 混合孵化器</a></li>
+    <li class="sub"><a href="#ch9-1">9.1 Android Zygote 与 OH appspawn 对比</a></li>
+    <li class="sub"><a href="#ch9-2">9.2 appspawn-x 四阶段启动</a></li>
+    <li class="sub"><a href="#ch9-3">9.3 Fork 与子进程初始化流程</a></li>
+    <li><a href="#ch10">10. APK 安装与包管理</a></li>
+    <li class="sub"><a href="#ch10-1">10.1 APK 与 HAP 对比</a></li>
+    <li class="sub"><a href="#ch10-2">10.2 安装流程设计</a></li>
+    <li class="sub"><a href="#ch10-3">10.3 PackageManager 适配</a></li>
+    <li class="sub"><a href="#ch10-4">10.4 OH 系统侧修改</a></li>
+    <li><a href="#ch11">11. OH 系统侧修改汇总</a></li>
+    <li><a href="#ch12">12. 构建系统</a></li>
+    <li><a href="#ch13">13. 实施计划</a></li>
+    <li><a href="#ch14">14. 设计文档索引</a></li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch1">1. 项目概述</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch1-1">1.1 项目背景与目标</h2>
+
+<p>本项目的目标是<strong>在 OpenHarmony（OH）系统上运行未经修改的 Android 应用程序</strong>。核心思路是在 Android Framework 与 OH 系统服务之间构建一个<strong>适配层（Adapter Layer）</strong>，拦截 Android App 通过 Binder IPC 发出的系统服务调用，将其转换并路由到等价的 OH 系统服务接口。</p>
+
+<p>这种方式不同于完整的 Android 容器或虚拟机方案：我们保留 Android 运行时（ART）和 Framework 层，但将底层系统服务替换为 OH 实现。Android App 无感知地运行在 OH 内核和系统服务之上。</p>
+
+<div class="info">
+  <strong>目标硬件：</strong>HH-SCDAYU600（DAYU600）开发板，搭载紫光展锐 UIS7885（ums9620）SoC。
+</div>
+
+<h2 id="ch1-2">1.2 核心设计理念</h2>
+
+<div class="card">
+  <h4>理念一：App 与系统服务接口桥接</h4>
+  <p>适配层的核心职责是实现 Android App 与 OH 系统服务之间的<strong>双向透明通信</strong>。正向方向上，拦截 Android App 通过 Binder IPC 发出的系统服务调用（如 ActivityManager、WindowManager、PackageManager），通过适配器将其转换为对等价 OH 系统服务（如 AbilityManager、SceneSessionManager、BundleManager）的调用，App 无需任何修改即可透明使用 OH 系统能力。反向方向上，OH 系统服务主动推送的回调（如 IAbilityScheduler 生命周期通知、ISessionStage 窗口事件、IAbilityConnection 服务连接通知）经过回调桥接层，转换为 Android App 能够识别的标准回调接口（如 IApplicationThread、IWindow、IServiceConnection），确保 App 的生命周期管理、窗口交互和服务绑定机制正常运作。整个桥接过程对 App 完全透明，530 个正向方法和 210 个反向回调方法均被覆盖。</p>
+  <div class="diagram">
+                          正向调用 (530 methods)
+                    ─────────────────────────────→
+┌──────────────┐    ┌──────────────────────────┐    ┌──────────────────────┐
+│  Android App │    │      Adapter Layer        │    │   OH System Services │
+│              │    │                           │    │                      │
+│ startActivity│───→│ ActivityTaskManagerAdapter │───→│ AbilityManager       │
+│ getWindow    │───→│ WindowManagerAdapter       │───→│ SceneSessionManager  │
+│ getPackage   │───→│ PackageManagerAdapter      │───→│ BundleManager        │
+│ sendBroadcast│───→│ ActivityManagerAdapter     │───→│ CommonEventService   │
+│              │    │                           │    │                      │
+│ IApplication │←───│ AbilitySchedulerBridge     │←───│ IAbilityScheduler    │
+│   Thread     │←───│ AppSchedulerBridge         │←───│ IAppScheduler        │
+│ IWindow      │←───│ SessionStageBridge         │←───│ ISessionStage        │
+│ IServiceConn │←───│ AbilityConnectionBridge    │←───│ IAbilityConnection   │
+└──────────────┘    └──────────────────────────┘    └──────────────────────┘
+                    ←─────────────────────────────
+                          反向回调 (210 methods)
+</div>
+</div>
+
+<div class="card">
+  <h4>理念二：Framework 自渲染</h4>
+  <p>保留完整的 Android Framework 渲染管线，App 的 UI 渲染完全由 Android Framework 自身完成，适配层不介入渲染过程本身。Android 的 View 体系（Measure → Layout → Draw）、RenderThread 硬件加速渲染、Skia 2D 图形库、HWUI 硬件抽象层等组件原封不动地在 ART 中运行。渲染产生的 GraphicBuffer 通过 Surface 桥接模块（OHGraphicBufferProducer）提交给 OH RenderService 进行合成显示。Android 和 OH 的图形缓冲区均基于 Linux dmabuf 机制，BufferQueue 状态机可 1:1 映射（FREE↔RELEASED、DEQUEUED↔REQUESTED、QUEUED↔FLUSHED、ACQUIRED↔ACQUIRED），保证了跨运行时缓冲区共享的可行性。这一设计避免了重新实现渲染管线的巨大工程量，同时保证了 Android App 的原生渲染质量和性能。</p>
+  <div class="diagram">
+┌─ Android Framework (完整保留，不修改) ─────────────────────────────────────────┐
+│                                                                                │
+│  App View 树                                                                   │
+│  ┌──────────┐                                                                  │
+│  │ ViewRoot │                                                                  │
+│  │ Impl     │                                                                  │
+│  └────┬─────┘                                                                  │
+│       │  performTraversals()                                                   │
+│       ▼                                                                        │
+│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌────────────────────┐        │
+│  │ Measure │────→│ Layout  │────→│  Draw   │────→│ RenderThread       │        │
+│  │ (计算    │     │ (计算    │     │ (录制    │     │ (GPU 硬件加速渲染)  │        │
+│  │  尺寸)   │     │  位置)   │     │  指令)   │     │  Skia / HWUI       │        │
+│  └─────────┘     └─────────┘     └─────────┘     └────────┬───────────┘        │
+│                                                           │                    │
+│                                                           ▼ GraphicBuffer      │
+├───────────────────────────────────────────────────────────────────────────── ───┤
+│  ┌─ 适配层 (仅此处介入) ─────────────────────────────────────────────────────┐  │
+│  │  OHGraphicBufferProducer                                                  │  │
+│  │  dequeueBuffer() ←→ OH Surface::RequestBuffer()      ┌──── dmabuf ────┐   │  │
+│  │  queueBuffer()   ←→ OH Surface::FlushBuffer()        │ 共享内核缓冲区  │   │  │
+│  └──────────────────────────────────────────────────────┴────────────────┘   │  │
+├────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─ OH RenderService ──────────────────────────────────────────────────────┐   │
+│  │  接收 GraphicBuffer → 合成 → 送显                                       │   │
+│  └─────────────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────────────┘
+</div>
+</div>
+
+<div class="card">
+  <h4>理念三：类继承桥接</h4>
+  <p>所有正向适配器均采用类继承方式（<code>extends IXxx.Stub</code>）实现，而非动态代理（Dynamic Proxy）。每个适配器直接继承 AIDL 自动生成的 Stub 抽象类，显式覆写每一个接口方法，获得编译时的完整类型检查和方法签名验证。相比动态代理方案（通过 InvocationHandler 拦截所有调用，以方法名字符串匹配分发），类继承方式消除了运行时反射开销，支持 IDE 代码导航和安全重构，且在接口变更时（如 AOSP 版本升级）编译器会立即报错，避免运行时才暴露的兼容性问题。每个适配器声明自己的 <code>native</code> 方法用于 OH 服务访问，持有独立的 OH 服务句柄（如 <code>long mOhAbilityManager</code>），保持模块间的清晰边界。</p>
+  <div class="diagram">
+┌─ AIDL 生成 ──────────────────────┐    ┌─ 适配层实现 ─────────────────────────────────┐
+│                                   │    │                                               │
+│  interface IActivityManager {     │    │  class ActivityManagerAdapter                  │
+│      int startActivity(...)       │    │        extends IActivityManager.Stub {         │
+│      boolean finishActivity(...)  │    │                                               │
+│      void registerReceiver(...)   │    │      long mOhAbilityManager; // OH 服务句柄    │
+│      ...249 methods               │    │      long mOhAppMgr;                          │
+│  }                                │    │                                               │
+│          │                        │    │      @Override  // 编译时类型检查               │
+│          ▼                        │    │      int startActivity(...) {                  │
+│  abstract class                   │    │          Want w = IntentWantConverter           │
+│  IActivityManager.Stub           ─┼───→│                    .intentToWant(intent);      │
+│      extends Binder               │    │          return nativeStartAbility(            │
+│      implements IActivityManager   │    │                    mOhAbilityManager, w);      │
+│  {                                │    │      }                                         │
+│      // onTransact() 分发          │    │                                               │
+│  }                                │    │      @Override  // [STUB] 安全默认值            │
+│                                   │    │      void setVrMode(...) {                     │
+│                                   │    │          logStub("setVrMode");                 │
+│                                   │    │      }                                         │
+│                                   │    │  }                                             │
+└───────────────────────────────────┘    └───────────────────────────────────────────────┘
+
+      ✗ 动态代理方案（弃用）                     ✓ 类继承方案（选用）
+  ┌──────────────────────────┐          ┌──────────────────────────────┐
+  │ 运行时反射，性能损耗       │          │ 直接方法调用，零反射开销       │
+  │ 方法名字符串匹配，易出错   │          │ 编译时类型检查，接口变更即报错  │
+  │ IDE 无法导航              │          │ IDE 可导航，可重构             │
+  └──────────────────────────┘          └──────────────────────────────┘
+</div>
+</div>
+
+<div class="card">
+  <h4>理念四：App 孵化进程 — 向下顺从 OH 机制，向上包含 ART 虚拟机</h4>
+  <p>Android App 的进程孵化由 appspawn-x 混合孵化器负责，其设计遵循<strong>"向下顺从、向上包含"</strong>的原则。向下，appspawn-x 完全遵循 OH 的进程管理机制：由 OH foundation 统一调度，使用 OH 标准的 socket 协议接收 spawn 请求，fork 后的子进程严格执行 OH 安全特化流程（UID/GID 设置、SELinux 上下文切换、AccessToken 绑定、sandbox 挂载），确保 Android App 进程与 OH 原生进程在安全模型和进程管控上完全一致，不引入任何安全模型的特例或旁路。向上，appspawn-x 在进程中集成了完整的 ART（Android Runtime）虚拟机，支持 Dex 字节码的加载与执行。ART 提供 JIT/AOT 编译、垃圾回收、JNI 调用等核心能力；APK 中的 classes.dex 通过 dex2oat 预编译为本地机器码（.odex/.vdex），确保运行时性能。appspawn-x 在 fork 前预加载 ART VM 及约 7000 个 Framework 核心类和资源，利用 COW（Copy-On-Write）机制实现多进程间内存共享，显著降低 App 启动延迟和内存占用。子进程 fork 后进入 <code>ActivityThread.main()</code> → <code>Looper.loop()</code>，在 ART 中运行标准的 Android 应用主循环。</p>
+  <div class="diagram">
+┌─ appspawn-x 混合孵化器：向下顺从 OH，向上包含 ART ──────────────────────────┐
+│                                                                              │
+│  ┌─ "向上" — Android 运行时 ──────────────────────────────────────────────┐  │
+│  │                                                                        │  │
+│  │  ┌─ ART 虚拟机 ─────────────────────────────────────────────────────┐  │  │
+│  │  │  • JIT/AOT 编译引擎    • 垃圾回收 (GC)    • JNI 调用支持         │  │  │
+│  │  │  • Dex 字节码加载       • 类加载/验证       • .odex 机器码执行     │  │  │
+│  │  └──────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                        │  │
+│  │  ┌─ 预加载内容 (fork 前加载，COW 共享) ─────────────────────────────┐  │  │
+│  │  │  • ~7000 个 Framework 核心类 (java.lang.*, android.app.*, ...)   │  │  │
+│  │  │  • Android 系统资源 (framework-res.apk)                          │  │  │
+│  │  │  • 适配层初始化 (OHEnvironment, IntentWantConverter, ...)         │  │  │
+│  │  └──────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                        │  │
+│  │  子进程入口: ActivityThread.main() → Looper.loop()                     │  │
+│  │                                                                        │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│  ═════════════════════════════════════════════════════════════════════════════│
+│  ┌─ "向下" — 完全顺从 OH 进程管理机制 ────────────────────────────────────┐  │
+│  │                                                                        │  │
+│  │  调度管理    OH foundation 统一调度，socket 协议接收 spawn 请求         │  │
+│  │              /dev/unix/socket/AppSpawnX                                │  │
+│  │                                                                        │  │
+│  │  进程创建    fork() — 与 OH appspawn 相同的 fork + specialize 模型     │  │
+│  │                                                                        │  │
+│  │  安全特化    ┌─────────────────────────────────────────────────────┐   │  │
+│  │  (fork 后)  │ UID/GID 设置    │ SELinux 上下文   │ AccessToken 绑定│   │  │
+│  │              │ sandbox 挂载    │ 进程组/cgroup    │ 能力 (cap) 设置 │   │  │
+│  │              └─────────────────────────────────────────────────────┘   │  │
+│  │                                                                        │  │
+│  │  死亡监控    OH 进程死亡监控机制，与原生进程一致                         │  │
+│  │                                                                        │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 完整流程 ──────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  OH foundation                                                               │
+│       │ spawn 请求                                                           │
+│       ▼                                                                      │
+│  appspawn-x (已预加载 ART + 7000 类)                                         │
+│       │                                                                      │
+│       ▼ fork()                                                               │
+│  ┌─ 子进程 ──────────────────────────────────────────────────────────────┐   │
+│  │  ① OH 安全特化: setUID → setSELinux → setAccessToken → mountSandbox  │   │
+│  │  ② Android 初始化: OHEnvironment.initialize() → 连接 OH 系统服务     │   │
+│  │  ③ 进入主循环: ActivityThread.main() → Looper.loop()                 │   │
+│  │                                                                      │   │
+│  │     ┌── ART VM (COW 共享) ──┐  ┌── OH 安全沙箱 ──────────────────┐   │   │
+│  │     │ 执行 App Dex 字节码    │  │ DAC + MAC + AccessToken         │   │   │
+│  │     │ .odex 本地机器码       │  │ 与 OH 原生进程安全模型完全一致   │   │   │
+│  │     └───────────────────────┘  └─────────────────────────────────┘   │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────┘
+</div>
+</div>
+
+<div class="card">
+  <h4>理念五：Java-C++ 双语言适配</h4>
+  <p>适配层采用 Java 与 C++ 双语言协作实现，通过 JNI（Java Native Interface）连接。这一选择由两端系统的技术栈决定：Android 的 AIDL 接口、Framework 数据类型（Intent、Bundle、Parcelable 等）和组件机制（ClientTransaction、ActivityRecord 等）均为 Java 实现，适配层的 Stub 继承和 Android 侧交互必须使用 Java；而 OH 系统服务的 IPC 接口基于 C++ 的 IRemoteProxy/IRemoteBroker 机制，适配层与 OH 服务的通信必须使用 C++。两种语言通过 <code>liboh_adapter_bridge.so</code> 共享库连接——正向调用中，Java 适配器通过 <code>native</code> 方法调用 C++ 层发起 OH IPC；反向回调中，C++ Stub 通过 <code>AttachCurrentThread</code> 获取 JNIEnv 并调用 Java Bridge 方法，每个 C++ 适配器缓存 Java 对象引用（<code>jobject</code>）和方法 ID（<code>jmethodID</code>），避免重复查找开销。</p>
+  <div class="diagram">
+┌─ 正向调用路径 ──────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  Android App (Java)                                                          │
+│       │                                                                      │
+│       ▼                                                                      │
+│  ┌─ Java 适配器 ─────────────────────┐                                       │
+│  │ ActivityManagerAdapter.java       │  Android AIDL Stub 继承               │
+│  │ Intent/Bundle/Parcelable 处理     │  Android 数据类型转换                   │
+│  │                                   │                                       │
+│  │ native int nativeStartAbility()  ─┼──→ JNI 调用                           │
+│  └───────────────────────────────────┘       │                               │
+│                                              ▼                               │
+│  ┌─ C++ 层 (liboh_adapter_bridge.so) ────────────────────────────────────┐   │
+│  │ oh_ability_manager_client.cpp     │  OH IRemoteProxy/IRemoteBroker    │   │
+│  │ Want 构造 + OH Binder IPC 调用    │  OH 数据类型处理                    │   │
+│  └───────────────────────────────────┴───────────────────────────────────┘   │
+│                                              │                               │
+│                                              ▼                               │
+│                                     OH AbilityManagerService                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ 反向回调路径 ──────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  OH System Service (回调推送)                                                │
+│       │                                                                      │
+│       ▼ OH Binder IPC                                                        │
+│  ┌─ C++ Stub 适配器 ────────────────────────────────────────────────────┐    │
+│  │ AbilitySchedulerAdapter : AbilitySchedulerStub                       │    │
+│  │ OnRemoteRequest() → 解析 OH 消息                                     │    │
+│  │                                                                      │    │
+│  │ AttachCurrentThread() → 获取 JNIEnv                                  │    │
+│  │ CallVoidMethod(jBridge, jMethodID, ...) ──→ JNI 回调                  │    │
+│  └──────────────────────────────────────────────┬───────────────────────┘    │
+│                                                  ▼                           │
+│  ┌─ Java Bridge ─────────────────────────────────────────────────────────┐   │
+│  │ AbilitySchedulerBridge.java                                           │   │
+│  │ OH 回调数据 → Android ClientTransaction / IApplicationThread 调用     │   │
+│  └───────────────────────────────────────────────────────────────────────┘   │
+│                                                  │                           │
+│                                                  ▼                           │
+│                                        Android App (Activity.onResume...)    │
+└──────────────────────────────────────────────────────────────────────────────┘
+</div>
+</div>
+
+<div class="card">
+  <h4>理念六：最小 OH 修改原则</h4>
+  <p>优先在适配层内部解决所有兼容性问题，仅在确实无法绕过时才修改 OH 系统源码。所有 OH 侧修改以补丁文件形式管理（存放于 <code>ohos_patches/</code> 目录），方便追踪、审查和随 OH 版本升级同步维护。当前 OH 修改范围控制在两个子系统内：ability_rt（能力管理框架，5 个文件）用于支持 Mission 内 Ability 栈和 Android 进程管理；bundle_framework（包管理框架，4 个文件）用于支持 APK 安装和 Android 包类型识别。其余所有适配逻辑（接口转换、数据格式映射、回调桥接等）均在适配层内闭合完成，OH Launcher、SystemUI 等上层应用无需任何修改。</p>
+  <div class="diagram">
+┌─ OH 系统源码 ───────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  ┌─ ability_rt (能力管理框架) ─ 5 个文件修改 ──────────────────────────────┐  │
+│  │ • ability_manager_interface.h.patch  → 新增 StartAbilityInMission()    │  │
+│  │ • mission.h / mission.cpp           → Mission 支持 Ability 栈         │  │
+│  │ • mission_list_manager_patch.cpp    → 栈管理逻辑                       │  │
+│  │ • remote_client_manager.h.patch     → Android 进程管理                 │  │
+│  │ • app_mgr_service_inner.cpp.patch   → Android App 生命周期             │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌─ bundle_framework (包管理框架) ─ 4 个文件修改 ─────────────────────────┐  │
+│  │ • bundle_constants.h.patch          → BundleType::APP_ANDROID = 10    │  │
+│  │ • installd_interface.h.patch        → 5 个新 IPC 方法 (codes 90-94)   │  │
+│  │ • bundle_installer.cpp.patch        → APK 安装分支                     │  │
+│  │ • installd_host_impl_android.cpp    → Android installd 实现            │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌─ 不修改 ──────────────────────────────────────────────────────────────┐   │
+│  │  OH Launcher ✓    SystemUI ✓    WindowManager 核心 ✓    foundation ✓  │   │
+│  │  CommonEventService ✓    DataShareService ✓    RenderService ✓        │   │
+│  └───────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  修改总量：2 个子系统，9 个文件    OH 源码整体修改率 &lt; 0.1%                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+</div>
+</div>
+
+<h2 id="ch1-3">1.3 全局统计数据</h2>
+
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="number">530</div>
+    <div class="label">正向接口方法</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">210</div>
+    <div class="label">反向回调方法</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">4</div>
+    <div class="label">正向适配器</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">6</div>
+    <div class="label">反向回调桥接</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">4</div>
+    <div class="label">Android 组件类型</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">14</div>
+    <div class="label">设计子文档</div>
+  </div>
+</div>
+
+<p>接口可行性三分类结论（711 方法总计）：</p>
+<table>
+  <tr><th>分类</th><th>方法数</th><th>占比</th><th>说明</th></tr>
+  <tr><td><span class="tag tag-bridged">可映射</span></td><td>305</td><td>43%</td><td>可直接或经逻辑转换映射到 OH 接口</td></tr>
+  <tr><td><span class="tag tag-ohonly">需 OH 增强</span></td><td>102</td><td>14%</td><td>OH 侧需新增或扩展接口</td></tr>
+  <tr><td><span class="tag tag-stub">可忽略</span></td><td>304</td><td>43%</td><td>多用户、测试、VR、壁纸等非核心功能</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch2">2. 总体架构</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch2-1">2.1 系统架构全景图</h2>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Android Application                                │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐  ┌───────────────────────┐  │
+│  │ Activity  │  │ Service  │  │ BroadcastReceiver  │  │   ContentProvider     │  │
+│  └─────┬────┘  └────┬─────┘  └─────────┬──────────┘  └──────────┬────────────┘  │
+├────────┼────────────┼──────────────────┼───────────────────────┼────────────────┤
+│        │    Android Framework (Modified AOSP 14)               │                │
+│  ┌─────┴────────────┴──────────────────┴───────────────────────┴────────────┐   │
+│  │  ActivityManager / ActivityTaskManager / WindowManagerGlobal / PackageMgr │   │
+│  │     ↓ OHEnvironment.isOHEnvironment() → return new XxxAdapter()          │   │
+│  └──────────────────────────────────┬───────────────────────────────────────┘   │
+├─────────────────────────────────────┼──────────────────────────────────────────┤
+│                    ┌────────────────┴────────────────┐                          │
+│                    │      Adapter Layer (本项目)       │                          │
+│   ┌────────────────┴────────────────────────────────┴──────────────────────┐    │
+│   │                                                                        │    │
+│   │  ┌─ 正向适配器 (extends IXxx.Stub) ────────────────────────────────┐   │    │
+│   │  │ ActivityManagerAdapter    │ ActivityTaskManagerAdapter           │   │    │
+│   │  │ WindowManagerAdapter      │ WindowSessionAdapter                │   │    │
+│   │  │ PackageManagerAdapter     │                                     │   │    │
+│   │  └─────────────────────────────────────────────────────────────────┘   │    │
+│   │                                                                        │    │
+│   │  ┌─ 反向回调桥接 ─────────────────────────────────────────────────┐   │    │
+│   │  │ AppSchedulerBridge        │ AbilitySchedulerBridge              │   │    │
+│   │  │ AbilityConnectionBridge   │ WindowCallbackBridge                │   │    │
+│   │  │ SessionStageBridge        │ WindowManagerAgentBridge            │   │    │
+│   │  └─────────────────────────────────────────────────────────────────┘   │    │
+│   │                                                                        │    │
+│   │  ┌─ 功能模块 ─────────────────────────────────────────────────────┐   │    │
+│   │  │ IntentWantConverter       │ LifecycleAdapter                    │   │    │
+│   │  │ BroadcastEventConverter   │ ContentProviderBridge               │   │    │
+│   │  │ ServiceConnectionRegistry │ OHGraphicBufferProducer             │   │    │
+│   │  │ PackageInfoBuilder        │ PermissionMapper                    │   │    │
+│   │  └─────────────────────────────────────────────────────────────────┘   │    │
+│   │                                                                        │    │
+│   │  ┌─ JNI 层 (liboh_adapter_bridge.so) ─────────────────────────────┐   │    │
+│   │  │ adapter_bridge.cpp        │ oh_callback_handler.cpp             │   │    │
+│   │  │ oh_ability_manager_client │ oh_app_mgr_client                   │   │    │
+│   │  │ oh_window_manager_client  │ oh_surface_bridge                   │   │    │
+│   │  │ oh_common_event_client    │ oh_datashare_client                 │   │    │
+│   │  │ oh_bundle_mgr_client      │ intent_want_converter (C++)         │   │    │
+│   │  └─────────────────────────────────────────────────────────────────┘   │    │
+│   └────────────────────────────────────────────────────────────────────────┘    │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                        OpenHarmony System Services                              │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────────────────┐ │
+│  │ AbilityMgr   │ │  AppMgr      │ │ WindowMgr    │ │  RenderService         │ │
+│  │ (SA 180)     │ │  (SA 501)    │ │ (SA 4607)    │ │  (RS, 图形合成)         │ │
+│  ├──────────────┤ ├──────────────┤ ├──────────────┤ ├────────────────────────┤ │
+│  │ MissionMgr   │ │ BundleMgr    │ │ CommonEvent  │ │  DataShareService      │ │
+│  │ (任务管理)    │ │  (SA 401)    │ │  (SA 3299)   │ │  (数据共享)             │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ └────────────────────────┘ │
+├────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─ appspawn-x (混合孵化器) ──────────────────────────────────────────────┐   │
+│  │ OH 安全模型 (DAC/MAC/AccessToken) + ART 预加载 (~7000 classes)          │   │
+│  │ fork + specialize → ActivityThread.main() → Looper.loop()              │   │
+│  └────────────────────────────────────────────────────────────────────────┘   │
+├────────────────────────────────────────────────────────────────────────────────┤
+│                        OpenHarmony Kernel (Linux)                               │
+└────────────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h2 id="ch2-2">2.2 分层架构</h2>
+
+<p>整个适配方案由以下五个层次组成：</p>
+
+<div class="layer">
+  <div class="layer-title">第 1 层：Android 应用层</div>
+  <p>标准 Android App（Activity、Service、BroadcastReceiver、ContentProvider），使用标准 Android SDK API，<strong>无需任何修改</strong>即可运行。</p>
+</div>
+
+<div class="layer">
+  <div class="layer-title">第 2 层：Android Framework 层（修改的 AOSP 14）</div>
+  <p>在关键服务获取点（<code>ActivityManager</code>、<code>ActivityTaskManager</code>、<code>WindowManagerGlobal</code>、<code>ActivityThread</code>）插入环境检测逻辑：<code>OHEnvironment.isOHEnvironment()</code> 为 true 时，返回适配器实例替代原始 Binder 代理。共修改 4 个 AOSP 源文件。</p>
+</div>
+
+<div class="layer">
+  <div class="layer-title">第 3 层：适配层（本项目核心）</div>
+  <p>位于 <code>framework/</code> 目录。包含正向适配器（5 个 Stub 子类）、反向回调桥接（6 个 Bridge 类 + 5 个 C++ Stub 适配器）、数据转换器（Intent↔Want、Broadcast↔CommonEvent、URI 映射等）、以及 JNI 层（<code>liboh_adapter_bridge.so</code>）。</p>
+</div>
+
+<div class="layer">
+  <div class="layer-title">第 4 层：OH 系统服务层</div>
+  <p>标准 OH 系统服务（AbilityManagerService、AppMgrService、WindowManagerService、RenderService、CommonEventService、DataShareService、BundleManagerService）。仅在必要时通过补丁扩展（<code>ohos_patches/</code>）。</p>
+</div>
+
+<div class="layer">
+  <div class="layer-title">第 5 层：进程管理层（appspawn-x）</div>
+  <p>混合孵化器，结合 OH 的安全模型和 Android Zygote 的 ART 预加载。负责 Android App 进程的创建和初始化。</p>
+</div>
+
+<h2 id="ch2-3">2.3 适配层核心组件</h2>
+
+<table>
+  <tr><th>组件</th><th>类型</th><th>职责</th></tr>
+  <tr><td><code>OHEnvironment</code></td><td>静态工具类</td><td>环境检测（<code>isOHEnvironment()</code>）、JNI 库加载、native 初始化/关闭</td></tr>
+  <tr><td><code>ServiceInterceptor</code></td><td>反射安装器</td><td>运行时通过反射替换 Singleton.mInstance（未修改 AOSP 的备选方案）</td></tr>
+  <tr><td><code>IntentWantConverter</code></td><td>无状态转换器</td><td>Android Intent ↔ OH Want 双向转换（Action 映射表 + 组件名拆分 + extras JSON 序列化）</td></tr>
+  <tr><td><code>LifecycleAdapter</code></td><td>单例</td><td>Android 6 状态 ↔ OH 4 状态生命周期映射</td></tr>
+  <tr><td><code>ServiceConnectionRegistry</code></td><td>单例</td><td>IServiceConnection ↔ OH IAbilityConnection 映射注册表</td></tr>
+  <tr><td><code>BroadcastEventConverter</code></td><td>无状态转换器</td><td>Android broadcast Action ↔ OH CommonEvent 名称映射</td></tr>
+  <tr><td><code>ContentProviderUriConverter</code></td><td>无状态转换器</td><td><code>content://</code> ↔ <code>datashare://</code> URI 双向转换</td></tr>
+  <tr><td><code>PackageInfoBuilder</code></td><td>构建器</td><td>OH BundleInfo JSON → Android PackageInfo 转换</td></tr>
+  <tr><td><code>PermissionMapper</code></td><td>映射表</td><td>android.permission.* ↔ ohos.permission.* 双向映射（50+ 条目）</td></tr>
+</table>
+
+<h2 id="ch2-4">2.4 代码目录结构</h2>
+
+<pre><code>framework/
+├── core/          # 共享基础设施：OHEnvironment, ServiceInterceptor, JNI bridge
+├── activity/      # Activity/Service 生命周期适配（IActivityManager, IActivityTaskManager）
+├── window/        # 窗口管理适配（IWindowManager, IWindowSession）
+├── surface/       # 图形/Surface 桥接（RSSurfaceNode, IGraphicBufferProducer）
+├── broadcast/     # 广播适配（BroadcastReceiver ↔ CommonEventService）
+├── contentprovider/  # 内容提供者适配（ContentProvider ↔ DataShareExtensionAbility）
+├── package-manager/  # 包管理适配（IPackageManager ↔ BMS）+ APK 安装
+├── appspawn-x/    # 混合进程孵化器
+└── CMakeLists.txt # 统一 CMake 构建
+
+aosp_patches/      # AOSP 源码修改补丁（4 个文件）
+ohos_patches/      # OH 源码修改补丁</code></pre>
+
+<!-- ================================================================ -->
+<h1 id="ch3">3. 可行性分析与接口映射</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch3-1">3.1 Android 与 OH 系统服务对比</h2>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>Android</th><th>OpenHarmony</th></tr>
+    <tr><td>IPC 机制</td><td>Binder（AIDL 自动生成 Proxy/Stub）</td><td>Binder（C++ IRemoteProxy/IRemoteStub，手动编写）</td></tr>
+    <tr><td>组件模型</td><td>Activity / Service / BR / CP（四大组件）</td><td>Ability / ServiceExtension / CommonEvent / DataShare（Stage 模型）</td></tr>
+    <tr><td>生命周期状态</td><td>6 状态（Created→Started→Resumed→Paused→Stopped→Destroyed）</td><td>4 状态（Initial→Inactive→Foreground→Background）</td></tr>
+    <tr><td>意图系统</td><td>Intent（Action + Data + Extras + Component）</td><td>Want（Action + URI + Parameters + Element）</td></tr>
+    <tr><td>窗口管理</td><td>WMS（system_server）+ SurfaceFlinger</td><td>WMS + SceneSessionManager + RenderService</td></tr>
+    <tr><td>图形缓冲区</td><td>GraphicBuffer（gralloc HAL, dmabuf）</td><td>SurfaceBuffer（BufferHandle, dmabuf）</td></tr>
+    <tr><td>进程管理</td><td>Zygote（预加载 ART + fork）</td><td>appspawn（fork + 逐进程创建运行时）</td></tr>
+    <tr><td>包管理</td><td>PMS（APK, AndroidManifest.xml, dex）</td><td>BMS（HAP, module.json, .abc）</td></tr>
+    <tr><td>权限模型</td><td>android.permission.* + runtime grant</td><td>ohos.permission.* + AccessToken</td></tr>
+  </table>
+</div>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="android_oh_adaptation_report.html">可行性分析报告</a> |
+  <a href="android_oh_interface_feasibility_report.html">接口可行性报告 v1</a> |
+  <a href="android_oh_interface_feasibility_report_v2.html">接口可行性报告 v2</a>
+</div>
+
+<h2 id="ch3-2">3.2 接口可行性分析结论</h2>
+
+<p>对 Android 4 大系统服务接口（530 正向方法）和 6 大回调接口（181 反向方法）进行了逐方法可行性分析：</p>
+
+<div class="card">
+  <h4>关键发现</h4>
+  <ul>
+    <li><strong>43% 直接可映射</strong> — 正向/反向接口中约 305 个方法可直接或经逻辑转换映射到 OH 接口</li>
+    <li><strong>仅 14% 需 OH 增强</strong> — 初始估算的 55% "不可映射" 方法中，经过三分类后只有 102 个真正需要 OH 侧新增能力</li>
+    <li><strong>43% 可安全忽略</strong> — 多用户、Instrumentation、VR/语音交互、锁屏/壁纸、调试追踪等功能在当前目标场景中不需要</li>
+    <li><strong>IActivityTaskManager 映射率最高</strong>（53%），广播和 ContentProvider 映射率最低（需专门适配设计）</li>
+  </ul>
+</div>
+
+<h2 id="ch3-3">3.3 正向接口映射（多对多）</h2>
+
+<p>Android 接口到 OH 接口的映射是<strong>多对多</strong>关系。一个 Android 接口的方法可能分散映射到多个 OH 接口：</p>
+
+<table>
+  <tr><th>Android 接口</th><th>方法数</th><th>OH 目标接口</th></tr>
+  <tr><td><code>IActivityManager</code></td><td>249</td><td>IAbilityManager, IAppMgr, IMissionManager</td></tr>
+  <tr><td><code>IActivityTaskManager</code></td><td>95</td><td>IAbilityManager, IMissionManager, ISceneSessionManager</td></tr>
+  <tr><td><code>IWindowManager</code></td><td>144</td><td>IWindowManager(OH), ISceneSessionManager, DisplayManager</td></tr>
+  <tr><td><code>IWindowSession</code></td><td>42</td><td>ISession, ISessionStage, ISceneSessionManager</td></tr>
+</table>
+
+<h2 id="ch3-4">3.4 反向回调映射</h2>
+
+<p>OH 系统通过回调接口向 App 推送生命周期、窗口事件等。需要将 210 个 OH 回调方法映射到 78 个 Android 回调方法：</p>
+
+<table>
+  <tr><th>OH 回调接口</th><th>方法数</th><th>Android 目标</th><th>映射关系</th></tr>
+  <tr><td><code>IAppScheduler</code></td><td>34</td><td><code>IApplicationThread</code></td><td>进程生命周期、内存管理</td></tr>
+  <tr><td><code>IAbilityScheduler</code></td><td>35</td><td><code>IApplicationThread</code></td><td>Activity/Service 生命周期</td></tr>
+  <tr><td><code>IAbilityConnection</code></td><td>2</td><td><code>IServiceConnection</code></td><td>1:1 映射</td></tr>
+  <tr><td><code>IWindow</code> (OH)</td><td>26</td><td><code>IWindow</code> (Android)</td><td>窗口状态回调</td></tr>
+  <tr><td><code>ISessionStage</code></td><td>94</td><td><code>IWindow</code> + <code>IApplicationThread</code></td><td>窗口+生命周期回调</td></tr>
+  <tr><td><code>IWindowManagerAgent</code></td><td>19</td><td>内部处理</td><td>无对应 Android 接口</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch4">4. 正向桥接设计</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch4-1">4.1 桥接模式：类继承</h2>
+
+<p>所有正向适配器均采用<strong>类继承模式</strong>（<code>extends IXxx.Stub</code>），而非动态代理。这一选择基于以下考虑：</p>
+
+<div class="card">
+  <table>
+    <tr><th>对比项</th><th>类继承（选用）</th><th>动态代理（弃用）</th></tr>
+    <tr><td>类型安全</td><td>编译时检查所有方法签名</td><td>运行时才发现参数类型错误</td></tr>
+    <tr><td>性能</td><td>直接方法调用，无反射开销</td><td>每次调用经过 InvocationHandler 反射</td></tr>
+    <tr><td>可维护性</td><td>IDE 可导航，重构安全</td><td>方法名字符串匹配，易出错</td></tr>
+    <tr><td>代码量</td><td>较多（需显式覆写每个方法）</td><td>较少（统一转发逻辑）</td></tr>
+  </table>
+</div>
+
+<p>每个适配器的基本结构：</p>
+
+<pre><code>public class ActivityManagerAdapter extends IActivityManager.Stub {
+    private long mOhAbilityManager;   // native OH 服务句柄
+    private long mOhAppMgr;           // 可持有多个 OH 服务句柄
+
+    public ActivityManagerAdapter() {
+        mOhAbilityManager = nativeConnectAbilityManager();
+        mOhAppMgr = nativeConnectAppMgr();
+    }
+
+    // [BRIDGED] — 已实现到 OH 的完整映射
+    @Override
+    public int startActivity(...) {
+        Want want = IntentWantConverter.intentToWant(intent);
+        return nativeStartAbility(mOhAbilityManager, want);
+    }
+
+    // [STUB] — 记录调用，返回默认值
+    @Override
+    public void setVrMode(...) { logStub("setVrMode"); }
+
+    private native long nativeConnectAbilityManager();
+    private native int nativeStartAbility(long handle, Want want);
+}</code></pre>
+
+<h2 id="ch4-2">4.2 四大适配器</h2>
+
+<table>
+  <tr><th>适配器</th><th>Android Stub</th><th>方法数</th><th>OH 服务句柄</th><th>日志 Tag</th></tr>
+  <tr><td><code>ActivityManagerAdapter</code></td><td>IActivityManager.Stub</td><td>249</td><td>mOhAbilityManager, mOhAppMgr</td><td>OH_AMAdapter</td></tr>
+  <tr><td><code>ActivityTaskManagerAdapter</code></td><td>IActivityTaskManager.Stub</td><td>95</td><td>mOhAbilityManager</td><td>OH_ATMAdapter</td></tr>
+  <tr><td><code>WindowManagerAdapter</code></td><td>IWindowManager.Stub</td><td>144</td><td>mOhWindowManager</td><td>OH_WMAdapter</td></tr>
+  <tr><td><code>WindowSessionAdapter</code></td><td>IWindowSession.Stub</td><td>42</td><td>mOhSession</td><td>OH_WSAdapter</td></tr>
+</table>
+
+<p>另有 <code>PackageManagerAdapter</code>（extends IPackageManager.Stub），作为 APK 安装模块的一部分，路由包查询到 OH BMS。</p>
+
+<h2 id="ch4-3">4.3 安装机制：AOSP 源码修改</h2>
+
+<p>通过修改 4 个 AOSP 源文件，在服务获取点插入适配器返回逻辑：</p>
+
+<table>
+  <tr><th>AOSP 文件</th><th>修改点</th><th>返回适配器</th></tr>
+  <tr><td><code>ActivityManager.java</code></td><td><code>IActivityManagerSingleton.create()</code></td><td><code>new ActivityManagerAdapter()</code></td></tr>
+  <tr><td><code>ActivityTaskManager.java</code></td><td><code>IActivityTaskManagerSingleton.create()</code></td><td><code>new ActivityTaskManagerAdapter()</code></td></tr>
+  <tr><td><code>ActivityThread.java</code></td><td><code>getPackageManager()</code></td><td><code>new PackageManagerAdapter()</code></td></tr>
+  <tr><td><code>WindowManagerGlobal.java</code></td><td><code>getWindowManagerService()</code> + <code>getWindowSession()</code></td><td><code>new WindowManagerAdapter()</code> / <code>new WindowSessionAdapter()</code></td></tr>
+</table>
+
+<div class="info">
+  所有修改点均包含 <code>try-catch</code> 降级逻辑——若适配器初始化失败，回退到原始 Binder 获取方式。<br>
+  <code>ServiceInterceptor.java</code> 作为运行时反射方式的备选方案，适用于无法修改 AOSP 源码的场景。
+</div>
+
+<h2 id="ch4-4">4.4 Intent &harr; Want 转换</h2>
+
+<p><code>IntentWantConverter</code> 负责 Android Intent 与 OH Want 的双向转换，主要处理以下映射：</p>
+
+<table>
+  <tr><th>Intent 字段</th><th>Want 字段</th><th>转换逻辑</th></tr>
+  <tr><td><code>action</code></td><td><code>action</code></td><td>Action 映射表（如 <code>android.intent.action.VIEW</code> → <code>ohos.want.action.viewData</code>）</td></tr>
+  <tr><td><code>component</code></td><td><code>element</code></td><td>PackageName→bundleName, ClassName→abilityName</td></tr>
+  <tr><td><code>data</code> (URI)</td><td><code>uri</code></td><td>直接传递（Scheme 保留）</td></tr>
+  <tr><td><code>type</code> (MIME)</td><td><code>type</code></td><td>直接传递</td></tr>
+  <tr><td><code>extras</code> (Bundle)</td><td><code>parameters</code></td><td>序列化为 JSON（基本类型直接映射，Parcelable 需特殊处理）</td></tr>
+  <tr><td><code>flags</code></td><td><code>flags</code></td><td>按位映射（如 FLAG_ACTIVITY_NEW_TASK → 对应 OH flag）</td></tr>
+  <tr><td><code>categories</code></td><td><code>entities</code></td><td>Category 映射表</td></tr>
+</table>
+
+<h2 id="ch4-5">4.5 生命周期映射</h2>
+
+<p><code>LifecycleAdapter</code> 处理 Android 6 状态与 OH 4 状态之间的映射：</p>
+
+<div class="diagram">
+Android 生命周期          OH Ability 生命周期
+═══════════════          ═══════════════════
+  CREATED ──────────────→ INITIAL
+  STARTED ──────────────→ INACTIVE
+  RESUMED ──────────────→ FOREGROUND
+  PAUSED  ──────────────→ INACTIVE (回退)
+  STOPPED ──────────────→ BACKGROUND
+  DESTROYED ────────────→ (释放，无对应状态)
+</div>
+
+<div class="note">
+  <strong>注意：</strong>OH 没有与 Android PAUSED 精确等价的状态。PAUSED 映射到 INACTIVE，但 INACTIVE 同时也是 STARTED 的映射目标。适配层通过 LifecycleAdapter 内部状态追踪来区分这两种情况。
+</div>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="interface_bridge_design.html">正向接口桥接设计</a> |
+  <a href="phase1_design.html">Phase 1 设计</a> |
+  <a href="phase1_hello_world_implementation_design.html">Phase 1 Hello World 实现设计</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch5">5. 反向回调桥接设计</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch5-1">5.1 回调方向与线程模型</h2>
+
+<p>反向回调是 OH 系统服务主动推送到 App 的调用（如生命周期转换、窗口配置变化）。由于 OH 使用 C++ Binder，回调到达时在 OH Binder 线程上，需要经过以下路径才能到达 Android App：</p>
+
+<div class="diagram">
+OH System Service
+       │
+       ▼ (OH Binder IPC)
+C++ Stub Adapter (OH Binder 线程)
+       │
+       ▼ JNI: AttachCurrentThread + CallVoidMethod
+Java Bridge 类 (仍在 Binder 线程)
+       │
+       ▼ Android IPC (Binder/Handler)
+Android App 组件 (主线程)
+</div>
+
+<h2 id="ch5-2">5.2 六大回调适配器</h2>
+
+<table>
+  <tr><th>C++ 适配器</th><th>继承 OH Stub</th><th>Java Bridge</th><th>Android 目标</th></tr>
+  <tr><td><code>AppSchedulerAdapter</code></td><td>AppSchedulerHost</td><td>AppSchedulerBridge</td><td>IApplicationThread（进程级）</td></tr>
+  <tr><td><code>AbilitySchedulerAdapter</code></td><td>AbilitySchedulerStub</td><td>AbilitySchedulerBridge</td><td>IApplicationThread（组件级）</td></tr>
+  <tr><td><code>AbilityConnectionAdapter</code></td><td>AbilityConnectionStub</td><td>AbilityConnectionBridge</td><td>IServiceConnection</td></tr>
+  <tr><td><code>WindowCallbackAdapter</code></td><td>IWindowStub(OH)</td><td>WindowCallbackBridge</td><td>IWindow (Android)</td></tr>
+  <tr><td><code>SessionStageAdapter</code></td><td>SessionStageStub</td><td>SessionStageBridge</td><td>IWindow + IApplicationThread</td></tr>
+  <tr><td><code>WindowManagerAgentAdapter</code></td><td>WindowManagerAgentStub</td><td>WindowManagerAgentBridge</td><td>内部处理（无 Android 等价接口）</td></tr>
+</table>
+
+<h2 id="ch5-3">5.3 两层架构：C++ Stub + Java Bridge</h2>
+
+<p>反向回调采用<strong>两层架构</strong>的原因：</p>
+
+<div class="card">
+  <ul>
+    <li><strong>C++ Stub 层</strong>：继承 OH 的 IRemoteStub 子类，处理 OH Binder OnRemoteRequest 消息解析。这一层必须用 C++ 实现，因为 OH Binder 是 C++ 原生接口。</li>
+    <li><strong>Java Bridge 层</strong>：持有 Android IApplicationThread / IWindow / IServiceConnection 引用，负责将 OH 回调数据转换为 Android API 调用。这一层用 Java 实现，因为 Android Binder 回调接口是 Java AIDL 生成的。</li>
+    <li><strong>JNI 连接</strong>：C++ Stub 通过 <code>AttachCurrentThread</code> 获取 JNIEnv，调用 Java Bridge 对应方法。每个 C++ 适配器缓存 Java Bridge 的 <code>jobject</code> 和关键方法的 <code>jmethodID</code>。</li>
+  </ul>
+</div>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="reverse_callback_bridge_design.html">反向回调桥接设计</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch6">6. 图形与窗口系统桥接</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch6-1">6.1 窗口管理适配</h2>
+
+<p>Android 和 OH 的窗口管理存在<strong>方向性差异</strong>：</p>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>Android</th><th>OpenHarmony</th></tr>
+    <tr><td>窗口创建方</td><td>WMS（system_server）创建 SurfaceControl</td><td>App 创建 RSSurfaceNode，交给 WMS 注册</td></tr>
+    <tr><td>会话模型</td><td>IWindowSession（per-display）</td><td>ISession（per-window，SceneSession 模型）</td></tr>
+    <tr><td>合成引擎</td><td>SurfaceFlinger（独立进程）</td><td>RenderService（合成 + 渲染统一）</td></tr>
+    <tr><td>输入分发</td><td>InputDispatcher → InputChannel（socket pair）</td><td>MMI（MultimodalInput）→ 独立分发</td></tr>
+  </table>
+</div>
+
+<p><code>WindowManagerAdapter</code>（144 方法）和 <code>WindowSessionAdapter</code>（42 方法）分别适配 IWindowManager 和 IWindowSession，将调用路由到 OH 的 SceneSessionManager 和 ISession。</p>
+
+<h2 id="ch6-2">6.2 Surface / 图形缓冲区桥接</h2>
+
+<p>图形缓冲区桥接是整个项目技术难度最高的部分。核心发现：</p>
+
+<div class="ok">
+  <strong>关键可行性确认：</strong>OH 的 <code>BufferHandle.fd</code> 是标准 Linux dmabuf 文件描述符，与 Android GraphicBuffer 使用相同的内核机制。OH <code>SyncFence</code> 同样使用 Linux <code>sync_file</code> fd。这证实了跨运行时缓冲区共享在技术上是可行的。
+</div>
+
+<p><code>OHGraphicBufferProducer</code> 适配器将 OH Surface 包装为 Android <code>IGraphicBufferProducer</code> 接口：</p>
+
+<div class="diagram">
+Android App (ViewRootImpl / BLASTBufferQueue)
+       │
+       ▼ IGraphicBufferProducer.dequeueBuffer()
+OHGraphicBufferProducer (适配器)
+       │
+       ▼ OH Surface::RequestBuffer()
+OH BufferQueue
+       │
+       ▼ 渲染完成后
+OHGraphicBufferProducer.queueBuffer()
+       │
+       ▼ OH Surface::FlushBuffer()
+OH RenderService (合成 + 显示)
+</div>
+
+<p>BufferQueue 状态机 1:1 映射：</p>
+
+<table>
+  <tr><th>Android 状态</th><th>OH 状态</th><th>语义</th></tr>
+  <tr><td>FREE</td><td>RELEASED</td><td>可分配</td></tr>
+  <tr><td>DEQUEUED</td><td>REQUESTED</td><td>App 持有，正在绘制</td></tr>
+  <tr><td>QUEUED</td><td>FLUSHED</td><td>已提交，等待合成</td></tr>
+  <tr><td>ACQUIRED</td><td>ACQUIRED</td><td>合成器持有</td></tr>
+</table>
+
+<h2 id="ch6-3">6.3 输入事件桥接</h2>
+
+<p><code>InputEventBridge</code> 将 OH 的 MMI（MultimodalInput）事件转换为 Android InputEvent，通过 <code>oh_input_bridge</code>（C++ 层）桥接 OH 的输入事件分发到 Android 的 InputChannel。</p>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="surface_bridging_design.html">Surface 桥接设计</a> |
+  <a href="interface_bridge_design.html">接口桥接设计（窗口部分）</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch7">7. 四大组件适配</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch7-1">7.1 Activity &harr; Ability 适配</h2>
+
+<p>Activity 适配是核心场景，通过 <code>ActivityManagerAdapter</code> + <code>ActivityTaskManagerAdapter</code> 正向桥接，以及 <code>AbilitySchedulerBridge</code> + <code>AppSchedulerBridge</code> 反向回调实现。</p>
+
+<div class="card">
+  <h4>startActivity 完整调用链</h4>
+  <ol>
+    <li>App 调用 <code>startActivity(intent)</code></li>
+    <li><code>Instrumentation.execStartActivity()</code> → <code>ATMS.getService().startActivity()</code></li>
+    <li>AOSP 修改点返回 <code>ActivityTaskManagerAdapter</code></li>
+    <li><code>ActivityTaskManagerAdapter.startActivity()</code> 内部：
+      <ul>
+        <li><code>IntentWantConverter.intentToWant(intent)</code> → OH Want</li>
+        <li><code>nativeStartAbility(mOhAbilityManager, want)</code> → JNI</li>
+      </ul>
+    </li>
+    <li>C++ 层通过 OH IPC 调用 <code>AbilityManagerService.StartAbility(want)</code></li>
+    <li>OH AMS 通过 <code>IAbilityScheduler</code> 回调</li>
+    <li><code>AbilitySchedulerAdapter</code> (C++) → JNI → <code>AbilitySchedulerBridge</code> (Java)</li>
+    <li><code>LifecycleAdapter.mapOHToAndroid()</code> → <code>ClientTransaction</code> → Activity.onResume()</li>
+  </ol>
+</div>
+
+<h2 id="ch7-2">7.2 Service &harr; ServiceExtensionAbility 适配</h2>
+
+<p>Service 适配覆盖三种场景：</p>
+
+<div class="card">
+  <h4>场景 S1：Android App → Android Service（双端运行于 OH）</h4>
+  <p>最常见场景。<code>startService(intent)</code> 通过适配层路由到 OH <code>AbilityManager.StartAbility()</code>，OH 通过 appspawn-x 在目标进程中创建 Service。</p>
+
+  <h4>场景 S2：Android App → OH ServiceExtension</h4>
+  <p>正向路径与 S1 相同。连接回调通过 <code>IAbilityConnection</code> → <code>AbilityConnectionBridge</code> → <code>IServiceConnection</code> 桥接回 Android App。</p>
+
+  <h4>场景 S3：OH App → Android Service（反向桥接）</h4>
+  <p>触发完整的 Android Service 创建流程：<code>scheduleCreateService</code> + <code>scheduleBindService</code>。</p>
+</div>
+
+<p><code>ServiceConnectionRegistry</code> 负责跟踪 <code>IServiceConnection</code> ↔ OH <code>IAbilityConnection</code> 的映射关系，处理并发连接和死亡监听自动清理。</p>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="service_extension_design.html">Service → ServiceExtensionAbility 适配设计</a>
+</div>
+
+<h2 id="ch7-3">7.3 BroadcastReceiver &harr; CommonEventService 适配</h2>
+
+<p>Android 广播系统通过 AMS 管理，OH 通过独立的 CommonEventService（CES, SA 3299）管理。两者均支持有序广播、粘性广播和权限保护。</p>
+
+<div class="card">
+  <h4>核心映射</h4>
+  <table>
+    <tr><th>Android 广播操作</th><th>OH CommonEvent</th></tr>
+    <tr><td><code>android.intent.action.BOOT_COMPLETED</code></td><td><code>usual.event.BOOT_COMPLETED</code></td></tr>
+    <tr><td><code>android.intent.action.BATTERY_CHANGED</code></td><td><code>usual.event.BATTERY_CHANGED</code></td></tr>
+    <tr><td><code>android.net.conn.CONNECTIVITY_CHANGE</code></td><td><code>usual.event.CONNECTIVITY_CHANGE</code></td></tr>
+    <tr><td><code>android.intent.action.SCREEN_ON/OFF</code></td><td><code>usual.event.SCREEN_ON/OFF</code></td></tr>
+    <tr><td>...</td><td>...</td></tr>
+  </table>
+</div>
+
+<p>关键组件：</p>
+<ul>
+  <li><code>BroadcastEventConverter</code> — Action 名称双向映射 + Intent ↔ CommonEventData 转换</li>
+  <li><code>CommonEventReceiverBridge</code> — C++ <code>EventReceiveStub</code> 实现，通过 JNI 回调 Java <code>IIntentReceiver</code></li>
+  <li><code>ActivityManagerAdapter</code> 中 5 个广播方法从 STUB 升级为 BRIDGED</li>
+</ul>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="broadcast_common_event_design.html">广播 / CommonEvent 适配设计</a>
+</div>
+
+<h2 id="ch7-4">7.4 ContentProvider &harr; DataShareExtensionAbility 适配</h2>
+
+<p>ContentProvider 适配面向两个场景：</p>
+
+<div class="card">
+  <ul>
+    <li><strong>S1：Android App → Android ContentProvider</strong> — 由 <code>ContentProviderRegistry</code> 内部管理，不经过 OH</li>
+    <li><strong>S2：Android App → OH 系统数据</strong> — 通过 <code>ContentProviderBridge</code> 将 <code>IContentProvider</code> 调用路由到 OH <code>DataShareHelper</code></li>
+  </ul>
+</div>
+
+<p>URI 转换：<code>content://com.android.contacts/contacts</code> ↔ <code>datashare:///com.ohos.contacts/contacts</code></p>
+
+<p>IContentProvider 21 个方法中 7 个核心方法（query/insert/update/delete/openFile/getType/bulkInsert）完全可映射，覆盖 95%+ 使用场景。</p>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="content_provider_datashare_design.html">ContentProvider → DataShare 适配设计</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch8">8. 任务管理适配</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch8-1">8.1 Android Task 与 OH Mission 差异</h2>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>Android Task</th><th>OH Mission</th></tr>
+    <tr><td>栈模型</td><td>多 Activity 栈（Task 内包含多个 ActivityRecord）</td><td>单 Ability（1 Mission = 1 AbilityRecord）</td></tr>
+    <tr><td>最近任务</td><td>一个 Task 在 Recents 中显示为一个条目</td><td>每个 Ability 单独显示</td></tr>
+    <tr><td>影响</td><td colspan="2">Android App 打开多个 Activity 会在 OH Recents 中产生多个独立条目，用户体验不一致</td></tr>
+  </table>
+</div>
+
+<h2 id="ch8-2">8.2 Mission 内置 Ability 栈方案</h2>
+
+<p>采用 v2.0 方案：在 <code>Mission</code> 类内部扩展，支持 Ability 栈：</p>
+
+<div class="card">
+  <ul>
+    <li>将 <code>abilityRecord_</code> 单指针扩展为 <code>abilityStack_</code> 向量</li>
+    <li><code>GetAbilityRecord()</code> 返回栈顶元素，所有外部接口不变</li>
+    <li>新增 1 个 IAbilityManager 方法：<code>StartAbilityInMission(want, missionId)</code></li>
+    <li><strong>封闭修改原则</strong>：所有改动封装在 Mission 类内部，OH Launcher 无需修改</li>
+    <li>仅修改 3 个 OH 系统文件 + 3 个 Adapter 文件（对比 v1.0 的 8+6 个文件）</li>
+  </ul>
+</div>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="mission_group_design.html">Mission Group 设计</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch9">9. 进程管理：appspawn-x 混合孵化器</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch9-1">9.1 Android Zygote 与 OH appspawn 对比</h2>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>Android Zygote</th><th>OH appspawn</th><th>appspawn-x（本项目）</th></tr>
+    <tr><td>运行时预加载</td><td>ART VM + ~7000 类 + 资源 + GPU 驱动</td><td>不预加载（各进程独立创建）</td><td>ART VM + ~7000 类 + 适配层</td></tr>
+    <tr><td>Fork 共享</td><td>COW 共享预加载内容</td><td>仅共享内核/SO</td><td>COW 共享 ART + 预加载类</td></tr>
+    <tr><td>安全模型</td><td>Android SELinux + UID/GID</td><td>OH DAC + MAC + AccessToken</td><td><strong>OH 安全模型</strong></td></tr>
+    <tr><td>入口点</td><td>ActivityThread.main()</td><td>MainThread (JS/ArkUI)</td><td>ActivityThread.main()</td></tr>
+    <tr><td>事件循环</td><td>Android Looper</td><td>EventRunner</td><td>Android Looper</td></tr>
+    <tr><td>Socket</td><td>/dev/socket/zygote</td><td>/dev/unix/socket/appspawn</td><td>/dev/unix/socket/AppSpawnX</td></tr>
+  </table>
+</div>
+
+<h2 id="ch9-2">9.2 appspawn-x 四阶段启动</h2>
+
+<div class="diagram">
+Phase 1: OH 初始化
+  ├── 创建 sandbox 环境
+  ├── 初始化 SELinux
+  ├── 初始化 Access Token
+  └── 创建监听 socket (/dev/unix/socket/AppSpawnX)
+
+Phase 2: Android 运行时初始化
+  ├── 创建 ART VM (JNI_CreateJavaVM)
+  ├── 注册 JNI 原生方法
+  ├── 预加载 ~7000 Java 类 (COW 共享)
+  ├── 预加载 Android 资源 (framework-res.apk)
+  └── 预加载适配层 (OHEnvironment, IntentWantConverter, ...)
+
+Phase 3: GC & Finalize
+  └── gcAndFinalize() — 清理预加载产生的垃圾
+
+Phase 4: 进入 poll 事件循环
+  └── 等待 foundation 发送 spawn 请求
+</div>
+
+<h2 id="ch9-3">9.3 Fork 与子进程初始化流程</h2>
+
+<div class="diagram">
+foundation 发送 spawn 请求
+         │
+         ▼
+appspawn-x: fork()
+         │
+    ┌────┴────┐
+    │ 父进程   │ 子进程
+    │ 继续等待 │    │
+    └─────────┘    ▼
+              OH Specialize:
+              ├── setUID/setGID
+              ├── SELinux context
+              ├── AccessToken
+              ├── sandbox mount
+              │
+              ▼
+              Android Init:
+              ├── OHEnvironment.initialize()
+              ├── 连接 OH 系统服务
+              │
+              ▼
+              ActivityThread.main()
+              └── Looper.loop() (主循环)
+</div>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="appspawn_x_design.html">appspawn-x 混合孵化器设计</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch10">10. APK 安装与包管理</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch10-1">10.1 APK 与 HAP 对比</h2>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>APK (Android)</th><th>HAP (OpenHarmony)</th></tr>
+    <tr><td>格式</td><td>ZIP 归档</td><td>ZIP 归档</td></tr>
+    <tr><td>清单文件</td><td>AndroidManifest.xml（AXML 二进制）</td><td>module.json（JSON 文本）</td></tr>
+    <tr><td>字节码</td><td>classes.dex (Dalvik)</td><td>.abc (Ark Bytecode)</td></tr>
+    <tr><td>签名</td><td>V1 (JAR) / V2 / V3 签名</td><td>EdDSA / RSA 签名</td></tr>
+    <tr><td>优化</td><td>dex2oat → .odex/.vdex</td><td>Ark AOT（可选）</td></tr>
+    <tr><td>原生库</td><td>lib/{abi}/*.so</td><td>libs/{abi}/*.so</td></tr>
+  </table>
+</div>
+
+<h2 id="ch10-2">10.2 安装流程设计</h2>
+
+<div class="diagram">
+APK 文件输入
+     │
+     ▼
+① 解析 AXML (AndroidManifest.xml 二进制格式)
+     │
+     ▼
+② 验证 APK 签名 (V1/V2)
+     │
+     ▼
+③ 版本检查 (与已安装版本对比)
+     │
+     ▼
+④ 分配 UID (OH UID 分配器)
+     │
+     ▼
+⑤ 部署文件:
+   ├── 复制 APK → /data/app/{bundleName}/
+   ├── 提取原生库 → /data/app/{bundleName}/lib/
+   └── dex2oat 优化 → /data/app/{bundleName}/oat/
+     │
+     ▼
+⑥ 构建 BundleInfo:
+   ├── ManifestData → InnerBundleInfo
+   ├── Activity → AbilityInfo (type=PAGE)
+   ├── Service → ExtensionAbilityInfo (type=SERVICE)
+   ├── Provider → ExtensionAbilityInfo (type=DATA_SHARE)
+   └── Permission → AccessToken 映射
+     │
+     ▼
+⑦ 注册到 OH BMS
+     │
+     ▼
+⑧ 发送安装完成 CommonEvent
+</div>
+
+<h2 id="ch10-3">10.3 PackageManager 适配</h2>
+
+<p><code>PackageManagerAdapter</code> extends <code>IPackageManager.Stub</code>，将 Android PackageManager 查询路由到 OH BMS：</p>
+
+<ul>
+  <li><code>PackageInfoBuilder</code> — OH <code>BundleInfo</code> JSON → Android <code>PackageInfo</code>（AbilityInfo → ActivityInfo, ExtensionAbilityInfo → ServiceInfo/ProviderInfo）</li>
+  <li><code>PermissionMapper</code> — 50+ 条 <code>android.permission.*</code> ↔ <code>ohos.permission.*</code> 双向映射</li>
+</ul>
+
+<h2 id="ch10-4">10.4 OH 系统侧修改</h2>
+
+<p>APK 安装需要 OH BMS 和 installd 的扩展：</p>
+
+<table>
+  <tr><th>修改目标</th><th>修改内容</th></tr>
+  <tr><td>BMS</td><td>新增 <code>BundleType::APP_ANDROID = 10</code>，新增 <code>ProcessApkInstall()</code> 方法</td></tr>
+  <tr><td>installd</td><td>5 个新 IPC 方法（codes 90-94）：CreateAndroidDataDir, ExtractApkNativeLibs, DexOptAndroid, RemoveAndroidDataDir, VerifyApkSignature</td></tr>
+</table>
+
+<div class="doc-ref">
+  <strong>详细文档：</strong>
+  <a href="apk_installation_design.html">APK 安装设计</a>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch11">11. OH 系统侧修改汇总</h1>
+<!-- ================================================================ -->
+
+<p>虽然适配层的设计原则是最小化 OH 系统修改，但部分功能仍需 OH 侧配合。所有修改以补丁形式存放在 <code>ohos_patches/</code> 目录：</p>
+
+<div class="card">
+  <h4>ability_rt（能力管理框架）</h4>
+  <table>
+    <tr><th>文件</th><th>修改类型</th><th>目的</th></tr>
+    <tr><td><code>ability_manager_interface.h</code></td><td>接口扩展</td><td>新增 <code>StartAbilityInMission()</code> 方法</td></tr>
+    <tr><td><code>mission.h / mission.cpp</code></td><td>内部扩展</td><td>Mission 支持 Ability 栈（多 Activity 支持）</td></tr>
+    <tr><td><code>mission_list_manager_patch.cpp</code></td><td>逻辑修改</td><td>Mission 栈管理逻辑适配</td></tr>
+    <tr><td><code>remote_client_manager.h</code></td><td>接口扩展</td><td>支持 Android 进程的客户端管理</td></tr>
+    <tr><td><code>app_mgr_service_inner.cpp</code></td><td>逻辑修改</td><td>Android App 进程生命周期管理</td></tr>
+  </table>
+
+  <h4>bundle_framework（包管理框架）</h4>
+  <table>
+    <tr><th>文件</th><th>修改类型</th><th>目的</th></tr>
+    <tr><td><code>bundle_constants.h</code></td><td>常量扩展</td><td>新增 <code>BundleType::APP_ANDROID = 10</code></td></tr>
+    <tr><td><code>installd_interface.h</code></td><td>接口扩展</td><td>新增 5 个 Android 安装相关 IPC 方法</td></tr>
+    <tr><td><code>bundle_installer.cpp</code></td><td>逻辑修改</td><td>新增 APK 安装处理分支</td></tr>
+    <tr><td><code>installd_host_impl_android.cpp</code></td><td>新增文件</td><td>Android 相关 installd 实现</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch12">12. 构建系统</h1>
+<!-- ================================================================ -->
+
+<p>项目通过 AOSP 构建系统（<code>Android.bp</code>）和 OH 构建系统（<code>BUILD.gn</code>）双线构建：</p>
+
+<div class="card">
+  <h4>AOSP 构建（Android.bp）</h4>
+  <table>
+    <tr><th>模块</th><th>类型</th><th>产物</th></tr>
+    <tr><td><code>liboh_adapter_bridge</code></td><td>cc_library_shared</td><td>JNI 共享库 (.so)</td></tr>
+    <tr><td><code>oh-adapter-framework</code></td><td>java_library</td><td>Java 适配层框架 (jar)，依赖 <code>framework</code></td></tr>
+    <tr><td><code>OHAdapterHelloWorld</code></td><td>android_app</td><td>测试 APK（platform 签名）</td></tr>
+  </table>
+
+  <h4>OH 构建（BUILD.gn）</h4>
+  <table>
+    <tr><th>模块</th><th>类型</th><th>产物</th></tr>
+    <tr><td><code>apk_installer</code></td><td>ohos_shared_library</td><td>APK 安装器库</td></tr>
+    <tr><td><code>appspawn_x</code></td><td>ohos_executable</td><td>混合孵化器可执行文件</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch13">13. 实施计划</h1>
+<!-- ================================================================ -->
+
+<p>项目采用分阶段实施策略：</p>
+
+<div class="phase-card phase-1">
+  <h4>阶段 1：Hello World 验证（已设计完成）</h4>
+  <ul>
+    <li>基础框架搭建：OHEnvironment、ServiceInterceptor、JNI Bridge</li>
+    <li>ActivityManagerAdapter / ActivityTaskManagerAdapter 核心方法（startActivity）</li>
+    <li>IntentWantConverter、LifecycleAdapter 基础实现</li>
+    <li>Hello World 测试 App（startActivity 调用链验证）</li>
+    <li>Stub 模式运行（日志模拟 OH IPC 调用）</li>
+  </ul>
+</div>
+
+<div class="phase-card phase-2">
+  <h4>阶段 2：完整生命周期 + 四大组件</h4>
+  <ul>
+    <li>正向桥接 530 方法全覆盖（BRIDGED 标记方法接入真实 OH IPC）</li>
+    <li>反向回调 6 大桥接实现（210 方法）</li>
+    <li>Service ↔ ServiceExtensionAbility 三种场景</li>
+    <li>BroadcastReceiver ↔ CommonEventService</li>
+    <li>ContentProvider ↔ DataShareExtensionAbility</li>
+    <li>Mission Group（Android Task 多 Activity 栈）</li>
+  </ul>
+</div>
+
+<div class="phase-card phase-3">
+  <h4>阶段 3：图形与窗口系统</h4>
+  <ul>
+    <li>WindowManagerAdapter / WindowSessionAdapter 接入真实 OH 窗口服务</li>
+    <li>OHGraphicBufferProducer — Surface 缓冲区桥接</li>
+    <li>RSSurfaceNode + RSUIDirector 管理</li>
+    <li>InputEventBridge — MMI 到 Android InputEvent 转换</li>
+    <li>图形合成流水线验证</li>
+  </ul>
+</div>
+
+<div class="phase-card phase-4">
+  <h4>阶段 4：进程管理与包管理</h4>
+  <ul>
+    <li>appspawn-x 混合孵化器实现</li>
+    <li>APK 安装流程（解析→签名验证→部署→BMS 注册）</li>
+    <li>PackageManagerAdapter 接入 OH BMS</li>
+    <li>PermissionMapper — 权限系统映射</li>
+    <li>端到端 APK 安装 + 运行验证</li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch14">14. 设计文档索引</h1>
+<!-- ================================================================ -->
+
+<p>以下是本项目所有设计子文档的完整索引：</p>
+
+<div class="card">
+  <table>
+    <tr><th>#</th><th>文档</th><th>内容</th><th>对应章节</th></tr>
+    <tr><td>1</td><td><a href="android_oh_adaptation_report.html">可行性分析报告</a></td><td>Android-OH 适配的技术可行性分析、核心挑战识别</td><td>§3</td></tr>
+    <tr><td>2</td><td><a href="android_oh_interface_feasibility_report.html">接口可行性报告 v1</a></td><td>711 方法逐一可行性分析（两分类）</td><td>§3</td></tr>
+    <tr><td>3</td><td><a href="android_oh_interface_feasibility_report_v2.html">接口可行性报告 v2</a></td><td>优化三分类（可映射/需增强/可忽略）</td><td>§3</td></tr>
+    <tr><td>4</td><td><a href="phase1_design.html">Phase 1 设计</a></td><td>Phase 1 Hello World 框架设计</td><td>§4, §13</td></tr>
+    <tr><td>5</td><td><a href="phase1_hello_world_implementation_design.html">Phase 1 实现设计</a></td><td>Phase 1 完整调用链与实现细节</td><td>§4, §7.1</td></tr>
+    <tr><td>6</td><td><a href="interface_bridge_design.html">正向接口桥接设计</a></td><td>4 大正向适配器详细设计</td><td>§4</td></tr>
+    <tr><td>7</td><td><a href="reverse_callback_bridge_design.html">反向回调桥接设计</a></td><td>6 大反向回调适配器设计</td><td>§5</td></tr>
+    <tr><td>8</td><td><a href="surface_bridging_design.html">Surface 桥接设计</a></td><td>图形缓冲区 Android Surface → OH RenderService 桥接</td><td>§6</td></tr>
+    <tr><td>9</td><td><a href="mission_group_design.html">Mission Group 设计</a></td><td>Android Task 多 Activity 栈 → OH Mission 适配</td><td>§8</td></tr>
+    <tr><td>10</td><td><a href="broadcast_common_event_design.html">广播 / CommonEvent 设计</a></td><td>BroadcastReceiver ↔ CommonEventService 适配</td><td>§7.3</td></tr>
+    <tr><td>11</td><td><a href="content_provider_datashare_design.html">ContentProvider → DataShare 设计</a></td><td>ContentProvider ↔ DataShareExtensionAbility 适配</td><td>§7.4</td></tr>
+    <tr><td>12</td><td><a href="service_extension_design.html">Service → ServiceExtension 设计</a></td><td>Android Service 三种场景适配</td><td>§7.2</td></tr>
+    <tr><td>13</td><td><a href="appspawn_x_design.html">appspawn-x 设计</a></td><td>混合进程孵化器设计</td><td>§9</td></tr>
+    <tr><td>14</td><td><a href="apk_installation_design.html">APK 安装设计</a></td><td>APK 解析、安装、BMS 集成</td><td>§10</td></tr>
+  </table>
+</div>
+
+<footer>
+  Android-OpenHarmony Adapter Project &mdash; 总体设计文档 v1.0 &mdash; 2026年3月18日
+</footer>
+
+</div>
+</body>
+</html>

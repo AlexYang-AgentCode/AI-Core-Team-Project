@@ -1,0 +1,97 @@
+--- a/bundle_framework/services/bundlemgr/src/bundle_installer.cpp
++++ b/bundle_framework/services/bundlemgr/src/bundle_installer.cpp
+@@ -xxx,6 +xxx,12 @@
++// Android APK installation support
++#include "apk_manifest_parser.h"
++#include "apk_bundle_parser.h"
++#include "apk_installer.h"
++#include "apk_signature_verifier.h"
++
+ ErrCode BundleInstaller::ProcessBundleInstall(
+         const std::string& bundlePath,
+         const InstallParam& installParam,
+         const sptr<IStatusReceiver>& statusReceiver) {
++    // Check if the file is an Android APK
++    if (bundlePath.size() > 4 &&
++        bundlePath.compare(bundlePath.size() - 4, 4, ".apk") == 0) {
++        return ProcessApkInstall(bundlePath, installParam, statusReceiver);
++    }
++
+     // Standard HAP installation flow
+     return ProcessHapInstall(bundlePath, installParam, statusReceiver);
+ }
+
++ErrCode BundleInstaller::ProcessApkInstall(
++        const std::string& apkPath,
++        const InstallParam& installParam,
++        const sptr<IStatusReceiver>& statusReceiver) {
++
++    // 1. Parse AndroidManifest.xml (AXML binary format)
++    oh_adapter::ApkManifestParser::ManifestData manifest;
++    if (!oh_adapter::ApkManifestParser::Parse(apkPath, manifest)) {
++        APP_LOGE("ProcessApkInstall: failed to parse AndroidManifest.xml");
++        statusReceiver->OnFinished(ERR_APPEXECFWK_INSTALL_INVALID_APK, "Invalid APK");
++        return ERR_APPEXECFWK_INSTALL_INVALID_APK;
++    }
++
++    // 2. APK signature verification
++    auto verifyResult = oh_adapter::ApkSignatureVerifier::Verify(apkPath);
++    if (!verifyResult.verified) {
++        APP_LOGE("ProcessApkInstall: signature verification failed: %{public}s",
++                 verifyResult.errorMsg.c_str());
++        statusReceiver->OnFinished(ERR_APPEXECFWK_INSTALL_FAILED_VERIFY_SIGNATURE,
++                                   "Signature verification failed");
++        return ERR_APPEXECFWK_INSTALL_FAILED_VERIFY_SIGNATURE;
++    }
++
++    // 3. Version check (if updating existing installation)
++    auto bundleDataMgr = DelayedSingleton<BundleDataMgr>::GetInstance();
++    InnerBundleInfo existingInfo;
++    bool isUpdate = bundleDataMgr->GetInnerBundleInfo(manifest.packageName, existingInfo);
++    if (isUpdate) {
++        if (manifest.versionCode < existingInfo.GetVersionCode()) {
++            APP_LOGE("ProcessApkInstall: version downgrade not allowed");
++            statusReceiver->OnFinished(ERR_APPEXECFWK_INSTALL_VERSION_DOWNGRADE,
++                                       "Version downgrade not allowed");
++            return ERR_APPEXECFWK_INSTALL_VERSION_DOWNGRADE;
++        }
++    }
++
++    // 4. Allocate UID/GID
++    int32_t uid = bundleDataMgr->AllocateUid(manifest.packageName);
++    int32_t gid = uid;
++
++    // 5. Deploy APK files (copy, extract libs, dex2oat, create dirs)
++    oh_adapter::ApkInstaller installer;
++    auto deployResult = installer.DeployApk(apkPath, manifest.packageName, uid, gid);
++    if (!deployResult.success) {
++        APP_LOGE("ProcessApkInstall: deploy failed: %{public}s",
++                 deployResult.errorMsg.c_str());
++        statusReceiver->OnFinished(ERR_APPEXECFWK_INSTALLD_CREATE_DIR_FAILED,
++                                   deployResult.errorMsg);
++        return ERR_APPEXECFWK_INSTALLD_CREATE_DIR_FAILED;
++    }
++
++    // 6. Build InnerBundleInfo from parsed manifest
++    std::string installDir = "/data/app/android/" + manifest.packageName;
++    InnerBundleInfo bundleInfo = oh_adapter::ApkBundleParser::Build(manifest, installDir);
++
++    // 7. Register in BMS database
++    if (isUpdate) {
++        bundleDataMgr->UpdateInnerBundleInfo(manifest.packageName, bundleInfo);
++    } else {
++        bundleDataMgr->AddInnerBundleInfo(manifest.packageName, bundleInfo);
++    }
++
++    // 8. Send installation event
++    std::string eventName = isUpdate
++        ? CommonEventConstants::BUNDLE_UPDATED
++        : CommonEventConstants::BUNDLE_ADDED;
++    SendCommonEvent(eventName, manifest.packageName);
++
++    APP_LOGI("ProcessApkInstall: success, package=%{public}s, versionCode=%{public}d",
++             manifest.packageName.c_str(), manifest.versionCode);
++
++    statusReceiver->OnFinished(ERR_OK, "Install success");
++    return ERR_OK;
++}

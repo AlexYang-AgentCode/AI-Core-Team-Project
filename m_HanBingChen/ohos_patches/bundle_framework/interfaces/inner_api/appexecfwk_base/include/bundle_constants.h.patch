@@ -1,0 +1,10 @@
+--- a/bundle_framework/interfaces/inner_api/appexecfwk_base/include/bundle_constants.h
++++ b/bundle_framework/interfaces/inner_api/appexecfwk_base/include/bundle_constants.h
+@@ -xxx,6 +xxx,7 @@
+ enum class BundleType : uint32_t {
+     APP = 0,               // OH application
+     ATOMIC_SERVICE = 1,    // Atomic service
+     SHARED = 2,            // Shared bundle
+     APP_SERVICE = 3,       // Application service
++    APP_ANDROID = 10,      // Android application (APK installed via adapter)
+ };

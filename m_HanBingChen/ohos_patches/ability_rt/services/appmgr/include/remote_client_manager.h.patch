@@ -1,0 +1,46 @@
+--- a/ability_rt/services/appmgr/include/remote_client_manager.h
++++ b/ability_rt/services/appmgr/include/remote_client_manager.h
+@@ -36,6 +36,7 @@ public:
+     std::shared_ptr<AppSpawnClient> GetNWebSpawnClient();
+     std::shared_ptr<AppSpawnClient> GetCJAppSpawnClient();
+     std::shared_ptr<AppSpawnClient> GetNativeSpawnClient();
++    std::shared_ptr<AppSpawnClient> GetAndroidSpawnClient();
+     std::shared_ptr<AppSpawnClient> GetHybridSpawnClient();
+     void SetServiceInstance(std::weak_ptr<AppMgrServiceInner> serviceInstance);
+     std::shared_ptr<BundleManagerHelper> GetBundleManagerHelper();
+@@ -49,6 +50,7 @@ private:
+     std::shared_ptr<AppSpawnClient> nwebSpawnClient_;
+     std::shared_ptr<AppSpawnClient> cjAppSpawnClient_;
+     std::shared_ptr<AppSpawnClient> nativeSpawnClient_;
++    std::shared_ptr<AppSpawnClient> androidSpawnClient_;
+     std::shared_ptr<AppSpawnClient> hybridSpawnClient_;
+     std::weak_ptr<AppMgrServiceInner> serviceInstance_;
+     std::shared_ptr<BundleManagerHelper> bundleManagerHelper_;
+--- a/ability_rt/services/appmgr/src/remote_client_manager.cpp
++++ b/ability_rt/services/appmgr/src/remote_client_manager.cpp
+@@ -27,7 +27,8 @@ RemoteClientManager::RemoteClientManager()
+       nwebSpawnClient_(std::make_shared<AppSpawnClient>("NWebSpawn")),
+       cjAppSpawnClient_(std::make_shared<AppSpawnClient>("CJAppSpawn")),
+       nativeSpawnClient_(std::make_shared<AppSpawnClient>("NativeSpawn")),
+-      hybridSpawnClient_(std::make_shared<AppSpawnClient>("HybridSpawn"))
++      androidSpawnClient_(std::make_shared<AppSpawnClient>("AppSpawnX")),
++      hybridSpawnClient_(std::make_shared<AppSpawnClient>("HybridSpawn"))
+ {
+ }
+
+@@ -64,6 +65,15 @@ std::shared_ptr<AppSpawnClient> RemoteClientManager::GetNativeSpawnClient()
+     return nativeSpawnClient_;
+ }
+
++std::shared_ptr<AppSpawnClient> RemoteClientManager::GetAndroidSpawnClient()
++{
++    if (!androidSpawnClient_) {
++        TAG_LOGE(AAFwkTag::APPMGR, "androidSpawnClient_ is null");
++        return nullptr;
++    }
++    return androidSpawnClient_;
++}
++
+ std::shared_ptr<AppSpawnClient> RemoteClientManager::GetHybridSpawnClient()
+ {
+     if (!hybridSpawnClient_) {

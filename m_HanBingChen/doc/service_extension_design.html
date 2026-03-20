@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android Service → OH ServiceExtensionAbility 适配设计方案</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #1565c0, #00695c); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-bridged { background: var(--bridged); }
+  .tag-stub { background: var(--stub); }
+  .tag-partial { background: var(--partial); }
+  .tag-ohonly { background: var(--ohonly); }
+  .tag-new { background: #00695c; }
+  .tag-fix { background: var(--high); }
+  .impact-high { color: var(--high); font-weight: 600; }
+  .impact-medium { color: var(--medium); font-weight: 600; }
+  .impact-low { color: var(--low); font-weight: 600; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.82em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .toc .sub2 { padding-left: 48px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .scenario { background: #f3e5f5; border-left: 4px solid #7b1fa2; padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Android Service &rarr; OH ServiceExtensionAbility 适配设计方案</h1>
+  <p>Android Service 组件到 OpenHarmony ServiceExtensionAbility（Stage 模型）的完整适配层设计</p>
+  <p>版本 1.0 | 2026年3月16日 | Adapter Team</p>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 概述</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 背景与目标</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 三种适配场景</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 统计概览</a></li>
+    <li><a href="#ch2">2. Android Service 机制分析</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 核心架构</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 IPC 接口方法</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 Service 生命周期</a></li>
+    <li class="sub"><a href="#ch2-4">2.4 startService 与 bindService 流程</a></li>
+    <li><a href="#ch3">3. OH ServiceExtensionAbility 机制分析</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 Stage 模型下的 ServiceExtension</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 IPC 接口方法</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 ServiceExtension 生命周期</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 ConnectAbility 流程</a></li>
+    <li><a href="#ch4">4. 适配方案设计</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 场景 S1：Android App &rarr; Android Service（双端运行于OH）</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 场景 S2：Android App &rarr; OH ServiceExtension</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 场景 S3：OH App &rarr; Android Service（反向桥接）</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 ServiceConnectionRegistry 设计</a></li>
+    <li><a href="#ch5">5. 接口映射表</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 正向接口映射（Android &rarr; OH）</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 反向回调映射（OH &rarr; Android）</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 连接回调映射</a></li>
+    <li><a href="#ch6">6. 数据流图</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 场景 S1 数据流：startService</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 场景 S1 数据流：bindService</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 场景 S2 数据流：Android App &rarr; OH ServiceExtension</a></li>
+    <li class="sub"><a href="#ch6-4">6.4 场景 S3 数据流：OH App &rarr; Android Service</a></li>
+    <li><a href="#ch7">7. 关键差异与解决方案</a></li>
+    <li><a href="#ch8">8. 代码实现清单</a></li>
+    <li><a href="#ch9">9. 现有代码缺陷修复</a></li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch1">1. 概述</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch1-1">1.1 背景与目标</h2>
+
+<p>Android Service 是 Android 四大组件之一，用于在后台执行长时间运行的操作或为其他应用提供跨进程服务。在 OpenHarmony（OH）系统中，对应的组件是 <strong>ServiceExtensionAbility</strong>（Stage 模型，ExtensionAbilityType = SERVICE = 3）。</p>
+
+<p>本文档设计 Android Service 与 OH ServiceExtensionAbility 之间的完整适配层，使得：</p>
+
+<div class="card">
+  <h3>设计目标</h3>
+  <ul>
+    <li><strong>Android App 无感运行</strong>：Android 应用调用 <code>startService()</code> / <code>bindService()</code> / <code>stopService()</code> 等标准 API，适配层透明地将请求转发到 OH ServiceExtensionAbility</li>
+    <li><strong>跨系统互调</strong>：支持 Android App 调用 OH 原生 ServiceExtension，也支持 OH App 调用 Android Service</li>
+    <li><strong>连接管理</strong>：完善 bindService/unbindService 的连接生命周期管理，支持多并发连接</li>
+    <li><strong>修复现有缺陷</strong>：修复当前代码中已识别的6个问题点</li>
+  </ul>
+</div>
+
+<h2 id="ch1-2">1.2 三种适配场景</h2>
+
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="number">S1</div>
+    <div class="label">Android App &rarr; Android Service<br>（双端运行于OH）</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">S2</div>
+    <div class="label">Android App &rarr; OH ServiceExtension<br>（跨系统正向调用）</div>
+  </div>
+  <div class="stat-box">
+    <div class="number">S3</div>
+    <div class="label">OH App &rarr; Android Service<br>（跨系统反向桥接）</div>
+  </div>
+</div>
+
+<div class="scenario">
+  <strong>场景 S1</strong>：最常见场景。Android 应用 A 启动/绑定同样运行在 OH 上的 Android Service B。适配层在 IPC 两端均需介入：正向通过 <code>ActivityManagerAdapter</code> 将 AMS 调用路由到 OH <code>IAbilityManager</code>，反向通过 <code>AbilitySchedulerBridge</code> 将 OH 回调转换为 <code>IApplicationThread</code> 调度。
+</div>
+<div class="scenario">
+  <strong>场景 S2</strong>：Android 应用调用 OH 原生 ServiceExtensionAbility。正向路径与 S1 一致，但反向无需 AbilitySchedulerBridge（OH Service 自行处理 IAbilityScheduler 回调）。连接回调通过 <code>IAbilityConnection</code> &rarr; <code>IServiceConnection</code> 桥接传递 remoteBinder。
+</div>
+<div class="scenario">
+  <strong>场景 S3</strong>：OH 原生应用通过 <code>ConnectAbility</code> 连接 Android Service。反向桥接层接收 <code>ScheduleConnectAbility</code>，需触发 Android Service 完整创建流程（<code>scheduleCreateService</code> + <code>scheduleBindService</code>），并将 <code>Service.onBind()</code> 返回的 IBinder 回传给 OH 调用方。
+</div>
+
+<h2 id="ch1-3">1.3 统计概览</h2>
+
+<div class="stat-grid">
+  <div class="stat-box"><div class="number">~15</div><div class="label">Android IActivityManager<br>Service 相关方法</div></div>
+  <div class="stat-box"><div class="number">5</div><div class="label">IApplicationThread<br>Service 回调方法</div></div>
+  <div class="stat-box"><div class="number">4</div><div class="label">OH IAbilityManager<br>Service 相关方法</div></div>
+  <div class="stat-box"><div class="number">3</div><div class="label">OH IAbilityScheduler<br>Service 回调方法</div></div>
+  <div class="stat-box"><div class="number">6</div><div class="label">现有代码缺陷数</div></div>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch2">2. Android Service 机制分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch2-1">2.1 核心架构</h2>
+
+<p>Android Service 运行在应用进程内，但其生命周期由系统服务 <strong>ActivityManagerService (AMS)</strong> 管理。Service 有两种运行模式：</p>
+
+<table>
+<tr><th>模式</th><th>启动方式</th><th>生命周期</th><th>特点</th></tr>
+<tr>
+  <td><strong>Started Service</strong></td>
+  <td><code>startService(Intent)</code></td>
+  <td>onCreate &rarr; onStartCommand &rarr; 运行 &rarr; onDestroy</td>
+  <td>独立运行，需调用 <code>stopSelf()</code> 或 <code>stopService()</code> 终止</td>
+</tr>
+<tr>
+  <td><strong>Bound Service</strong></td>
+  <td><code>bindService(Intent, conn, flags)</code></td>
+  <td>onCreate &rarr; onBind &rarr; 运行 &rarr; onUnbind &rarr; onDestroy</td>
+  <td>基于连接计数，所有客户端 unbind 后自动销毁</td>
+</tr>
+<tr>
+  <td><strong>混合模式</strong></td>
+  <td>startService + bindService</td>
+  <td>onCreate &rarr; onStartCommand + onBind &rarr; 运行 &rarr; onUnbind &rarr; onDestroy</td>
+  <td>需同时满足 stop + 所有 unbind 才销毁</td>
+</tr>
+</table>
+
+<h2 id="ch2-2">2.2 IPC 接口方法</h2>
+
+<h3>IActivityManager 中 Service 相关方法（App &rarr; AMS）</h3>
+
+<table>
+<tr><th>#</th><th>方法签名</th><th>说明</th></tr>
+<tr><td>1</td><td><code>startService(caller, intent, resolvedType, requireForeground, callingPkg, callingFeatureId, userId)</code></td><td>启动 Service，返回 ComponentName</td></tr>
+<tr><td>2</td><td><code>stopService(caller, intent, resolvedType, userId)</code></td><td>停止 Started Service</td></tr>
+<tr><td>3</td><td><code>bindService(caller, token, intent, resolvedType, connection, flags, callingPkg, userId)</code></td><td>绑定 Service，传入 IServiceConnection 回调</td></tr>
+<tr><td>4</td><td><code>bindServiceInstance(caller, token, intent, resolvedType, connection, flags, instanceName, callingPkg, userId)</code></td><td>绑定特定实例的 Service（Android 12+）</td></tr>
+<tr><td>5</td><td><code>unbindService(connection)</code></td><td>解绑 Service</td></tr>
+<tr><td>6</td><td><code>publishService(token, intent, service)</code></td><td>Service.onBind() 返回后发布 IBinder 给等待的客户端</td></tr>
+<tr><td>7</td><td><code>unbindFinished(token, intent, doRebind)</code></td><td>Service.onUnbind() 完成通知</td></tr>
+<tr><td>8</td><td><code>stopServiceToken(className, token, startId)</code></td><td>Service 内部调用 stopSelf(startId)</td></tr>
+<tr><td>9</td><td><code>serviceDoneExecuting(token, type, startId, res)</code></td><td>Service 生命周期回调执行完毕通知</td></tr>
+<tr><td>10</td><td><code>setServiceForeground(className, token, id, notification, flags, foregroundServiceType)</code></td><td>设为前台 Service（显示通知）</td></tr>
+<tr><td>11</td><td><code>peekService(intent, resolvedType, callingPkg)</code></td><td>查看 Service 已发布的 IBinder（不触发绑定）</td></tr>
+<tr><td>12</td><td><code>bindIsolatedService(caller, token, intent, resolvedType, connection, flags, instanceName, callingPkg, isolatedProcess)</code></td><td>绑定到隔离进程中的 Service</td></tr>
+<tr><td>13</td><td><code>updateServiceGroup(connection, group, importance)</code></td><td>更新 Service 进程组和优先级</td></tr>
+</table>
+
+<h3>IApplicationThread 中 Service 回调方法（AMS &rarr; App）</h3>
+
+<table>
+<tr><th>#</th><th>方法签名</th><th>说明</th></tr>
+<tr><td>1</td><td><code>scheduleCreateService(token, info, compatInfo, processState)</code></td><td>创建 Service 实例</td></tr>
+<tr><td>2</td><td><code>scheduleBindService(token, intent, rebind, processState)</code></td><td>触发 Service.onBind() / onRebind()</td></tr>
+<tr><td>3</td><td><code>scheduleUnbindService(token, intent)</code></td><td>触发 Service.onUnbind()</td></tr>
+<tr><td>4</td><td><code>scheduleServiceArgs(token, taskRemoved, startId, flags, intent)</code></td><td>触发 Service.onStartCommand()</td></tr>
+<tr><td>5</td><td><code>scheduleStopService(token)</code></td><td>触发 Service.onDestroy()</td></tr>
+</table>
+
+<h3>IServiceConnection 回调接口（AMS &rarr; App）</h3>
+
+<table>
+<tr><th>方法</th><th>说明</th></tr>
+<tr><td><code>connected(ComponentName name, IBinder service, boolean dead)</code></td><td>连接建立/断开通知。<code>dead=false</code> 表示连接成功并传递 Service 的 IBinder；<code>dead=true</code> 表示 Service 进程死亡</td></tr>
+</table>
+
+<h2 id="ch2-3">2.3 Service 生命周期</h2>
+
+<div class="diagram">
+                            startService()
+                                 │
+                                 ▼
+                         ┌──────────────┐
+                         │   onCreate() │
+                         └──────┬───────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+             startService()          bindService()
+                    │                       │
+                    ▼                       ▼
+          ┌─────────────────┐     ┌──────────────┐
+          │ onStartCommand() │     │   onBind()   │
+          └────────┬────────┘     └──────┬───────┘
+                   │                     │
+                   │              publishService()
+                   │             客户端收到 IBinder
+                   │                     │
+              stopService()        unbindService()
+              / stopSelf()               │
+                   │                     ▼
+                   │             ┌──────────────┐
+                   │             │  onUnbind()  │
+                   │             └──────┬───────┘
+                   │                    │
+                   │          doRebind=true?──┐
+                   │                    │     │
+                   │                    │     ▼
+                   │                    │  onRebind()
+                   │                    │     │
+                   └────────────────────┘
+                                │
+                                ▼
+                        ┌──────────────┐
+                        │ onDestroy()  │
+                        └──────────────┘</div>
+
+<h2 id="ch2-4">2.4 startService 与 bindService 流程</h2>
+
+<h4>startService 流程</h4>
+
+<div class="diagram">
+Client App              AMS                             Service App (IApplicationThread)
+ │                       │                                  │
+ │ startService(intent)  │                                  │
+ │──────────────────────>│                                  │
+ │                       │ 1. 解析 Intent，找到目标 Service   │
+ │                       │ 2. 如 Service 未创建:             │
+ │                       │                                  │
+ │                       │ scheduleCreateService(token,info) │
+ │                       │─────────────────────────────────>│
+ │                       │                                  │ Service.onCreate()
+ │                       │                                  │
+ │                       │ scheduleServiceArgs(token,        │
+ │                       │   startId, flags, intent)         │
+ │                       │─────────────────────────────────>│
+ │                       │                                  │ Service.onStartCommand(intent)
+ │                       │                                  │
+ │                       │  serviceDoneExecuting(token)      │
+ │  return ComponentName │<─────────────────────────────────│
+ │<──────────────────────│                                  │</div>
+
+<h4>bindService 流程</h4>
+
+<div class="diagram">
+Client App              AMS                             Service App (IApplicationThread)
+ │                       │                                  │
+ │ bindService(intent,   │                                  │
+ │   connection, flags)  │                                  │
+ │──────────────────────>│                                  │
+ │                       │ 1. 记录 IServiceConnection        │
+ │                       │ 2. 如 Service 未创建:             │
+ │                       │                                  │
+ │                       │ scheduleCreateService(token,info) │
+ │                       │─────────────────────────────────>│
+ │                       │                                  │ Service.onCreate()
+ │                       │                                  │
+ │                       │ scheduleBindService(token,intent) │
+ │                       │─────────────────────────────────>│
+ │                       │                                  │ Service.onBind(intent)
+ │                       │                                  │   返回 IBinder
+ │                       │                                  │
+ │                       │ AMS.publishService(token,         │
+ │                       │   intent, binder)                 │
+ │                       │<─────────────────────────────────│
+ │                       │                                  │
+ │ IServiceConnection    │                                  │
+ │   .connected(name,    │                                  │
+ │     binder, false)    │                                  │
+ │<──────────────────────│                                  │</div>
+
+<!-- ================================================================ -->
+<h1 id="ch3">3. OH ServiceExtensionAbility 机制分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch3-1">3.1 Stage 模型下的 ServiceExtension</h2>
+
+<p>在 OpenHarmony Stage 模型中，<strong>ServiceExtensionAbility</strong> 是后台服务组件，对应 <code>ExtensionAbilityType::SERVICE = 3</code>。与 Android Service 的核心区别在于：</p>
+
+<table>
+<tr><th>特性</th><th>Android Service</th><th>OH ServiceExtensionAbility</th></tr>
+<tr><td>启动方式</td><td>startService + bindService（两种模式）</td><td>ConnectAbility（类bind） + StartAbility（类start，但不常用于Service）</td></tr>
+<tr><td>连接模型</td><td>IServiceConnection 单回调</td><td>IAbilityConnection 双回调（ConnectDone + DisconnectDone）</td></tr>
+<tr><td>服务发布</td><td>publishService（显式发布 IBinder）</td><td>OnConnect 返回值自动传递 remoteObject</td></tr>
+<tr><td>实例管理</td><td>单实例，多客户端共享</td><td>单实例，多客户端共享</td></tr>
+<tr><td>前台服务</td><td>setServiceForeground + Notification</td><td>无直接等价（通过 WantAgent 实现通知）</td></tr>
+<tr><td>隔离进程</td><td>支持 isolatedProcess</td><td>不支持</td></tr>
+<tr><td>onStartCommand</td><td>返回重启策略（START_STICKY等）</td><td>OnCommand 无返回值</td></tr>
+</table>
+
+<h2 id="ch3-2">3.2 IPC 接口方法</h2>
+
+<h3>IAbilityManager 中 Service 相关方法</h3>
+
+<table>
+<tr><th>#</th><th>方法</th><th>说明</th></tr>
+<tr><td>1</td><td><code>ConnectAbility(Want, IAbilityConnection, callerToken)</code></td><td>连接 ServiceExtension，传入 IAbilityConnection 回调。等价于 Android bindService</td></tr>
+<tr><td>2</td><td><code>ConnectAbilityCommon(Want, IAbilityConnection, callerToken, extensionType)</code></td><td>ConnectAbility 的通用版本，可指定 ExtensionAbility 类型</td></tr>
+<tr><td>3</td><td><code>DisconnectAbility(IAbilityConnection)</code></td><td>断开与 ServiceExtension 的连接。等价于 Android unbindService</td></tr>
+<tr><td>4</td><td><code>StopServiceAbility(Want, callerToken, accountId)</code></td><td>停止 ServiceExtension。等价于 Android stopService</td></tr>
+</table>
+
+<h3>IAbilityConnection 回调接口（系统 &rarr; 调用方App）</h3>
+
+<table>
+<tr><th>方法</th><th>说明</th></tr>
+<tr><td><code>OnAbilityConnectDone(ElementName, IRemoteObject remoteObject, resultCode)</code></td><td>连接成功，携带 Service 的 remoteObject（等价于 IBinder）</td></tr>
+<tr><td><code>OnAbilityDisconnectDone(ElementName, resultCode)</code></td><td>连接断开通知</td></tr>
+</table>
+
+<h3>IAbilityScheduler 中 Service 回调方法（系统 &rarr; Service 进程）</h3>
+
+<table>
+<tr><th>#</th><th>方法</th><th>说明</th></tr>
+<tr><td>1</td><td><code>ScheduleConnectAbility(Want)</code></td><td>触发 ServiceExtension.OnConnect(want)，返回 remoteObject</td></tr>
+<tr><td>2</td><td><code>ScheduleDisconnectAbility(Want)</code></td><td>触发 ServiceExtension.OnDisconnect(want)</td></tr>
+<tr><td>3</td><td><code>ScheduleCommandAbility(Want, restart, startId)</code></td><td>触发 ServiceExtension.OnCommand(want, startId)</td></tr>
+</table>
+
+<h2 id="ch3-3">3.3 ServiceExtension 生命周期</h2>
+
+<div class="diagram">
+                    ConnectAbility(want)
+                           │
+                           ▼
+                   ┌──────────────┐
+                   │   OnStart()  │  ← 等价于 onCreate
+                   └──────┬───────┘
+                          │
+              ┌───────────┴───────────┐
+              │                       │
+       ConnectAbility()        StartAbility()
+              │                       │
+              ▼                       ▼
+     ┌──────────────┐       ┌──────────────────┐
+     │ OnConnect()  │       │   OnCommand()    │
+     │ return remote│       │                  │
+     └──────┬───────┘       └────────┬─────────┘
+            │                        │
+     DisconnectAbility()      StopServiceAbility()
+            │                        │
+            ▼                        │
+    ┌────────────────┐               │
+    │ OnDisconnect() │               │
+    └───────┬────────┘               │
+            │                        │
+            └────────────────────────┘
+                          │
+                          ▼
+                  ┌──────────────┐
+                  │   OnStop()   │  ← 等价于 onDestroy
+                  └──────────────┘</div>
+
+<h2 id="ch3-4">3.4 ConnectAbility 流程</h2>
+
+<div class="diagram">
+Client App              AbilityManagerService          ServiceExtension (IAbilityScheduler)
+ │                            │                              │
+ │ ConnectAbility(want,       │                              │
+ │   abilityConnection)       │                              │
+ │───────────────────────────>│                              │
+ │                            │ 1. 解析 Want，找到目标 Service │
+ │                            │ 2. 如 Service 未启动:         │
+ │                            │    ScheduleAbilityTransaction │
+ │                            │    (Lifecycle::OnStart)       │
+ │                            │─────────────────────────────>│
+ │                            │                              │ OnStart()
+ │                            │                              │
+ │                            │ ScheduleConnectAbility(want)  │
+ │                            │─────────────────────────────>│
+ │                            │                              │ OnConnect(want)
+ │                            │                              │   返回 remoteObject
+ │                            │   remoteObject               │
+ │                            │<─────────────────────────────│
+ │                            │                              │
+ │ IAbilityConnection         │                              │
+ │  .OnAbilityConnectDone(    │                              │
+ │    elementName,            │                              │
+ │    remoteObject,           │                              │
+ │    resultCode)             │                              │
+ │<───────────────────────────│                              │</div>
+
+<!-- ================================================================ -->
+<h1 id="ch4">4. 适配方案设计</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch4-1">4.1 场景 S1：Android App &rarr; Android Service（双端运行于OH）</h2>
+
+<p>这是最常见的场景。Android 应用的 startService / bindService 调用通过适配层路由到 OH 系统服务，OH 系统服务再调度目标 Android Service 的生命周期。</p>
+
+<div class="card">
+  <h3>正向路径（App &rarr; 系统）</h3>
+  <ol>
+    <li>Android App 调用 <code>ContextImpl.startService(intent)</code></li>
+    <li>Framework 层调用 <code>IActivityManager.startService()</code></li>
+    <li><code>ActivityManagerAdapter.startService()</code> 拦截，将 Intent 转换为 Want</li>
+    <li>通过 JNI 调用 <code>nativeStartAbility(want)</code>，映射到 OH <code>IAbilityManager::StartAbility(want)</code></li>
+    <li>OH AbilityManagerService 启动目标 ServiceExtensionAbility</li>
+  </ol>
+
+  <h3>反向路径（系统 &rarr; Service App）</h3>
+  <ol>
+    <li>OH 系统通过 <code>IAbilityScheduler.ScheduleCommandAbility(want)</code> 通知目标进程</li>
+    <li>C++ <code>AbilitySchedulerAdapter</code> 接收调用，通过 JNI 回调到 Java 层</li>
+    <li><code>AbilitySchedulerBridge.onScheduleCommandAbility()</code> 转换参数</li>
+    <li>调用 <code>IApplicationThread.scheduleServiceArgs(token, startId, flags, intent)</code></li>
+    <li>Android Service 的 <code>onStartCommand()</code> 被正常触发</li>
+  </ol>
+</div>
+
+<div class="note">
+  <strong>关键点</strong>：场景 S1 中，目标 Android Service 也运行在 OH 环境中，其进程的 IAbilityScheduler 由 <code>AbilitySchedulerAdapter</code>（C++ Stub）实现，负责接收 OH 系统的调度并转发给 Android Framework 的 <code>IApplicationThread</code>。
+</div>
+
+<h2 id="ch4-2">4.2 场景 S2：Android App &rarr; OH ServiceExtension</h2>
+
+<p>Android 应用调用 OH 原生的 ServiceExtensionAbility。正向路径与 S1 一致，区别在于反向路径——OH ServiceExtension 自行处理 <code>IAbilityScheduler</code> 回调，无需 <code>AbilitySchedulerBridge</code> 介入。</p>
+
+<div class="card">
+  <h3>连接回调路径</h3>
+  <ol>
+    <li>Android App 调用 <code>bindService(intent, serviceConnection, flags)</code></li>
+    <li><code>ActivityManagerAdapter.bindService()</code> 拦截：
+      <ul>
+        <li>将 <code>IServiceConnection</code> 注册到 <code>ServiceConnectionRegistry</code>，获得 <code>connectionId</code></li>
+        <li>通过 JNI 调用 <code>nativeConnectAbility(want, connectionId)</code></li>
+      </ul>
+    </li>
+    <li>C++ 侧为该 connectionId 创建一个 <code>AbilityConnectionAdapter</code> 实例并传给 OH <code>ConnectAbility</code></li>
+    <li>OH ServiceExtension 的 <code>OnConnect()</code> 返回 remoteObject</li>
+    <li>OH 系统调用 <code>IAbilityConnection.OnAbilityConnectDone(element, remoteObject, resultCode)</code></li>
+    <li>C++ <code>AbilityConnectionAdapter</code> 通过 JNI 回调到 Java</li>
+    <li><code>AbilityConnectionBridge.onAbilityConnectDone()</code> 查找 <code>ServiceConnectionRegistry</code>，调用 <code>IServiceConnection.connected(componentName, binder, false)</code></li>
+  </ol>
+</div>
+
+<h2 id="ch4-3">4.3 场景 S3：OH App &rarr; Android Service（反向桥接）</h2>
+
+<p>OH 原生应用通过 <code>ConnectAbility</code> 连接到 Android Service。这是最复杂的场景，需要完整模拟 Android Service 的创建和绑定流程。</p>
+
+<div class="card">
+  <h3>完整流程</h3>
+  <ol>
+    <li>OH App 调用 <code>ConnectAbility(want, abilityConnection)</code>，目标指向 Android Service</li>
+    <li>OH AbilityManagerService 识别目标为 Android 兼容 Ability，调度到 Android 兼容进程</li>
+    <li><code>AbilitySchedulerAdapter</code>（C++ Stub）接收 <code>ScheduleConnectAbility(want)</code></li>
+    <li>通过 JNI 回调到 <code>AbilitySchedulerBridge.onScheduleConnectAbility(want)</code></li>
+    <li>桥接层执行以下 Android Service 创建序列：
+      <ul>
+        <li>如果 Service 未创建：调用 <code>IApplicationThread.scheduleCreateService(token, serviceInfo)</code></li>
+        <li>调用 <code>IApplicationThread.scheduleBindService(token, intent, rebind=false)</code></li>
+      </ul>
+    </li>
+    <li>Android Service 的 <code>onBind(intent)</code> 返回 IBinder</li>
+    <li>Service 调用 <code>AMS.publishService(token, intent, binder)</code></li>
+    <li><code>ActivityManagerAdapter.publishService()</code> 拦截，通过 JNI 调用 <code>nativePublishService(connectionId, binder)</code></li>
+    <li>C++ 侧将 IBinder 包装后通过 <code>ScheduleConnectAbilityDone</code> 回传给 OH</li>
+    <li>OH 系统调用原始调用方的 <code>IAbilityConnection.OnAbilityConnectDone()</code></li>
+  </ol>
+</div>
+
+<div class="warn">
+  <strong>注意</strong>：场景 S3 中，<code>AbilitySchedulerBridge</code> 需要管理 Android Service 的 token，并维护一个 Service 实例追踪表，确保同一 Service 不会被重复创建。同时需要处理 Android IBinder 到 OH IRemoteObject 的跨系统 Binder 转换。
+</div>
+
+<h2 id="ch4-4">4.4 ServiceConnectionRegistry 设计</h2>
+
+<p>新增单例类 <code>ServiceConnectionRegistry</code>，统一管理 bindService/unbindService 的连接生命周期。</p>
+
+<div class="card">
+<h3>类设计</h3>
+<pre><code>/**
+ * Singleton registry for tracking Android Service connections mapped to OH AbilityConnections.
+ *
+ * Thread-safe: all public methods are synchronized.
+ */
+public class ServiceConnectionRegistry {
+    private static final ServiceConnectionRegistry sInstance = new ServiceConnectionRegistry();
+
+    // Connection tracking
+    private final Map&lt;IBinder, ConnectionRecord&gt; mConnectionsByToken = new HashMap&lt;&gt;();
+    private final Map&lt;Integer, ConnectionRecord&gt; mConnectionsById = new HashMap&lt;&gt;();
+    private int mNextConnectionId = 1;
+
+    static class ConnectionRecord {
+        final int connectionId;
+        final IServiceConnection connection;
+        final IBinder connectionToken;  // IServiceConnection.asBinder()
+        ComponentName componentName;
+        boolean isBound;
+
+        ConnectionRecord(int id, IServiceConnection conn, IBinder token) { ... }
+    }
+
+    public static ServiceConnectionRegistry getInstance() { return sInstance; }
+
+    /**
+     * Register a new connection. Called from ActivityManagerAdapter.bindService().
+     * @return connectionId for passing to native ConnectAbility
+     */
+    public synchronized int register(IServiceConnection connection, ComponentName name) { ... }
+
+    /**
+     * Unregister a connection. Called from ActivityManagerAdapter.unbindService().
+     * @return connectionId for passing to native DisconnectAbility, or -1 if not found
+     */
+    public synchronized int unregister(IServiceConnection connection) { ... }
+
+    /**
+     * Called when OH IAbilityConnection.OnAbilityConnectDone fires.
+     * Dispatches to the corresponding IServiceConnection.connected().
+     */
+    public synchronized void onConnected(int connectionId, String bundleName,
+            String abilityName, IBinder remoteBinder) { ... }
+
+    /**
+     * Called when OH IAbilityConnection.OnAbilityDisconnectDone fires.
+     * Dispatches IServiceConnection.connected(name, null, dead=true).
+     */
+    public synchronized void onDisconnected(int connectionId) { ... }
+
+    /**
+     * Find connectionId by IServiceConnection token.
+     */
+    public synchronized int findConnectionId(IBinder connectionToken) { ... }
+}</code></pre>
+</div>
+
+<div class="info">
+  <strong>设计决策</strong>：使用 <code>connectionId</code>（int）而非直接传递 IBinder 到 native 层，原因如下：
+  <ul>
+    <li>OH 的 <code>IAbilityConnection</code> 是 C++ 对象，无法直接持有 Java IBinder 引用</li>
+    <li>connectionId 作为轻量级标识符可安全跨 JNI 边界传递</li>
+    <li>Java 侧通过 connectionId 查表即可恢复完整的 IServiceConnection 引用</li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch5">5. 接口映射表</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch5-1">5.1 正向接口映射（Android &rarr; OH）</h2>
+
+<table>
+<tr><th>Android IActivityManager 方法</th><th>OH 目标接口及方法</th><th>状态</th><th>说明</th></tr>
+<tr>
+  <td><code>startService(intent)</code></td>
+  <td><code>IAbilityManager::StartAbility(want)</code></td>
+  <td><span class="tag tag-bridged">BRIDGED</span></td>
+  <td>Intent 转 Want，通过 StartAbility 启动。需设置 Want 的 extensionAbilityType = SERVICE</td>
+</tr>
+<tr>
+  <td><code>stopService(intent)</code></td>
+  <td><code>IAbilityManager::StopServiceAbility(want)</code></td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前代码未实现 OH IPC 调用，仅返回 1。需修复</td>
+</tr>
+<tr>
+  <td><code>bindService(intent, conn, flags)</code></td>
+  <td><code>IAbilityManager::ConnectAbility(want, connection)</code></td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前代码不保存 IServiceConnection，需通过 ServiceConnectionRegistry 管理</td>
+</tr>
+<tr>
+  <td><code>bindServiceInstance(intent, conn, flags, instanceName)</code></td>
+  <td><code>IAbilityManager::ConnectAbility(want, connection)</code></td>
+  <td><span class="tag tag-partial">PARTIAL</span></td>
+  <td>OH 无实例名概念，instanceName 忽略</td>
+</tr>
+<tr>
+  <td><code>unbindService(connection)</code></td>
+  <td><code>IAbilityManager::DisconnectAbility(connection)</code></td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>需从 ServiceConnectionRegistry 查找对应 connectionId，传递给 native DisconnectAbility</td>
+</tr>
+<tr>
+  <td><code>publishService(token, intent, binder)</code></td>
+  <td>内部处理（见场景 S3）</td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前为空 stub。需实现将 IBinder 回传给等待连接的 OH 调用方</td>
+</tr>
+<tr>
+  <td><code>unbindFinished(token, intent, doRebind)</code></td>
+  <td>内部处理</td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前为空 stub。需通知 OH 系统 unbind 完成状态和 rebind 策略</td>
+</tr>
+<tr>
+  <td><code>stopServiceToken(className, token, startId)</code></td>
+  <td><code>IAbilityManager::StopServiceAbility(want)</code></td>
+  <td><span class="tag tag-bridged">BRIDGED</span></td>
+  <td>Service 内部 stopSelf()，转换为 StopServiceAbility</td>
+</tr>
+<tr>
+  <td><code>serviceDoneExecuting(token, type, startId, res)</code></td>
+  <td>无直接等价</td>
+  <td><span class="tag tag-stub">STUB</span></td>
+  <td>OH 无需显式通知 Service 回调完成，记录日志即可</td>
+</tr>
+<tr>
+  <td><code>setServiceForeground(className, token, id, notification)</code></td>
+  <td>无直接等价</td>
+  <td><span class="tag tag-stub">STUB</span></td>
+  <td>OH 通过 WantAgent 实现前台通知，暂以 stub 处理</td>
+</tr>
+<tr>
+  <td><code>peekService(intent)</code></td>
+  <td>无直接等价</td>
+  <td><span class="tag tag-stub">STUB</span></td>
+  <td>可通过 ServiceConnectionRegistry 查找已发布的 IBinder 实现</td>
+</tr>
+<tr>
+  <td><code>bindIsolatedService(...)</code></td>
+  <td><code>IAbilityManager::ConnectAbility(want, connection)</code></td>
+  <td><span class="tag tag-partial">PARTIAL</span></td>
+  <td>OH 不支持隔离进程，退化为普通 ConnectAbility</td>
+</tr>
+<tr>
+  <td><code>updateServiceGroup(conn, group, importance)</code></td>
+  <td>无直接等价</td>
+  <td><span class="tag tag-stub">STUB</span></td>
+  <td>OH 进程优先级由系统管理，无法从应用侧设置</td>
+</tr>
+</table>
+
+<h2 id="ch5-2">5.2 反向回调映射（OH &rarr; Android）</h2>
+
+<table>
+<tr><th>OH IAbilityScheduler 方法</th><th>Android IApplicationThread 方法</th><th>状态</th><th>说明</th></tr>
+<tr>
+  <td><code>ScheduleConnectAbility(want)</code></td>
+  <td><code>scheduleCreateService(token, info)</code><br>+ <code>scheduleBindService(token, intent)</code></td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前仅打日志。需实现：首次创建 Service + 绑定</td>
+</tr>
+<tr>
+  <td><code>ScheduleDisconnectAbility(want)</code></td>
+  <td><code>scheduleUnbindService(token, intent)</code></td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前仅打日志。需实现</td>
+</tr>
+<tr>
+  <td><code>ScheduleCommandAbility(want, restart, startId)</code></td>
+  <td><code>scheduleServiceArgs(token, taskRemoved, startId, flags, intent)</code></td>
+  <td><span class="tag tag-fix">FIX</span></td>
+  <td>当前仅打日志。需实现</td>
+</tr>
+</table>
+
+<h2 id="ch5-3">5.3 连接回调映射</h2>
+
+<table>
+<tr><th>OH IAbilityConnection 方法</th><th>Android IServiceConnection 方法</th><th>状态</th><th>说明</th></tr>
+<tr>
+  <td><code>OnAbilityConnectDone(element, remoteObject, resultCode)</code></td>
+  <td><code>connected(componentName, binder, dead=false)</code></td>
+  <td><span class="tag tag-bridged">BRIDGED</span></td>
+  <td>ElementName 转 ComponentName，remoteObject 转 IBinder</td>
+</tr>
+<tr>
+  <td><code>OnAbilityDisconnectDone(element, resultCode)</code></td>
+  <td><code>connected(componentName, null, dead=true)</code></td>
+  <td><span class="tag tag-bridged">BRIDGED</span></td>
+  <td>OH 断开通知映射为 Android 的 dead 连接通知</td>
+</tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch6">6. 数据流图</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch6-1">6.1 场景 S1 数据流：startService</h2>
+
+<div class="diagram">
+Android App                 Adapter Layer (Java)         JNI              OH System
+    │                            │                        │                  │
+    │ Context.startService(      │                        │                  │
+    │   intent)                  │                        │                  │
+    │───────────────────────────>│                        │                  │
+    │                            │ ActivityManagerAdapter  │                  │
+    │                            │   .startService()      │                  │
+    │                            │                        │                  │
+    │                            │ 1. IntentWantConverter  │                  │
+    │                            │    .toWant(intent)      │                  │
+    │                            │                        │                  │
+    │                            │ nativeStartAbility     │                  │
+    │                            │   (want)               │                  │
+    │                            │───────────────────────>│                  │
+    │                            │                        │ OhAbilityMgrClient│
+    │                            │                        │  ::StartAbility  │
+    │                            │                        │  (want)          │
+    │                            │                        │─────────────────>│
+    │                            │                        │                  │ AbilityMS
+    │                            │                        │                  │ 调度目标进程
+    │                            │                        │                  │
+    │                            │                        │                  ▼
+    │                            │                        │           ┌────────────┐
+    │                            │                        │           │ OH AMS 调度│
+    │                            │                        │           │ 目标Android│
+    │                            │                        │           │ Service进程│
+    │                            │                        │           └─────┬──────┘
+    │                            │                        │                 │
+    │                            │                        │                 ▼
+    │                            │    AbilityScheduler    │    ScheduleCommandAbility(want)
+    │                            │    Bridge (目标进程)    │<─────────────────│
+    │                            │<───────────────────────│                  │
+    │                            │                        │                  │
+    │                            │ IApplicationThread     │                  │
+    │                            │  .scheduleServiceArgs()│                  │
+    │                            │                        │                  │
+    │                            │  Service.onStartCommand│                  │
+    │                            │                        │                  │</div>
+
+<h2 id="ch6-2">6.2 场景 S1 数据流：bindService</h2>
+
+<div class="diagram">
+Android App                 Adapter Layer (Java)               JNI / C++              OH System
+    │                            │                               │                       │
+    │ Context.bindService(       │                               │                       │
+    │   intent, conn, flags)     │                               │                       │
+    │───────────────────────────>│                               │                       │
+    │                            │ ActivityManagerAdapter         │                       │
+    │                            │   .bindService()              │                       │
+    │                            │                               │                       │
+    │                            │ 1. ServiceConnectionRegistry  │                       │
+    │                            │    .register(conn)            │                       │
+    │                            │    → connectionId = 42        │                       │
+    │                            │                               │                       │
+    │                            │ 2. IntentWantConverter         │                       │
+    │                            │    .toWant(intent)            │                       │
+    │                            │                               │                       │
+    │                            │ 3. nativeConnectAbility       │                       │
+    │                            │    (want, 42)                 │                       │
+    │                            │──────────────────────────────>│                       │
+    │                            │                               │ new AbilityConnection │
+    │                            │                               │   Adapter(id=42)      │
+    │                            │                               │                       │
+    │                            │                               │ ConnectAbility(want,  │
+    │                            │                               │   adapter)            │
+    │                            │                               │──────────────────────>│
+    │                            │                               │                       │
+    │                            │                               │                       │ OH AMS 调度
+    │                            │                               │                       │ Service 进程
+    │                            │                               │                       │
+    │  ← (异步等待连接回调)       │                               │                       │
+    │                            │                               │   OnAbilityConnect    │
+    │                            │                               │   Done(element,       │
+    │                            │                               │     remoteObj, 0)     │
+    │                            │                               │<──────────────────────│
+    │                            │                               │                       │
+    │                            │ AbilityConnectionBridge       │                       │
+    │                            │  .onAbilityConnectDone(42,    │                       │
+    │                            │    bundleName, abilityName,   │                       │
+    │                            │    remoteBinder)              │                       │
+    │                            │<──────────────────────────────│                       │
+    │                            │                               │                       │
+    │                            │ ServiceConnectionRegistry     │                       │
+    │                            │  .onConnected(42, ...)        │                       │
+    │                            │  → IServiceConnection         │                       │
+    │                            │    .connected(name, binder,   │                       │
+    │                            │      dead=false)              │                       │
+    │                            │                               │                       │
+    │ ServiceConnection          │                               │                       │
+    │  .onServiceConnected(      │                               │                       │
+    │    name, binder)           │                               │                       │
+    │<───────────────────────────│                               │                       │</div>
+
+<h2 id="ch6-3">6.3 场景 S2 数据流：Android App &rarr; OH ServiceExtension</h2>
+
+<div class="diagram">
+Android App            ActivityManagerAdapter        JNI / C++           OH ServiceExtension
+    │                        │                         │                        │
+    │ bindService(intent,    │                         │                        │
+    │   conn, flags)         │                         │                        │
+    │───────────────────────>│                         │                        │
+    │                        │ register(conn) → id=7   │                        │
+    │                        │ nativeConnectAbility     │                        │
+    │                        │  (want, 7)              │                        │
+    │                        │────────────────────────>│                        │
+    │                        │                         │ ConnectAbility(want,   │
+    │                        │                         │   adapter_7)           │
+    │                        │                         │───────────────────────>│
+    │                        │                         │                        │
+    │                        │                         │                        │ (OH 原生处理)
+    │                        │                         │                        │ OnConnect(want)
+    │                        │                         │                        │ return remoteObj
+    │                        │                         │                        │
+    │                        │                         │  OnAbilityConnectDone  │
+    │                        │                         │  (element, remoteObj)  │
+    │                        │                         │<───────────────────────│
+    │                        │                         │                        │
+    │                        │ onConnected(7, ...)      │                        │
+    │                        │<────────────────────────│                        │
+    │                        │                         │                        │
+    │ conn.onServiceConnected│                         │                        │
+    │  (name, binder)        │                         │                        │
+    │<───────────────────────│                         │                        │
+
+注：与 S1 的区别在于 OH 侧直接由原生 ServiceExtension 处理，
+   无需 AbilitySchedulerBridge 介入目标进程。</div>
+
+<h2 id="ch6-4">6.4 场景 S3 数据流：OH App &rarr; Android Service</h2>
+
+<div class="diagram">
+OH App                OH AbilityMS             AbilitySchedulerAdapter    AbilitySchedulerBridge
+  │                       │                    (C++ Stub, 目标进程)       (Java, 目标进程)
+  │                       │                           │                        │
+  │ ConnectAbility(want,  │                           │                        │
+  │   abilityConnection)  │                           │                        │
+  │──────────────────────>│                           │                        │
+  │                       │ ScheduleConnectAbility    │                        │
+  │                       │  (want)                   │                        │
+  │                       │──────────────────────────>│                        │
+  │                       │                           │ JNI callback           │
+  │                       │                           │───────────────────────>│
+  │                       │                           │                        │
+  │                       │                           │                        │ 1. 检查 Service
+  │                       │                           │                        │    是否已创建
+  │                       │                           │                        │
+  │                       │                           │                        │ 2. 如未创建:
+  │                       │                           │                        │ IApplicationThread
+  │                       │                           │                        │  .scheduleCreateService
+  │                       │                           │                        │  (token, serviceInfo)
+  │                       │                           │                        │
+  │                       │                           │                        │ → Service.onCreate()
+  │                       │                           │                        │
+  │                       │                           │                        │ 3. IApplicationThread
+  │                       │                           │                        │  .scheduleBindService
+  │                       │                           │                        │  (token, intent)
+  │                       │                           │                        │
+  │                       │                           │                        │ → Service.onBind()
+  │                       │                           │                        │   return IBinder
+  │                       │                           │                        │
+  │                       │                           │                        │ 4. AMS.publishService
+  │                       │                           │                        │   (token,intent,binder)
+  │                       │                           │                        │
+  │                       │        ActivityManagerAdapter                      │
+  │                       │          .publishService()                         │
+  │                       │              │                                     │
+  │                       │              │ nativePublishService(connId, binder)│
+  │                       │              │                                     │
+  │                       │              ▼                                     │
+  │                       │     C++ 侧: ScheduleConnectAbilityDone            │
+  │                       │       (remoteObject 包装自 binder)                 │
+  │                       │<──────────────────────────│                        │
+  │                       │                           │                        │
+  │ IAbilityConnection    │                           │                        │
+  │  .OnAbilityConnectDone│                           │                        │
+  │  (element, remoteObj) │                           │                        │
+  │<──────────────────────│                           │                        │</div>
+
+<!-- ================================================================ -->
+<h1 id="ch7">7. 关键差异与解决方案</h1>
+<!-- ================================================================ -->
+
+<table>
+<tr><th>#</th><th>差异点</th><th>Android 行为</th><th>OH 行为</th><th>影响</th><th>解决方案</th></tr>
+<tr>
+  <td>1</td>
+  <td><strong>启动与绑定分离</strong></td>
+  <td>startService 和 bindService 是独立操作，Service 可以同时被 start 和 bind</td>
+  <td>ConnectAbility（bind）和 StartAbility + ScheduleCommandAbility（start）相对独立</td>
+  <td class="impact-medium">中</td>
+  <td>适配层维护 Service 的混合模式状态。startService 使用 StartAbility，bindService 使用 ConnectAbility，两者可并存。销毁条件需在适配层判断</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><strong>连接回调差异</strong></td>
+  <td><code>IServiceConnection.connected(name, binder, dead)</code> — 单个方法，通过 dead 参数区分连接/断开</td>
+  <td><code>IAbilityConnection</code> 有两个独立方法：<code>OnAbilityConnectDone</code> 和 <code>OnAbilityDisconnectDone</code></td>
+  <td class="impact-low">低</td>
+  <td>ConnectDone 映射为 connected(dead=false)，DisconnectDone 映射为 connected(dead=true)</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>服务发布机制</strong></td>
+  <td>Service.onBind() 返回 IBinder 后，需显式调用 <code>AMS.publishService()</code> 将 Binder 发布给客户端</td>
+  <td>OnConnect() 直接返回 remoteObject，系统自动传递给调用方</td>
+  <td class="impact-high">高</td>
+  <td>场景 S1/S3：<code>publishService</code> 拦截 IBinder，通过 JNI 传递给等待的 C++ AbilityConnectionAdapter，完成 ConnectAbilityDone 回调。场景 S2：OH 原生 Service 自动处理，无需适配</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><strong>onStartCommand 返回值</strong></td>
+  <td>返回 START_STICKY / START_NOT_STICKY / START_REDELIVER_INTENT，控制 Service 被杀后的重启行为</td>
+  <td>OnCommand 无返回值，系统默认管理 Service 重启</td>
+  <td class="impact-medium">中</td>
+  <td>适配层记录 onStartCommand 返回值但不传递给 OH。OH 系统自行管理进程重启策略</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><strong>前台服务</strong></td>
+  <td><code>setServiceForeground()</code> + Notification 对象</td>
+  <td>无直接等价 API</td>
+  <td class="impact-medium">中</td>
+  <td>Phase 1 以 stub 处理。后续可通过 OH WantAgent + Notification 实现类似效果</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><strong>Rebind 机制</strong></td>
+  <td>Service.onUnbind() 返回 true 时，下次 bind 触发 onRebind() 而非 onBind()</td>
+  <td>OH 每次 ConnectAbility 都调用 OnConnect，无 rebind 概念</td>
+  <td class="impact-low">低</td>
+  <td>适配层在 <code>unbindFinished</code> 中记录 doRebind 标志。当同一 Service 再次收到 ScheduleConnectAbility 时，如 doRebind=true 则调用 scheduleBindService(rebind=true)</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><strong>连接多路复用</strong></td>
+  <td>多个客户端可分别 bind 同一 Service，每个客户端有独立的 IServiceConnection</td>
+  <td>多个客户端可分别 ConnectAbility，每个有独立的 IAbilityConnection</td>
+  <td class="impact-low">低</td>
+  <td>ServiceConnectionRegistry 按 connectionId 管理，天然支持多连接</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><strong>IBinder 跨系统传递</strong></td>
+  <td>IBinder 是 Android Binder 框架的核心</td>
+  <td>IRemoteObject 是 OH IPC 框架的核心</td>
+  <td class="impact-high">高</td>
+  <td>需要实现 IBinder &harr; IRemoteObject 的双向包装。C++ 侧通过 <code>BinderBridge</code> 将 Android Binder transaction 转换为 OH IPC transaction</td>
+</tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch8">8. 代码实现清单</h1>
+<!-- ================================================================ -->
+
+<h3>新增文件</h3>
+
+<table>
+<tr><th>文件路径</th><th>类型</th><th>说明</th></tr>
+<tr>
+  <td><code>framework/activity/java/ServiceConnectionRegistry.java</code></td>
+  <td><span class="tag tag-new">NEW</span> Java</td>
+  <td>Service 连接注册表单例。管理 connectionId &harr; IServiceConnection 映射，处理连接/断开回调分发</td>
+</tr>
+</table>
+
+<h3>修改文件</h3>
+
+<table>
+<tr><th>文件路径</th><th>类型</th><th>修改内容</th></tr>
+<tr>
+  <td><code>framework/activity/java/ActivityManagerAdapter.java</code></td>
+  <td><span class="tag tag-fix">FIX</span> Java</td>
+  <td>
+    <ul>
+      <li><code>stopService()</code>：添加 <code>nativeStopServiceAbility(want)</code> 调用</li>
+      <li><code>bindService()</code>：集成 ServiceConnectionRegistry，传 connectionId 给 native</li>
+      <li><code>unbindService()</code>：从 Registry 查找 connectionId，调用 <code>nativeDisconnectAbility()</code></li>
+      <li><code>publishService()</code>：实现 <code>nativePublishService(connectionId, binder)</code></li>
+      <li><code>unbindFinished()</code>：实现 rebind 标志记录</li>
+      <li><code>stopServiceToken()</code>：调用 <code>nativeStopServiceAbility(want)</code></li>
+      <li>新增 native 方法声明：<code>nativeStopServiceAbility</code>, <code>nativeDisconnectAbility</code>, <code>nativePublishService</code></li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td><code>framework/activity/java/AbilitySchedulerBridge.java</code></td>
+  <td><span class="tag tag-fix">FIX</span> Java</td>
+  <td>
+    <ul>
+      <li><code>onScheduleConnectAbility()</code>：实现 scheduleCreateService + scheduleBindService 调用</li>
+      <li><code>onScheduleDisconnectAbility()</code>：实现 scheduleUnbindService 调用</li>
+      <li><code>onScheduleCommandAbility()</code>：实现 scheduleServiceArgs 调用</li>
+      <li>新增 Service token 和实例状态管理</li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td><code>framework/activity/java/AbilityConnectionBridge.java</code></td>
+  <td><span class="tag tag-fix">FIX</span> Java</td>
+  <td>
+    <ul>
+      <li><code>onAbilityConnectDone()</code>：通过 ServiceConnectionRegistry 分发到正确的 IServiceConnection</li>
+      <li><code>onAbilityDisconnectDone()</code>：通过 ServiceConnectionRegistry 分发断开通知</li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td><code>framework/activity/jni/oh_ability_manager_client.h/cpp</code></td>
+  <td><span class="tag tag-fix">FIX</span> C++</td>
+  <td>
+    <ul>
+      <li>新增 <code>StopServiceAbility(Want&amp;)</code> 方法</li>
+      <li><code>ConnectAbility()</code>：按 connectionId 创建独立的 <code>AbilityConnectionAdapter</code></li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td><code>framework/core/jni/oh_callback_handler.h/cpp</code></td>
+  <td><span class="tag tag-fix">FIX</span> C++</td>
+  <td>
+    <ul>
+      <li>将单一 <code>abilityConnection_</code> 替换为 <code>Map&lt;int, sptr&lt;AbilityConnectionAdapter&gt;&gt;</code></li>
+      <li>新增 <code>GetOrCreateConnection(connectionId)</code> 方法</li>
+      <li>新增 <code>RemoveConnection(connectionId)</code> 方法</li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td><code>framework/core/jni/adapter_bridge.cpp</code></td>
+  <td><span class="tag tag-fix">FIX</span> C++</td>
+  <td>
+    <ul>
+      <li>注册新 native 方法：<code>nativeStopServiceAbility</code>, <code>nativeDisconnectAbility</code>, <code>nativePublishService</code></li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td><code>framework/activity/jni/ability_scheduler_adapter.h/cpp</code></td>
+  <td><span class="tag tag-fix">FIX</span> C++</td>
+  <td>
+    <ul>
+      <li><code>ScheduleConnectAbility()</code>：完善 JNI 回调，传递完整 Want 数据</li>
+      <li><code>ScheduleDisconnectAbility()</code>：完善 JNI 回调</li>
+      <li><code>ScheduleCommandAbility()</code>：完善 JNI 回调，传递 startId</li>
+    </ul>
+  </td>
+</tr>
+</table>
+
+<h3>文件修改统计</h3>
+
+<div class="stat-grid">
+  <div class="stat-box"><div class="number">1</div><div class="label">新增 Java 文件</div></div>
+  <div class="stat-box"><div class="number">3</div><div class="label">修改 Java 文件</div></div>
+  <div class="stat-box"><div class="number">4</div><div class="label">修改 C++ 文件</div></div>
+  <div class="stat-box"><div class="number">~8</div><div class="label">涉及文件总数</div></div>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch9">9. 现有代码缺陷修复</h1>
+<!-- ================================================================ -->
+
+<p>通过代码审查，发现以下6个影响 Service 适配正常工作的缺陷：</p>
+
+<div class="card">
+<h3>缺陷 #1：无连接跟踪机制</h3>
+<table>
+<tr><th>位置</th><td><code>ActivityManagerAdapter.java</code> — <code>bindService()</code></td></tr>
+<tr><th>现状</th><td><code>bindService()</code> 接收 <code>IServiceConnection</code> 参数但从未保存。<code>nativeConnectAbility()</code> 始终传递 connectionId = 0，导致 OH 侧连接回调无法关联回正确的 IServiceConnection</td></tr>
+<tr><th>影响</th><td class="impact-high">高 — bindService 永远无法正确回调客户端</td></tr>
+<tr><th>修复</th><td>引入 <code>ServiceConnectionRegistry</code>，在 bindService 中注册 IServiceConnection 并获取唯一 connectionId，传递给 native 层</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>缺陷 #2：全局单一 AbilityConnection 实例</h3>
+<table>
+<tr><th>位置</th><td><code>oh_callback_handler.h/cpp</code> — <code>abilityConnection_</code> 字段</td></tr>
+<tr><th>现状</th><td><code>OHCallbackHandler</code> 仅持有单个 <code>abilityConnection_</code> 实例。当多个 bindService 并发调用时，新的连接会覆盖旧的，导致之前的连接回调丢失</td></tr>
+<tr><th>影响</th><td class="impact-high">高 — 仅支持同时存在一个 Service 连接</td></tr>
+<tr><th>修复</th><td>将 <code>abilityConnection_</code> 替换为 <code>std::unordered_map&lt;int, sptr&lt;AbilityConnectionAdapter&gt;&gt; connectionMap_</code>，以 connectionId 为键管理多个并发连接</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>缺陷 #3：stopService 未执行 OH IPC 调用</h3>
+<table>
+<tr><th>位置</th><td><code>ActivityManagerAdapter.java</code> — <code>stopService()</code></td></tr>
+<tr><th>现状</th><td>方法体仅 <code>logStub("stopService")</code> 并 <code>return 1</code>，未调用任何 OH 系统服务。被 stop 的 Service 实际上仍在 OH 侧运行</td></tr>
+<tr><th>影响</th><td class="impact-high">高 — Service 无法被停止，造成资源泄漏</td></tr>
+<tr><th>修复</th><td>实现 Intent 到 Want 转换，调用 <code>nativeStopServiceAbility(want)</code>，映射到 OH <code>IAbilityManager::StopServiceAbility(want)</code></td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>缺陷 #4：publishService / unbindFinished 为空 Stub</h3>
+<table>
+<tr><th>位置</th><td><code>ActivityManagerAdapter.java</code> — <code>publishService()</code> 和 <code>unbindFinished()</code></td></tr>
+<tr><th>现状</th><td>两个方法均为空实现。publishService 不处理意味着 Service.onBind() 返回的 IBinder 永远无法到达客户端。unbindFinished 不处理意味着 rebind 信息丢失</td></tr>
+<tr><th>影响</th><td class="impact-high">高 — Bound Service 的核心功能完全不可用</td></tr>
+<tr><th>修复</th><td>
+  <ul>
+    <li><code>publishService</code>：实现 <code>nativePublishService(connectionId, binder)</code>，将 IBinder 传递给 C++ 侧等待的 AbilityConnectionAdapter</li>
+    <li><code>unbindFinished</code>：记录 doRebind 标志到 Service 状态表，供后续 ScheduleConnectAbility 判断是否使用 rebind 路径</li>
+  </ul>
+</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>缺陷 #5：AbilitySchedulerBridge Service 回调未实现</h3>
+<table>
+<tr><th>位置</th><td><code>AbilitySchedulerBridge.java</code> — <code>onScheduleConnectAbility()</code>, <code>onScheduleDisconnectAbility()</code>, <code>onScheduleCommandAbility()</code></td></tr>
+<tr><th>现状</th><td>三个方法均仅打印日志，不执行任何实际的 IApplicationThread 调用。这意味着 OH 系统的 Service 调度请求被完全忽略</td></tr>
+<tr><th>影响</th><td class="impact-high">高 — 场景 S1、S3 的 Service 生命周期回调完全不工作</td></tr>
+<tr><th>修复</th><td>
+  <ul>
+    <li><code>onScheduleConnectAbility</code>：通过反射或直接调用 <code>IApplicationThread.scheduleCreateService()</code>（如 Service 未创建）+ <code>scheduleBindService()</code></li>
+    <li><code>onScheduleDisconnectAbility</code>：调用 <code>IApplicationThread.scheduleUnbindService()</code></li>
+    <li><code>onScheduleCommandAbility</code>：调用 <code>IApplicationThread.scheduleServiceArgs()</code>，将 OH Want 转换回 Android Intent，传递 startId</li>
+  </ul>
+</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>缺陷 #6：serviceDoneExecuting 为空实现</h3>
+<table>
+<tr><th>位置</th><td><code>ActivityManagerAdapter.java</code> — <code>serviceDoneExecuting()</code></td></tr>
+<tr><th>现状</th><td>空 stub。Android Service 生命周期方法执行完毕后会调用此方法通知 AMS。在 OH 环境中虽无直接等价物，但缺少此通知可能影响服务状态追踪</td></tr>
+<tr><th>影响</th><td class="impact-low">低 — OH 不依赖此通知管理 Service 状态</td></tr>
+<tr><th>修复</th><td>保持 stub，但增加适配层内部状态更新逻辑（如更新 ServiceConnectionRegistry 中的 Service 状态）</td></tr>
+</table>
+</div>
+
+<h3>缺陷优先级总结</h3>
+
+<table>
+<tr><th>优先级</th><th>缺陷编号</th><th>说明</th></tr>
+<tr><td class="impact-high">P0（阻塞）</td><td>#1, #2, #3, #4, #5</td><td>这5个缺陷导致 Service 的启动、绑定、停止功能完全不可用，必须在本阶段全部修复</td></tr>
+<tr><td class="impact-low">P1（优化）</td><td>#6</td><td>不影响核心功能，可在后续迭代中完善</td></tr>
+</table>
+
+<footer>
+  <p>Android-OpenHarmony Adapter Project | Service &harr; ServiceExtensionAbility 适配设计方案 v1.0</p>
+  <p>2026年3月16日</p>
+</footer>
+
+</div>
+</body>
+</html>

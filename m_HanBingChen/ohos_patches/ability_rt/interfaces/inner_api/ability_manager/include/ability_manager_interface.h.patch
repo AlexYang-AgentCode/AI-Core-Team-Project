@@ -1,0 +1,22 @@
+--- ability_manager_interface.h.orig
++++ ability_manager_interface.h
+@@ Add at end of IAbilityManager class, before closing brace @@
+
+    /**
+     * Start an Ability within an existing Mission (push onto Ability stack).
+     * Used by Android adapter to add a new Activity to the same Task/Mission.
+     *
+     * For OH native apps, use StartAbility() which creates a new Mission.
+     * For Android adapted apps, use this method to push Activities onto
+     * an existing Mission's Ability stack.
+     *
+     * @param want       the Want to start the new Ability
+     * @param missionId  the target Mission ID to push the Ability into
+     * @return ERR_OK on success
+     */
+    virtual int StartAbilityInMission(const Want &want, int32_t missionId) = 0;
+
+@@ Add IPC code to the enum (append after last existing code) @@
+
+    // Multi-ability stack support (Android adapter)
+    START_ABILITY_IN_MISSION,

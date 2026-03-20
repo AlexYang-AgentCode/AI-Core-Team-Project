@@ -1,0 +1,63 @@
+--- a/bundle_framework/services/bundlemgr/include/installd/installd_interface.h
++++ b/bundle_framework/services/bundlemgr/include/installd/installd_interface.h
+@@ -xxx,6 +xxx,36 @@
++    // ============================================================
++    // Android APK installation support — new IPC methods
++    // Method codes: 90-94
++    // ============================================================
++
++    /**
++     * [90] Create Android-style data directories for an APK.
++     * Creates: cache, code_cache, databases, files, shared_prefs, lib
++     *
++     * @param bundleName  Package/bundle name
++     * @param uid         UID assigned by BMS
++     * @param gid         GID assigned by BMS
++     * @param targetSdkVersion  Android target SDK version
++     */
++    virtual ErrCode CreateAndroidDataDir(const std::string& bundleName,
++                                          int32_t uid, int32_t gid,
++                                          int32_t targetSdkVersion) = 0;
++
++    /**
++     * [91] Extract native libraries from APK ZIP.
++     * Extracts lib/{abi}/*.so files to the target directory.
++     *
++     * @param apkPath    Path to the APK file
++     * @param targetDir  Directory to extract .so files into
++     * @param primaryAbi Selected ABI (e.g. "arm64-v8a")
++     */
++    virtual ErrCode ExtractApkNativeLibs(const std::string& apkPath,
++                                          const std::string& targetDir,
++                                          const std::string& primaryAbi) = 0;
++
++    /**
++     * [92] Run dex2oat to optimize DEX bytecode to OAT machine code.
++     *
++     * @param apkPath         Path to the APK file containing DEX
++     * @param oatDir          Output directory for .odex/.vdex files
++     * @param uid             UID to run dex2oat as
++     * @param instructionSet  Target ISA (e.g. "arm64")
++     * @param compilerFilter  Compiler filter (e.g. "speed", "quicken")
++     */
++    virtual ErrCode DexOptAndroid(const std::string& apkPath,
++                                   const std::string& oatDir,
++                                   int32_t uid,
++                                   const std::string& instructionSet,
++                                   const std::string& compilerFilter) = 0;
++
++    /**
++     * [93] Remove Android data directories for a package.
++     *
++     * @param bundleName  Package/bundle name to remove
++     */
++    virtual ErrCode RemoveAndroidDataDir(const std::string& bundleName) = 0;
++
++    /**
++     * [94] Verify APK signature (V1 JAR / V2 APK Signing).
++     *
++     * @param apkPath          Path to the APK file
++     * @param expectedCertHash Expected certificate hash (empty for first install)
++     */
++    virtual ErrCode VerifyApkSignature(const std::string& apkPath,
++                                        const std::string& expectedCertHash) = 0;

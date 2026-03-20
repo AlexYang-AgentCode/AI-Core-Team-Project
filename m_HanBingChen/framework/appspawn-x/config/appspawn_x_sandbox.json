@@ -1,0 +1,111 @@
+{
+    "common": {
+        "top-sandbox-switch": "ON",
+        "app-base": {
+            "sandbox-root": "/mnt/sandbox/<currentUserId>/appspawnx/<PackageName>",
+            "mount-paths": [
+                {
+                    "src-path": "/system",
+                    "sandbox-path": "/system",
+                    "sandbox-flags": ["bind", "rec", "rdonly"],
+                    "check-action-status": "true"
+                },
+                {
+                    "src-path": "/vendor",
+                    "sandbox-path": "/vendor",
+                    "sandbox-flags": ["bind", "rec", "rdonly"],
+                    "check-action-status": "true"
+                },
+                {
+                    "src-path": "/dev",
+                    "sandbox-path": "/dev",
+                    "sandbox-flags": ["bind", "rec"],
+                    "check-action-status": "true"
+                },
+                {
+                    "src-path": "/proc",
+                    "sandbox-path": "/proc",
+                    "sandbox-flags": ["bind", "rec"],
+                    "check-action-status": "true"
+                },
+                {
+                    "src-path": "/sys",
+                    "sandbox-path": "/sys",
+                    "sandbox-flags": ["bind", "rec", "rdonly"],
+                    "check-action-status": "true"
+                }
+            ],
+            "symbol-links": [
+                {
+                    "target-name": "/system/lib64",
+                    "link-name": "/lib64"
+                },
+                {
+                    "target-name": "/system/lib",
+                    "link-name": "/lib"
+                }
+            ]
+        },
+        "android-app-base": {
+            "comment": "Android-specific mount paths for APK, DEX cache, and app data",
+            "mount-paths": [
+                {
+                    "src-path": "/system/framework",
+                    "sandbox-path": "/system/framework",
+                    "sandbox-flags": ["bind", "rec", "rdonly"],
+                    "comment": "Android framework JARs (framework.jar, ext.jar, etc.)"
+                },
+                {
+                    "src-path": "/system/app",
+                    "sandbox-path": "/system/app",
+                    "sandbox-flags": ["bind", "rec", "rdonly"],
+                    "comment": "Pre-installed Android APKs"
+                },
+                {
+                    "src-path": "/data/app",
+                    "sandbox-path": "/data/app",
+                    "sandbox-flags": ["bind", "rec", "rdonly"],
+                    "comment": "User-installed Android APKs"
+                },
+                {
+                    "src-path": "/data/misc/appspawnx/dalvik-cache",
+                    "sandbox-path": "/data/dalvik-cache",
+                    "sandbox-flags": ["bind", "rec"],
+                    "comment": "DEX optimization cache (shared)"
+                },
+                {
+                    "src-path": "/data/data/<PackageName>",
+                    "sandbox-path": "/data/data/<PackageName>",
+                    "sandbox-flags": ["bind", "rec"],
+                    "comment": "App private data directory"
+                },
+                {
+                    "src-path": "/data/user/0/<PackageName>",
+                    "sandbox-path": "/data/user/0/<PackageName>",
+                    "sandbox-flags": ["bind", "rec"],
+                    "comment": "App user-specific data directory"
+                },
+                {
+                    "src-path": "/storage/emulated/0/Android/data/<PackageName>",
+                    "sandbox-path": "/storage/emulated/0/Android/data/<PackageName>",
+                    "sandbox-flags": ["bind", "rec"],
+                    "comment": "App external storage data"
+                },
+                {
+                    "src-path": "/data/local/tmp",
+                    "sandbox-path": "/data/local/tmp",
+                    "sandbox-flags": ["bind", "rec"],
+                    "comment": "Temporary files (debugging)"
+                }
+            ],
+            "symbol-links": [
+                {
+                    "target-name": "/data/data/<PackageName>",
+                    "link-name": "/data/user/0/<PackageName>",
+                    "comment": "Compatibility symlink for user 0"
+                }
+            ]
+        }
+    },
+    "individual": []
+}

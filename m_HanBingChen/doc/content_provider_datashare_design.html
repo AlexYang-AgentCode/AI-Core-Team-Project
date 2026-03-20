@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ContentProvider → DataShareExtensionAbility 适配设计</title>
+<style>
+  @page { margin: 2cm; size: A4; }
+  body { font-family: "Microsoft YaHei", sans-serif; font-size: 12pt; line-height: 1.8; color: #333; max-width: 210mm; margin: 0 auto; padding: 2cm; }
+  h1 { font-size: 22pt; text-align: center; color: #1a1a2e; border-bottom: 3px solid #16213e; padding-bottom: 10px; }
+  h2 { font-size: 16pt; color: #16213e; border-bottom: 2px solid #0f3460; padding-bottom: 5px; margin-top: 30px; }
+  h3 { font-size: 14pt; color: #0f3460; margin-top: 20px; }
+  h4 { font-size: 12pt; color: #533483; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; }
+  th { background-color: #16213e; color: white; padding: 8px 10px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 6px 10px; vertical-align: top; }
+  tr:nth-child(even) { background-color: #f2f2f2; }
+  code { background-color: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-family: Consolas, monospace; font-size: 10pt; }
+  pre { background-color: #1e1e1e; color: #d4d4d4; border-radius: 5px; padding: 15px; overflow-x: auto; font-family: Consolas, monospace; font-size: 9pt; line-height: 1.5; }
+  pre .comment { color: #6a9955; }
+  pre .keyword { color: #569cd6; }
+  pre .string { color: #ce9178; }
+  pre .type { color: #4ec9b0; }
+  .cover { text-align: center; page-break-after: always; padding-top: 100px; }
+  .cover h1 { font-size: 26pt; border: none; }
+  .cover .subtitle { font-size: 16pt; color: #555; margin-top: 20px; }
+  .cover .date { font-size: 14pt; color: #777; margin-top: 40px; }
+  .page-break { page-break-before: always; }
+  .highlight { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px 15px; margin: 15px 0; }
+  .success { background-color: #d4edda; border-left: 4px solid #28a745; padding: 10px 15px; margin: 15px 0; }
+  .danger { background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 10px 15px; margin: 15px 0; }
+  .info { background-color: #d1ecf1; border-left: 4px solid #17a2b8; padding: 10px 15px; margin: 15px 0; }
+  .diagram { background-color: #f8f9fa; border: 2px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 15px 0; font-family: Consolas, monospace; font-size: 9pt; line-height: 1.4; white-space: pre; overflow-x: auto; }
+  ul, ol { margin: 5px 0; }
+  .toc { background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px 30px; }
+  .toc a { color: #0f3460; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .match-tag { display: inline-block; background: #28a745; color: white; padding: 1px 8px; border-radius: 10px; font-size: 8pt; }
+  .partial-tag { display: inline-block; background: #ffc107; color: #333; padding: 1px 8px; border-radius: 10px; font-size: 8pt; }
+  .gap-tag { display: inline-block; background: #dc3545; color: white; padding: 1px 8px; border-radius: 10px; font-size: 8pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>ContentProvider → DataShareExtensionAbility</h1>
+  <div class="subtitle">适配设计与实现文档</div>
+  <div class="subtitle" style="font-size:13pt; margin-top:10px;">Stage 模型 · Android App 间数据访问 + Android App 访问 OH 系统数据</div>
+  <div class="date" style="margin-top: 60px;">Android-OpenHarmony 适配层项目</div>
+  <div class="date">2026年3月16日</div>
+  <div class="date" style="font-size:11pt; margin-top:30px; color:#999;">
+    适配层源码：D:\code\adapter\
+  </div>
+</div>
+
+<!-- ==================== 目录 ==================== -->
+<h1>目录</h1>
+<div class="toc">
+<ol>
+  <li><a href="#ch1">适配范围与需求</a></li>
+  <li><a href="#ch2">Android ContentProvider 机制概要</a></li>
+  <li><a href="#ch3">OH DataShareExtensionAbility 机制概要 (Stage 模型)</a></li>
+  <li><a href="#ch4">接口映射与数据类型对照</a></li>
+  <li><a href="#ch5">适配架构设计</a></li>
+  <li><a href="#ch6">实现详解</a></li>
+  <li><a href="#ch7">源文件清单</a></li>
+</ol>
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第一章 ==================== -->
+<h2 id="ch1">一、适配范围与需求</h2>
+
+<h3>1.1 需要支持的场景</h3>
+
+<table>
+  <tr><th>编号</th><th>场景</th><th>数据流方向</th><th>说明</th></tr>
+  <tr>
+    <td><strong>S1</strong></td>
+    <td>Android App 之间的数据访问</td>
+    <td>Android App A → Android App B 的 ContentProvider</td>
+    <td>App B 通过 <code>publishContentProviders()</code> 注册自身 CP，App A 通过 <code>ContentResolver</code> 访问。在适配层内部通过 ContentProviderRegistry 管理，不涉及 OH 系统服务。</td>
+  </tr>
+  <tr>
+    <td><strong>S2</strong></td>
+    <td>Android App 访问 OH 系统应用数据</td>
+    <td>Android App → OH DataShareExtensionAbility</td>
+    <td>Android App 通过 <code>ContentResolver</code> 访问通讯录、短信、图库等系统数据，适配层将 content:// URI 转换为 datashare:// URI，通过 OH DataShareHelper (Stage 模型) 完成数据操作。</td>
+  </tr>
+</table>
+
+<h3>1.2 不需要支持的场景</h3>
+
+<table>
+  <tr><th>场景</th><th>原因</th></tr>
+  <tr>
+    <td>OH 原生应用访问 Android App 的 ContentProvider</td>
+    <td>不在项目适配范围内，无此需求</td>
+  </tr>
+  <tr>
+    <td>FA 模型 (Page Ability) 的 DataAbility</td>
+    <td>项目统一适配到 Stage 模型</td>
+  </tr>
+</table>
+
+<h3>1.3 适配目标模型</h3>
+
+<div class="success">
+<strong>目标：Stage 模型的 DataShareExtensionAbility</strong><br>
+OH 客户端 API：<code>DataShareHelper</code>（Stage 模型）<br>
+不使用 FA 模型的 DataAbilityHelper。
+</div>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第二章 ==================== -->
+<h2 id="ch2">二、Android ContentProvider 机制概要</h2>
+
+<h3>2.1 核心架构</h3>
+
+<div class="diagram">App 调用 ContentResolver.query(content://authority/path)
+        │
+        ▼
+ContentResolver.acquireProvider(authority)
+        │
+        ├── 检查本进程缓存 ──── 命中 ──► 直接使用已缓存的 IContentProvider
+        │
+        └── 未命中 ──► IActivityManager.getContentProvider(authority)
+                              │
+                              ├── AMS 查找已发布的 Provider
+                              │   (App 启动时通过 publishContentProviders 注册)
+                              │
+                              └── 返回 ContentProviderHolder
+                                    │
+                                    └── 内含 IContentProvider (Binder 引用)
+                                          │
+                                          ▼
+                              IContentProvider.query/insert/update/delete
+                              (直接 Binder IPC 到 Provider 进程的 Transport)</div>
+
+<h3>2.2 IContentProvider 核心方法 (21 个)</h3>
+
+<p>按功能分组，核心 CRUD 6 个，文件操作 3 个，辅助方法 12 个：</p>
+
+<table>
+  <tr><th>分类</th><th>方法</th><th>适配优先级</th></tr>
+  <tr><td rowspan="4">CRUD</td><td><code>query(AttributionSource, Uri, String[], Bundle, ICancellationSignal) → Cursor</code></td><td>P0</td></tr>
+  <tr><td><code>insert(AttributionSource, Uri, ContentValues, Bundle) → Uri</code></td><td>P0</td></tr>
+  <tr><td><code>update(AttributionSource, Uri, ContentValues, Bundle) → int</code></td><td>P0</td></tr>
+  <tr><td><code>delete(AttributionSource, Uri, Bundle) → int</code></td><td>P0</td></tr>
+  <tr><td rowspan="2">批量</td><td><code>bulkInsert(AttributionSource, Uri, ContentValues[]) → int</code></td><td>P1</td></tr>
+  <tr><td><code>applyBatch(AttributionSource, String, ArrayList&lt;ContentProviderOperation&gt;) → ContentProviderResult[]</code></td><td>P2</td></tr>
+  <tr><td rowspan="3">文件</td><td><code>openFile(AttributionSource, Uri, String, ICancellationSignal) → ParcelFileDescriptor</code></td><td>P1</td></tr>
+  <tr><td><code>openAssetFile(...) → AssetFileDescriptor</code></td><td>P2</td></tr>
+  <tr><td><code>openTypedAssetFile(...) → AssetFileDescriptor</code></td><td>P2</td></tr>
+  <tr><td rowspan="3">元数据</td><td><code>getType(AttributionSource, Uri) → String</code></td><td>P1</td></tr>
+  <tr><td><code>getStreamTypes(AttributionSource, Uri, String) → String[]</code></td><td>P3</td></tr>
+  <tr><td><code>call(AttributionSource, String, String, String, Bundle) → Bundle</code></td><td>P2</td></tr>
+  <tr><td rowspan="5">辅助</td><td><code>canonicalize / uncanonicalize</code></td><td>P3</td></tr>
+  <tr><td><code>refresh</code></td><td>P3</td></tr>
+  <tr><td><code>checkUriPermission</code></td><td>P3</td></tr>
+  <tr><td><code>createCancellationSignal</code></td><td>P3</td></tr>
+  <tr><td>Async 变体（3 个）</td><td>P3</td></tr>
+</table>
+
+<h3>2.3 AMS 中的 ContentProvider 管理方法</h3>
+
+<table>
+  <tr><th>IActivityManager 方法</th><th>说明</th><th>适配方式</th></tr>
+  <tr><td><code>getContentProvider(caller, pkg, authority, userId, stable)</code></td><td>Client 获取 Provider 引用</td><td>[BRIDGED] → ContentProviderRegistry.acquireProvider()</td></tr>
+  <tr><td><code>publishContentProviders(caller, holders)</code></td><td>App 发布自身的 Provider</td><td>[BRIDGED] → ContentProviderRegistry.publishProviders()</td></tr>
+  <tr><td><code>refContentProvider / removeContentProvider</code></td><td>引用计数管理</td><td>[PARTIAL] 适配层不需要引用计数</td></tr>
+  <tr><td><code>openContentUri(uriString)</code></td><td>通过 AMS 打开文件</td><td>[BRIDGED] → ContentProviderBridge.openFile()</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第三章 ==================== -->
+<h2 id="ch3">三、OH DataShareExtensionAbility 机制概要 (Stage 模型)</h2>
+
+<h3>3.1 架构</h3>
+
+<div class="diagram">Client App 调用 DataShareHelper.Query(datashare:///bundleName/path)
+        │
+        ▼
+DataShareHelper::Creator(token, uri)  ── 通过 AMS 连接 DataShareExtensionAbility
+        │
+        ├── ConnectDataShareExtensionAbility(want, connection)
+        │       │
+        │       └── AMS 启动/连接目标 ExtensionAbility (Type=DATASHARE=5)
+        │               │
+        │               └── IAbilityConnection.OnAbilityConnectDone(remoteObject)
+        │
+        └── 获取 DataShareHelper 实例（持有远程连接）
+                │
+                ▼
+        DataShareHelper.Query/Insert/Update/Delete/OpenFile
+        (通过已建立的 IPC 连接直接调用)</div>
+
+<h3>3.2 DataShareHelper 核心方法 (Stage 模型)</h3>
+
+<table>
+  <tr><th>方法</th><th>参数</th><th>返回</th></tr>
+  <tr><td><code>Creator(token, uri)</code></td><td>IRemoteObject token, string uri</td><td>shared_ptr&lt;DataShareHelper&gt;</td></tr>
+  <tr><td><code>Query(uri, predicates, columns)</code></td><td>Uri, DataSharePredicates, vector&lt;string&gt;</td><td>shared_ptr&lt;DataShareResultSet&gt;</td></tr>
+  <tr><td><code>Insert(uri, bucket)</code></td><td>Uri, DataShareValuesBucket</td><td>int (rowIndex)</td></tr>
+  <tr><td><code>Update(uri, predicates, bucket)</code></td><td>Uri, DataSharePredicates, DataShareValuesBucket</td><td>int (count)</td></tr>
+  <tr><td><code>Delete(uri, predicates)</code></td><td>Uri, DataSharePredicates</td><td>int (count)</td></tr>
+  <tr><td><code>OpenFile(uri, mode)</code></td><td>Uri, string</td><td>int (fd)</td></tr>
+  <tr><td><code>GetType(uri)</code></td><td>Uri</td><td>string (mimeType)</td></tr>
+  <tr><td><code>BatchInsert(uri, buckets)</code></td><td>Uri, vector&lt;DataShareValuesBucket&gt;</td><td>int (count)</td></tr>
+  <tr><td><code>RegisterObserver(uri, observer)</code></td><td>Uri, sptr&lt;IDataAbilityObserver&gt;</td><td>void</td></tr>
+  <tr><td><code>UnregisterObserver(uri, observer)</code></td><td>Uri, sptr&lt;IDataAbilityObserver&gt;</td><td>void</td></tr>
+  <tr><td><code>NotifyChange(uri)</code></td><td>Uri</td><td>void</td></tr>
+  <tr><td><code>Release()</code></td><td>void</td><td>bool</td></tr>
+</table>
+
+<h3>3.3 与 FA 模型 DataAbilityHelper 的关键区别</h3>
+
+<table>
+  <tr><th>维度</th><th>DataAbilityHelper (FA)</th><th>DataShareHelper (Stage)</th></tr>
+  <tr><td>Predicates</td><td>NativeRdb::DataAbilityPredicates</td><td><strong>DataShare::DataSharePredicates</strong></td></tr>
+  <tr><td>ValuesBucket</td><td>NativeRdb::ValuesBucket</td><td><strong>DataShare::DataShareValuesBucket</strong></td></tr>
+  <tr><td>ResultSet</td><td>NativeRdb::AbsSharedResultSet</td><td><strong>DataShare::DataShareResultSet</strong></td></tr>
+  <tr><td>URI scheme</td><td>dataability://</td><td><strong>datashare://</strong></td></tr>
+  <tr><td>连接方式</td><td>ConnectAbility</td><td><strong>ConnectDataShareExtensionAbility</strong></td></tr>
+  <tr><td>call()</td><td>支持</td><td><strong>不支持</strong>（Stage 模型无此方法）</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第四章 ==================== -->
+<h2 id="ch4">四、接口映射与数据类型对照</h2>
+
+<h3>4.1 方法映射</h3>
+
+<table>
+  <tr><th>Android IContentProvider</th><th>OH DataShareHelper (Stage)</th><th>匹配度</th></tr>
+  <tr><td><code>query(src, uri, proj, bundle, signal)</code></td><td><code>Query(uri, predicates, columns)</code></td><td><span class="partial-tag">PARTIAL</span> Bundle→Predicates</td></tr>
+  <tr><td><code>insert(src, uri, values, extras)</code></td><td><code>Insert(uri, bucket)</code></td><td><span class="match-tag">MATCH</span></td></tr>
+  <tr><td><code>update(src, uri, values, extras)</code></td><td><code>Update(uri, predicates, bucket)</code></td><td><span class="partial-tag">PARTIAL</span></td></tr>
+  <tr><td><code>delete(src, uri, extras)</code></td><td><code>Delete(uri, predicates)</code></td><td><span class="partial-tag">PARTIAL</span></td></tr>
+  <tr><td><code>bulkInsert(src, uri, values[])</code></td><td><code>BatchInsert(uri, buckets)</code></td><td><span class="match-tag">MATCH</span></td></tr>
+  <tr><td><code>getType(src, uri)</code></td><td><code>GetType(uri)</code></td><td><span class="match-tag">MATCH</span></td></tr>
+  <tr><td><code>openFile(src, uri, mode, signal)</code></td><td><code>OpenFile(uri, mode)</code></td><td><span class="match-tag">MATCH</span></td></tr>
+  <tr><td><code>call(src, auth, method, arg, extras)</code></td><td>不支持（Stage 模型无此方法）</td><td><span class="gap-tag">GAP</span></td></tr>
+  <tr><td><code>applyBatch</code></td><td>无直接对应</td><td><span class="gap-tag">GAP</span></td></tr>
+  <tr><td><code>openAssetFile / openTypedAssetFile</code></td><td>回退到 openFile</td><td><span class="partial-tag">PARTIAL</span></td></tr>
+  <tr><td><code>canonicalize / uncanonicalize</code></td><td>NormalizeUri / DenormalizeUri（通过 DataShareHelper 未暴露）</td><td><span class="gap-tag">GAP</span></td></tr>
+  <tr><td><code>checkUriPermission</code></td><td>OH 使用 TokenId 验证</td><td><span class="gap-tag">GAP</span></td></tr>
+</table>
+
+<div class="success">
+<strong>结论：</strong>核心 CRUD (4个) + openFile + getType + bulkInsert = 7 个方法可完整映射，覆盖 95%+ 的实际使用场景。
+</div>
+
+<h3>4.2 数据类型映射</h3>
+
+<table>
+  <tr><th>Android</th><th>OH (Stage)</th><th>转换方案</th></tr>
+  <tr>
+    <td><code>Uri</code><br><code>content://authority/path</code></td>
+    <td><code>Uri</code><br><code>datashare:///bundleName/path</code></td>
+    <td>ContentProviderUriConverter：scheme 替换 + authority/bundleName 映射表</td>
+  </tr>
+  <tr>
+    <td><code>ContentValues</code></td>
+    <td><code>DataShareValuesBucket</code></td>
+    <td>Java 层拆为 keys[]/values[]/types[] 三个并行数组，JNI 层逐项调用 PutString/PutInt/PutLong/PutDouble/PutNull</td>
+  </tr>
+  <tr>
+    <td><code>Bundle</code> (SQL selection/selectionArgs)</td>
+    <td><code>DataSharePredicates</code></td>
+    <td>C++ 层 SQL where 子句解析器：<br><code>"age > ? AND name LIKE ?"</code> → <code>predicates->GreaterThan("age","18")->And()->Like("name","John%")</code><br>不可解析时降级为 SetWhereClause() 原始 SQL</td>
+  </tr>
+  <tr>
+    <td><code>Cursor</code> (CursorWindow)</td>
+    <td><code>DataShareResultSet</code></td>
+    <td>C++ 层遍历 ResultSet 逐行逐列填充 Java MatrixCursor（通过 JNI newRow/add）</td>
+  </tr>
+  <tr>
+    <td><code>ParcelFileDescriptor</code></td>
+    <td><code>int fd</code></td>
+    <td>ParcelFileDescriptor.adoptFd(fd)</td>
+  </tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第五章 ==================== -->
+<h2 id="ch5">五、适配架构设计</h2>
+
+<h3>5.1 整体架构</h3>
+
+<div class="diagram">┌──────────────────────────────────────────────────────────────────────────────┐
+│                ContentProvider → DataShare 适配层架构                          │
+│                                                                              │
+│  场景 S1: Android App 间数据访问         场景 S2: Android App 访问 OH 系统数据 │
+│  ─────────────────────────────          ─────────────────────────────────    │
+│                                                                              │
+│  Android App A                          Android App                          │
+│  ┌────────────────┐                     ┌────────────────┐                  │
+│  │ContentResolver │                     │ContentResolver │                  │
+│  │.query(content: │                     │.query(content: │                  │
+│  │//com.b.app/x)  │                     │//contacts/...) │                  │
+│  └──────┬─────────┘                     └──────┬─────────┘                  │
+│         │                                      │                             │
+│         ▼                                      ▼                             │
+│  ┌──────────────────────────────────────────────────────┐                    │
+│  │           ActivityManagerAdapter                      │                    │
+│  │           .getContentProvider(authority)               │                    │
+│  │                     │                                 │                    │
+│  │                     ▼                                 │                    │
+│  │  ┌──────────────────────────────────────────┐         │                    │
+│  │  │       ContentProviderRegistry             │         │                    │
+│  │  │                                          │         │                    │
+│  │  │  ① 查本地注册表 mLocalProviders           │         │                    │
+│  │  │     (App B 发布的 ContentProvider)        │         │                    │
+│  │  │     ├── 命中 → 直接返回 IContentProvider  │         │                    │
+│  │  │     │                                    │         │                    │
+│  │  │  ② 未命中 → 创建 ContentProviderBridge    │         │                    │
+│  │  │     (连接 OH DataShareHelper)            │         │                    │
+│  │  └──────────────────┬───────────────────────┘         │                    │
+│  └─────────────────────│─────────────────────────────────┘                    │
+│                        │                                                      │
+│         ┌──────────────┴─────────────┐                                       │
+│         │                            │                                        │
+│    S1 路径                       S2 路径                                      │
+│    ┌────▼───────┐              ┌─────▼──────────────────────────┐            │
+│    │ App B 的    │              │ ContentProviderBridge           │            │
+│    │ Transport   │              │ extends ContentProviderNative   │            │
+│    │ (Android CP │              │                                │            │
+│    │  原生 IPC)  │              │ · URI 转换 (content→datashare)  │            │
+│    └────────────┘              │ · ContentValues→ValuesBucket   │            │
+│                                │ · Selection→DataSharePredicates│            │
+│                                │ · ResultSet→MatrixCursor       │            │
+│                                └─────┬──────────────────────────┘            │
+│                                      │ JNI                                    │
+│                                ┌─────▼──────────────────────┐                │
+│                                │ OHDataShareClient (C++)     │                │
+│                                │ · DataShareHelper::Creator()│   OH IPC       │
+│                                │ · Query(uri,pred,cols) ─────│──────────►    │
+│                                │ · Insert(uri,bucket)   ─────│──────────►    │
+│                                │ · Update(uri,pred,bkt) ─────│──────────►  OH │
+│                                │ · Delete(uri,pred)     ─────│──────────► Data│
+│                                │ · OpenFile(uri,mode)   ─────│──────────► Share│
+│                                └─────────────────────────────┘              │
+└──────────────────────────────────────────────────────────────────────────────┘</div>
+
+<h3>5.2 关键设计决策</h3>
+
+<table>
+  <tr><th>决策</th><th>方案</th><th>原因</th></tr>
+  <tr>
+    <td>ContentProviderBridge 的基类</td>
+    <td>extends <code>ContentProviderNative</code></td>
+    <td>ContentProviderNative 是 IContentProvider 的 Binder Stub 实现。继承它可以作为合法的 IContentProvider 返回给 ContentResolver，走标准 Binder IPC 路径。</td>
+  </tr>
+  <tr>
+    <td>App 间 CP 管理</td>
+    <td><code>ContentProviderRegistry</code> 单例</td>
+    <td>替代 AMS 中的 ContentProviderHelper，在适配层内部管理已发布的 Android CP。不涉及 OH 系统服务。</td>
+  </tr>
+  <tr>
+    <td>ContentValues 传递方式</td>
+    <td>拆为 keys[]/values[]/types[] 三个并行数组</td>
+    <td>避免在 JNI 层遍历 Java Map 的复杂反射。Java 层负责拆包，C++ 层按类型重建 ValuesBucket。</td>
+  </tr>
+  <tr>
+    <td>ResultSet→Cursor 转换</td>
+    <td>C++ 层使用 JNI 构建 MatrixCursor</td>
+    <td>MatrixCursor 是 Android 的轻量级内存 Cursor 实现，适合中小结果集。避免了 CursorWindow 共享内存的复杂转换。</td>
+  </tr>
+  <tr>
+    <td>SQL Selection 解析</td>
+    <td>正则表达式简单解析 + SetWhereClause 降级</td>
+    <td>覆盖 90%+ 的常见 selection 模式。无法解析时降级为 OH 支持的 SetWhereClause 原始 SQL。</td>
+  </tr>
+  <tr>
+    <td>OH DataShareHelper 连接模型</td>
+    <td>首次 getContentProvider 时建立，缓存复用</td>
+    <td>OH DataShareHelper::Creator 是异步连接。在 nativeConnect 中同步等待连接完成，后续操作复用已建立的连接。</td>
+  </tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第六章 ==================== -->
+<h2 id="ch6">六、实现详解</h2>
+
+<h3>6.1 Java 层：ContentProviderBridge</h3>
+
+<p><strong>文件：</strong><code>framework/contentprovider/java/ContentProviderBridge.java</code></p>
+<p>实现 IContentProvider 的全部 21 个方法，其中 7 个桥接到 OH DataShareHelper，其余返回安全默认值：</p>
+
+<table>
+  <tr><th>方法</th><th>状态</th><th>实现要点</th></tr>
+  <tr><td>query</td><td>[BRIDGED]</td><td>从 Bundle 提取 selection/selectionArgs/sortOrder → nativeQuery → 返回 MatrixCursor</td></tr>
+  <tr><td>insert</td><td>[BRIDGED]</td><td>ContentValues 拆包 → nativeInsert → 返回带 rowId 的 Uri</td></tr>
+  <tr><td>update</td><td>[BRIDGED]</td><td>ContentValues 拆包 + selection 提取 → nativeUpdate</td></tr>
+  <tr><td>delete</td><td>[BRIDGED]</td><td>selection 提取 → nativeDelete</td></tr>
+  <tr><td>bulkInsert</td><td>[BRIDGED]</td><td>循环调用 nativeInsert（DataShareHelper.BatchInsert 可优化）</td></tr>
+  <tr><td>getType</td><td>[BRIDGED]</td><td>nativeGetType</td></tr>
+  <tr><td>openFile</td><td>[BRIDGED]</td><td>nativeOpenFile → ParcelFileDescriptor.adoptFd</td></tr>
+  <tr><td>call</td><td>[STUB]</td><td>Stage 模型 DataShareHelper 不支持 call</td></tr>
+  <tr><td>openAssetFile</td><td>[PARTIAL]</td><td>回退到 openFile</td></tr>
+  <tr><td>checkUriPermission</td><td>[STUB]</td><td>默认返回 PERMISSION_GRANTED</td></tr>
+  <tr><td>其他 10 个</td><td>[STUB]</td><td>返回 null/false/空数组</td></tr>
+</table>
+
+<h3>6.2 Java 层：ContentProviderRegistry</h3>
+
+<p><strong>文件：</strong><code>framework/contentprovider/java/ContentProviderRegistry.java</code></p>
+<p>单例，维护两个 Map：</p>
+<ul>
+  <li><code>mLocalProviders</code> (ConcurrentHashMap&lt;authority, ContentProviderHolder&gt;) — App 自身发布的 CP</li>
+  <li><code>mOhBridges</code> (ConcurrentHashMap&lt;authority, ContentProviderBridge&gt;) — OH DataShare 桥接（缓存）</li>
+</ul>
+<p>acquireProvider() 先查 mLocalProviders（场景 S1），未命中则创建/返回 ContentProviderBridge（场景 S2）。</p>
+
+<h3>6.3 Java 层：ContentProviderUriConverter</h3>
+
+<p><strong>文件：</strong><code>framework/contentprovider/java/ContentProviderUriConverter.java</code></p>
+<p>双向 URI 转换 + 系统 Provider authority/bundleName 映射表：</p>
+
+<table>
+  <tr><th>Android authority</th><th>OH bundleName</th><th>数据类型</th></tr>
+  <tr><td>com.android.contacts / contacts</td><td>com.ohos.contacts</td><td>通讯录</td></tr>
+  <tr><td>media</td><td>com.ohos.medialibrary.medialibrarydata</td><td>媒体/图库</td></tr>
+  <tr><td>com.android.calendar</td><td>com.ohos.calendardata</td><td>日历</td></tr>
+  <tr><td>settings</td><td>com.ohos.settingsdata</td><td>系统设置</td></tr>
+  <tr><td>sms / mms / mms-sms</td><td>com.ohos.mms</td><td>短信</td></tr>
+  <tr><td>downloads</td><td>com.ohos.download</td><td>下载</td></tr>
+</table>
+
+<h3>6.4 C++ 层：OHDataShareClient</h3>
+
+<p><strong>文件：</strong><code>framework/contentprovider/jni/oh_datashare_client.h/cpp</code></p>
+<p>核心功能：</p>
+
+<h4>SQL Selection 解析器 (buildPredicates)</h4>
+<p>将 Android SQL 风格的 selection 字符串解析为 OH DataSharePredicates 链式调用：</p>
+
+<table>
+  <tr><th>SQL 操作符</th><th>OH Predicates 方法</th></tr>
+  <tr><td><code>=</code></td><td><code>EqualTo(column, value)</code></td></tr>
+  <tr><td><code>!=</code> / <code>&lt;&gt;</code></td><td><code>NotEqualTo(column, value)</code></td></tr>
+  <tr><td><code>&gt;</code></td><td><code>GreaterThan(column, value)</code></td></tr>
+  <tr><td><code>&lt;</code></td><td><code>LessThan(column, value)</code></td></tr>
+  <tr><td><code>&gt;=</code></td><td><code>GreaterThanOrEqualTo(column, value)</code></td></tr>
+  <tr><td><code>&lt;=</code></td><td><code>LessThanOrEqualTo(column, value)</code></td></tr>
+  <tr><td><code>LIKE</code></td><td><code>Like(column, value)</code></td></tr>
+  <tr><td><code>IS NULL</code></td><td><code>IsNull(column)</code></td></tr>
+  <tr><td><code>IS NOT NULL</code></td><td><code>IsNotNull(column)</code></td></tr>
+  <tr><td><code>AND</code></td><td><code>And()</code></td></tr>
+  <tr><td><code>OR</code></td><td><code>Or()</code></td></tr>
+</table>
+<p>无法解析的复杂 SQL 降级为 <code>SetWhereClause(selection) + SetWhereArgs(selArgs)</code>。</p>
+
+<h4>ResultSet → MatrixCursor 转换 (resultSetToCursor)</h4>
+<p>通过 JNI 调用构建 Java MatrixCursor：</p>
+<ol>
+  <li>从 DataShareResultSet 获取列名列表 → 创建 Java String[] → new MatrixCursor(columns)</li>
+  <li>遍历 ResultSet 每行：cursor.newRow() → 根据列类型(STRING/INTEGER/FLOAT/NULL)调用 rowBuilder.add(value)</li>
+  <li>JNI 类/方法 ID 在 JNI_OnLoad 时缓存，避免每次查询重复查找</li>
+</ol>
+
+<h3>6.5 ActivityManagerAdapter 集成</h3>
+
+<p>修改了 ActivityManagerAdapter.java 中 5 个 ContentProvider 相关方法（从 STUB 升级为 BRIDGED/PARTIAL）：</p>
+
+<table>
+  <tr><th>方法</th><th>原状态</th><th>新状态</th><th>实现</th></tr>
+  <tr><td>getContentProvider</td><td>STUB (return null)</td><td><strong>BRIDGED</strong></td><td>ContentProviderRegistry.acquireProvider(authority)</td></tr>
+  <tr><td>getContentProviderExternal</td><td>STUB</td><td><strong>BRIDGED</strong></td><td>同上</td></tr>
+  <tr><td>publishContentProviders</td><td>STUB</td><td><strong>BRIDGED</strong></td><td>ContentProviderRegistry.publishProviders()</td></tr>
+  <tr><td>openContentUri</td><td>STUB</td><td><strong>BRIDGED</strong></td><td>通过 acquireProvider → openFile</td></tr>
+  <tr><td>refContentProvider等</td><td>STUB</td><td>PARTIAL</td><td>不需要引用计数，保持无操作</td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<!-- ==================== 第七章 ==================== -->
+<h2 id="ch7">七、源文件清单</h2>
+
+<h3>7.1 新增文件</h3>
+
+<table>
+  <tr><th>层</th><th>文件路径</th><th>说明</th></tr>
+  <tr><td rowspan="3">Java</td>
+    <td><code>framework/contentprovider/java/<strong>ContentProviderBridge.java</strong></code></td>
+    <td>IContentProvider 实现，桥接到 OH DataShareHelper</td>
+  </tr>
+  <tr>
+    <td><code>framework/contentprovider/java/<strong>ContentProviderRegistry.java</strong></code></td>
+    <td>CP 注册表（本地 Android CP + OH DataShare 桥接缓存）</td>
+  </tr>
+  <tr>
+    <td><code>framework/contentprovider/java/<strong>ContentProviderUriConverter.java</strong></code></td>
+    <td>content:// ↔ datashare:// URI 转换 + 映射表</td>
+  </tr>
+  <tr><td rowspan="2">C++ JNI</td>
+    <td><code>framework/contentprovider/jni/<strong>oh_datashare_client.h</strong></code></td>
+    <td>OHDataShareClient 类声明 + OHDataShareClientManager</td>
+  </tr>
+  <tr>
+    <td><code>framework/contentprovider/jni/<strong>oh_datashare_client.cpp</strong></code></td>
+    <td>OH DataShareHelper IPC + SQL 解析 + ResultSet→Cursor + JNI 方法实现</td>
+  </tr>
+</table>
+
+<h3>7.2 修改文件</h3>
+
+<table>
+  <tr><th>文件</th><th>修改内容</th></tr>
+  <tr>
+    <td><code>framework/activity/java/<strong>ActivityManagerAdapter.java</strong></code></td>
+    <td>Category 5 (ContentProvider) 从 STUB 升级为 BRIDGED：<br>getContentProvider / publishContentProviders / openContentUri 集成 ContentProviderRegistry</td>
+  </tr>
+  <tr>
+    <td><code>framework/core/jni/<strong>adapter_bridge.cpp</strong></code></td>
+    <td>添加 #include oh_datashare_client.h，在 initialize() 中调用 initDataShareJniCache()</td>
+  </tr>
+  <tr>
+    <td><code>framework/<strong>CMakeLists.txt</strong></code></td>
+    <td>添加 oh_datashare_client.cpp 源文件，添加 DataShare/RDB include 路径</td>
+  </tr>
+</table>
+
+<h3>7.3 项目结构（新增部分标粗）</h3>
+
+<pre>
+D:\code\adapter\framework\
+├── activity/java/
+│   └── ActivityManagerAdapter.java         <span class="comment"># [修改] CP 方法 STUB→BRIDGED</span>
+├── contentprovider/
+│   ├── java/
+│   │   ├── <strong>ContentProviderBridge.java</strong>      <span class="comment"># [新增] IContentProvider→OH DataShare</span>
+│   │   ├── <strong>ContentProviderRegistry.java</strong>    <span class="comment"># [新增] CP 注册表管理</span>
+│   │   └── <strong>ContentProviderUriConverter.java</strong> <span class="comment"># [新增] URI 转换</span>
+│   └── jni/
+│       ├── <strong>oh_datashare_client.h</strong>           <span class="comment"># [新增] OH DataShareHelper 客户端</span>
+│       ├── <strong>oh_datashare_client.cpp</strong>         <span class="comment"># [新增] 实现 + JNI 方法</span>
+│       └── ...
+├── core/jni/
+│   └── adapter_bridge.cpp                  <span class="comment"># [修改] DataShare JNI 缓存初始化</span>
+└── CMakeLists.txt                          <span class="comment"># [修改] 添加源文件和 include</span>
+</pre>
+
+<!-- 文档信息 -->
+<div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ccc; color: #999; font-size: 9pt;">
+  <p>文档版本：v2.0 | 更新日期：2026年3月16日 | 适配目标：Stage 模型</p>
+  <p>关联项目：Android-OpenHarmony 适配层（D:\code\adapter\）</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Android Broadcast → OH CommonEvent 适配设计方案</title>
+<style>
+body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; line-height: 1.8; color: #333; }
+h1 { color: #1a237e; border-bottom: 3px solid #1a237e; padding-bottom: 10px; }
+h2 { color: #283593; border-bottom: 2px solid #5c6bc0; padding-bottom: 6px; margin-top: 40px; }
+h3 { color: #3949ab; margin-top: 30px; }
+h4 { color: #5c6bc0; }
+pre { background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 12px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #e8eaf6; color: #1a237e; }
+tr:nth-child(even) { background: #fafafa; }
+.note { background: #fff3e0; border-left: 4px solid #ff9800; padding: 12px 16px; margin: 16px 0; }
+.warn { background: #fce4ec; border-left: 4px solid #e53935; padding: 12px 16px; margin: 16px 0; }
+.info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; }
+.ok { background: #e8f5e9; border-left: 4px solid #43a047; padding: 12px 16px; margin: 16px 0; }
+.diagram { background: #fafafa; border: 2px solid #90a4ae; border-radius: 8px; padding: 16px; margin: 16px 0; font-family: "Consolas", "Courier New", monospace; white-space: pre; font-size: 12px; line-height: 1.4; overflow-x: auto; }
+.version { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<h1>Android Broadcast → OH CommonEvent 适配设计方案</h1>
+<p class="version">版本：v1.0 | 日期：2026年3月11日 | 作者：Adapter Team</p>
+
+<!-- ============================================================ -->
+<h2>第一部分：Android 广播机制分析</h2>
+<!-- ============================================================ -->
+
+<h3>1.1 核心架构</h3>
+
+<p>Android 广播机制基于 <b>AMS（ActivityManagerService）</b> 集中管理，应用通过 <code>Context</code> 发送/接收广播，
+AMS 负责广播分发、接收者匹配和有序广播的顺序控制。</p>
+
+<h4>参与角色</h4>
+<table>
+<tr><th>角色</th><th>类</th><th>职责</th></tr>
+<tr><td>发送方</td><td><code>ContextImpl</code></td><td>调用 <code>sendBroadcast()</code> / <code>sendOrderedBroadcast()</code></td></tr>
+<tr><td>接收方</td><td><code>BroadcastReceiver</code></td><td>实现 <code>onReceive(Context, Intent)</code></td></tr>
+<tr><td>注册代理</td><td><code>LoadedApk.ReceiverDispatcher</code></td><td>包装 BroadcastReceiver 为 IPC Binder 对象</td></tr>
+<tr><td>IPC 回调</td><td><code>IIntentReceiver.Stub</code>（InnerReceiver）</td><td>AMS 到应用的回调接口</td></tr>
+<tr><td>匹配过滤</td><td><code>IntentFilter</code></td><td>Action / Category / Data (scheme/host/path/type)</td></tr>
+<tr><td>系统服务</td><td><code>IActivityManager</code>（AMS）</td><td>广播注册、匹配分发、有序控制</td></tr>
+</table>
+
+<h3>1.2 IPC 接口方法</h3>
+
+<p>以下是 <code>IActivityManager.aidl</code> 中广播相关的全部方法：</p>
+
+<table>
+<tr><th>方法</th><th>方向</th><th>说明</th></tr>
+<tr>
+  <td><code>registerReceiverWithFeature(caller, callerPkg, featureId, receiverId, <b>receiver</b>, <b>filter</b>, permission, userId, flags)</code></td>
+  <td>App → AMS</td>
+  <td>动态注册广播接收者。<b>receiver</b> 是 IIntentReceiver Binder；<b>filter</b> 是 IntentFilter。返回当前 sticky Intent（如有）</td>
+</tr>
+<tr>
+  <td><code>unregisterReceiver(<b>receiver</b>)</code></td>
+  <td>App → AMS</td>
+  <td>注销广播接收者。传入注册时的 IIntentReceiver Binder</td>
+</tr>
+<tr>
+  <td><code>broadcastIntentWithFeature(caller, featureId, <b>intent</b>, resolvedType, <b>resultTo</b>, resultCode, resultData, map, requiredPermissions, excludePermissions, excludePackages, appOp, options, <b>serialized</b>, <b>sticky</b>, userId)</code></td>
+  <td>App → AMS</td>
+  <td>发送广播。<b>serialized</b>=true 为有序广播；<b>sticky</b>=true 为粘性广播；<b>resultTo</b> 为有序广播最终接收者</td>
+</tr>
+<tr>
+  <td><code>finishReceiver(who, resultCode, resultData, map, abortBroadcast, flags)</code></td>
+  <td>App → AMS (oneway)</td>
+  <td>接收者处理完毕通知 AMS。有序广播中用于传递结果并触发下一个接收者</td>
+</tr>
+<tr>
+  <td><code>unbroadcastIntent(caller, intent, userId)</code></td>
+  <td>App → AMS</td>
+  <td>撤回粘性广播</td>
+</tr>
+</table>
+
+<p>回调接口 <code>IIntentReceiver.aidl</code>（oneway）：</p>
+<pre>
+oneway interface IIntentReceiver {
+    void performReceive(in Intent intent, int resultCode, String data,
+            in Bundle extras, boolean ordered, boolean sticky, int sendingUser);
+}
+</pre>
+
+<h3>1.3 广播注册流程</h3>
+
+<div class="diagram">
+App                          ContextImpl                    LoadedApk                AMS
+ │                              │                              │                      │
+ │ registerReceiver(receiver,   │                              │                      │
+ │   filter)                    │                              │                      │
+ │─────────────────────────────>│                              │                      │
+ │                              │ getReceiverDispatcher()      │                      │
+ │                              │─────────────────────────────>│                      │
+ │                              │                              │ new ReceiverDispatcher│
+ │                              │                              │   └ new InnerReceiver │
+ │                              │                              │     (IIntentReceiver  │
+ │                              │   IIntentReceiver rd         │      .Stub)           │
+ │                              │<─────────────────────────────│                      │
+ │                              │                              │                      │
+ │                              │ IActivityManager.registerReceiverWithFeature(       │
+ │                              │   caller, pkg, rd, filter, permission, userId)      │
+ │                              │─────────────────────────────────────────────────────>│
+ │                              │                              │     AMS 记录:         │
+ │                              │                              │     rd Binder + filter│
+ │                              │   return sticky Intent       │                      │
+ │                              │<─────────────────────────────────────────────────────│
+ │  return sticky Intent        │                              │                      │
+ │<─────────────────────────────│                              │                      │
+</div>
+
+<h3>1.4 广播发送与接收流程</h3>
+
+<h4>1.4.1 无序广播</h4>
+
+<div class="diagram">
+Sender App              AMS                          Receiver App (InnerReceiver)
+ │                       │                              │
+ │ sendBroadcast(intent) │                              │
+ │──────────────────────>│                              │
+ │   broadcastIntent     │                              │
+ │   WithFeature(        │                              │
+ │     intent,           │                              │
+ │     serialized=false) │                              │
+ │                       │ 1. 匹配 IntentFilter         │
+ │                       │ 2. 对每个匹配的接收者:        │
+ │                       │                              │
+ │                       │ IIntentReceiver              │
+ │                       │   .performReceive(           │
+ │                       │     intent, resultCode,      │
+ │                       │     data, extras,            │
+ │                       │     ordered=false,           │
+ │                       │     sticky=false)            │
+ │                       │─────────────────────────────>│
+ │                       │      (oneway, 并行分发)       │ ReceiverDispatcher
+ │                       │                              │   .performReceive()
+ │  return               │                              │     ↓
+ │<──────────────────────│                              │ Handler.post(Args)
+ │                       │                              │     ↓ (主线程)
+ │                       │                              │ BroadcastReceiver
+ │                       │                              │   .onReceive(ctx, intent)
+ │                       │                              │     ↓
+ │                       │   finishReceiver()           │ PendingResult.finish()
+ │                       │<─────────────────────────────│
+</div>
+
+<h4>1.4.2 有序广播</h4>
+
+<div class="diagram">
+Sender App              AMS                     Receiver A (高优先级)   Receiver B (低优先级)
+ │                       │                          │                      │
+ │ sendOrderedBroadcast  │                          │                      │
+ │  (intent, resultRcvr) │                          │                      │
+ │──────────────────────>│                          │                      │
+ │   broadcastIntent     │                          │                      │
+ │   WithFeature(        │ 按 priority 排序          │                      │
+ │     serialized=true,  │                          │                      │
+ │     resultTo=rd)      │ performReceive            │                      │
+ │                       │ (ordered=true)            │                      │
+ │                       │─────────────────────────>│                      │
+ │                       │                          │ onReceive()           │
+ │                       │                          │ setResultCode(42)     │
+ │                       │                          │ finish()              │
+ │                       │   finishReceiver(42)     │                      │
+ │                       │<─────────────────────────│                      │
+ │                       │                          │                      │
+ │                       │ performReceive(code=42)  │                      │
+ │                       │─────────────────────────────────────────────────>│
+ │                       │                          │                      │ onReceive()
+ │                       │                          │                      │ finish()
+ │                       │   finishReceiver()       │                      │
+ │                       │<────────────────────────────────────────────────│
+ │                       │                          │                      │
+ │                       │ 通知 resultReceiver       │                      │
+ │  resultRcvr.onReceive │                          │                      │
+ │<──────────────────────│                          │                      │
+</div>
+
+<h3>1.5 关键特性</h3>
+
+<table>
+<tr><th>特性</th><th>机制</th></tr>
+<tr><td>粘性广播</td><td><code>sendStickyBroadcast()</code>，广播持久保存在 AMS 中。后续注册者立即收到缓存值</td></tr>
+<tr><td>有序广播</td><td><code>sendOrderedBroadcast()</code>，按优先级顺序分发，可修改/中止结果</td></tr>
+<tr><td>权限保护</td><td>发送方可要求接收方持有特定权限；注册方可要求发送方持有特定权限</td></tr>
+<tr><td>异步接收</td><td><code>goAsync()</code> 返回 PendingResult，允许工作线程处理后再 finish()</td></tr>
+<tr><td>本地广播</td><td><code>LocalBroadcastManager</code>（进程内，不经过 AMS，已弃用）</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>第二部分：OH CommonEvent 机制分析</h2>
+<!-- ============================================================ -->
+
+<h3>2.1 核心架构</h3>
+
+<p>OH 事件通知基于 <b>CES（CommonEventService）</b> 系统服务集中管理。应用通过 <code>CommonEventManager</code>
+静态接口发布/订阅事件，CES 负责事件匹配和分发。</p>
+
+<h4>参与角色</h4>
+<table>
+<tr><th>角色</th><th>类</th><th>职责</th></tr>
+<tr><td>发布方</td><td><code>CommonEventManager</code></td><td>调用 <code>PublishCommonEvent()</code></td></tr>
+<tr><td>订阅方</td><td><code>CommonEventSubscriber</code></td><td>实现 <code>OnReceiveEvent(CommonEventData)</code></td></tr>
+<tr><td>IPC 回调</td><td><code>CommonEventListener : EventReceiveStub</code></td><td>CES 到应用的回调接口</td></tr>
+<tr><td>匹配过滤</td><td><code>MatchingSkills</code></td><td>Event (Action) / Entity / Scheme</td></tr>
+<tr><td>订阅信息</td><td><code>CommonEventSubscribeInfo</code></td><td>封装 MatchingSkills + priority + permission + threadMode</td></tr>
+<tr><td>事件数据</td><td><code>CommonEventData</code></td><td>Want + code + data</td></tr>
+<tr><td>发布参数</td><td><code>CommonEventPublishInfo</code></td><td>ordered / sticky / subscriberPermissions / subscriberUids</td></tr>
+<tr><td>系统服务</td><td><code>CommonEventManagerService : CommonEventStub</code></td><td>事件注册、匹配分发、有序控制、冻结管理</td></tr>
+</table>
+
+<h3>2.2 IPC 接口方法</h3>
+
+<p>以下是 <code>CommonEventStub</code> 的 IPC 方法：</p>
+
+<table>
+<tr><th>方法</th><th>IPC Code</th><th>说明</th></tr>
+<tr>
+  <td><code>SubscribeCommonEvent(subscribeInfo, commonEventListener, instanceKey)</code></td>
+  <td>CES_SUBSCRIBE = 2</td>
+  <td>订阅事件。subscribeInfo 含 MatchingSkills 过滤条件；listener 是 EventReceiveStub Binder</td>
+</tr>
+<tr>
+  <td><code>UnsubscribeCommonEvent(commonEventListener)</code></td>
+  <td>CES_UNSUBSCRIBE = 3</td>
+  <td>取消订阅</td>
+</tr>
+<tr>
+  <td><code>PublishCommonEvent(event, publishInfo, commonEventListener, userId)</code></td>
+  <td>CES_PUBLISH = 0</td>
+  <td>发布事件。publishInfo 控制 ordered / sticky / permissions</td>
+</tr>
+<tr>
+  <td><code>FinishReceiver(proxy, code, receiverData, abortEvent)</code></td>
+  <td>CES_FINISH_RECEIVER = 5</td>
+  <td>有序事件：接收者处理完毕通知</td>
+</tr>
+<tr>
+  <td><code>GetStickyCommonEvent(event)</code></td>
+  <td>CES_GET_STICKY = 4</td>
+  <td>获取粘性事件缓存值</td>
+</tr>
+<tr>
+  <td><code>RemoveStickyCommonEvent(event)</code></td>
+  <td>CES_REMOVE_STICKY = 9</td>
+  <td>移除粘性事件</td>
+</tr>
+<tr>
+  <td><code>Freeze(uid) / Unfreeze(uid)</code></td>
+  <td>CES_FREEZE = 6 / 7</td>
+  <td>冻结/解冻应用事件接收（事件排队）</td>
+</tr>
+</table>
+
+<p>回调接口 <code>EventReceiveStub</code>：</p>
+<pre>
+virtual ErrCode NotifyEvent(const CommonEventData&amp; data,
+    bool ordered, bool sticky) = 0;
+</pre>
+
+<h3>2.3 事件订阅流程</h3>
+
+<div class="diagram">
+App                     CommonEventManager         CES (CommonEventManagerService)
+ │                          │                          │
+ │ new MySubscriber         │                          │
+ │  (subscribeInfo with     │                          │
+ │   MatchingSkills)        │                          │
+ │                          │                          │
+ │ SubscribeCommonEvent     │                          │
+ │  (subscriber)            │                          │
+ │─────────────────────────>│                          │
+ │                          │ 创建 CommonEventListener  │
+ │                          │  (extends EventReceiveStub)
+ │                          │                          │
+ │                          │ CES.SubscribeCommonEvent  │
+ │                          │  (subscribeInfo, listener)│
+ │                          │─────────────────────────>│
+ │                          │                          │ CommonEventSubscriberManager
+ │                          │                          │   .InsertSubscriber(event,
+ │                          │                          │     subscriberRecord)
+ │                          │                          │
+ │                          │                          │ 注册 DeathRecipient
+ │                          │                          │   (应用死亡自动清理)
+ │                          │   return OK              │
+ │                          │<─────────────────────────│
+ │  return OK               │                          │
+ │<─────────────────────────│                          │
+</div>
+
+<h3>2.4 事件发布与接收流程</h3>
+
+<div class="diagram">
+Publisher App           CES                              Subscriber App
+ │                       │                                  │
+ │ PublishCommonEvent     │                                  │
+ │  (data, publishInfo)  │                                  │
+ │──────────────────────>│                                  │
+ │                       │ InnerCommonEventManager           │
+ │                       │   .PublishCommonEvent()           │
+ │                       │     ↓                             │
+ │                       │ SubscriberManager                 │
+ │                       │   .GetSubscriberRecords(event)    │
+ │                       │     ↓ 匹配 MatchingSkills         │
+ │                       │                                  │
+ │                       │ [无序] → 投递到 unorderedQueue_    │
+ │                       │ [有序] → 按 priority 顺序投递     │
+ │                       │                                  │
+ │                       │ EventReceiveStub.NotifyEvent     │
+ │                       │  (data, ordered, sticky)         │
+ │                       │─────────────────────────────────>│
+ │                       │                                  │ CommonEventListener
+ │  return               │                                  │   .NotifyEvent()
+ │<──────────────────────│                                  │     ↓
+ │                       │                                  │ CommonEventSubscriber
+ │                       │                                  │   .OnReceiveEvent(data)
+ │                       │                                  │
+ │                       │                    [有序] FinishReceiver(code, data)
+ │                       │<─────────────────────────────────│
+ │                       │ 投递给下一个订阅者                  │
+</div>
+
+<h3>2.5 MatchingSkills vs IntentFilter</h3>
+
+<table>
+<tr><th>功能</th><th>Android IntentFilter</th><th>OH MatchingSkills</th></tr>
+<tr><td>Action 匹配</td><td><code>addAction(String)</code></td><td><code>AddEvent(String)</code></td></tr>
+<tr><td>Category 匹配</td><td><code>addCategory(String)</code></td><td><code>AddEntity(String)</code>（语义类似）</td></tr>
+<tr><td>Data Scheme</td><td><code>addDataScheme(String)</code></td><td><code>AddScheme(String)</code></td></tr>
+<tr><td>Data Host/Port</td><td><code>addDataAuthority(host, port)</code></td><td>不支持</td></tr>
+<tr><td>Data Path</td><td><code>addDataPath(path, type)</code></td><td>不支持</td></tr>
+<tr><td>MIME Type</td><td><code>addDataType(String)</code></td><td>不支持</td></tr>
+<tr><td>优先级</td><td><code>setPriority(int)</code></td><td>在 <code>CommonEventSubscribeInfo.priority_</code> 中</td></tr>
+</table>
+
+<h3>2.6 OH 独有特性</h3>
+
+<table>
+<tr><th>特性</th><th>说明</th></tr>
+<tr><td>冻结/解冻</td><td><code>Freeze(uid)</code> 暂停事件投递（排队 30 秒超时）；<code>Unfreeze(uid)</code> 恢复</td></tr>
+<tr><td>ThreadMode</td><td>订阅者可指定回调线程：HANDLER / POST / ASYNC / BACKGROUND / COMMON</td></tr>
+<tr><td>发布者过滤</td><td>订阅者可限制 <code>publisherBundleName</code> / <code>publisherUid</code></td></tr>
+<tr><td>接收者 UID 限制</td><td>发布方可限制最多 3 个 <code>subscriberUids</code></td></tr>
+<tr><td>静态订阅</td><td>StaticSubscriberExtension 机制（类似 Android manifest 静态注册）</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>第三部分：适配方案设计</h2>
+<!-- ============================================================ -->
+
+<h3>3.1 设计目标</h3>
+
+<ol>
+<li>Android 应用调用 <code>registerReceiver()</code> 能订阅到 OH 系统事件</li>
+<li>Android 应用调用 <code>sendBroadcast()</code> 能发布 OH CommonEvent</li>
+<li>OH 系统事件（电池、网络、屏幕等）能以 Android Intent 格式投递给 Android 应用的 BroadcastReceiver</li>
+<li>有序广播、粘性广播语义完整保留</li>
+<li>OH 原生应用不受影响</li>
+</ol>
+
+<h3>3.2 整体架构</h3>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Android Application                                │
+│                                                                             │
+│   Context.sendBroadcast(Intent)              Context.registerReceiver(     │
+│          │                                     BroadcastReceiver, filter)   │
+│          ↓                                            │                    │
+│   ContextImpl ──────→ IActivityManager ←──────── ContextImpl               │
+│                              │                        │                    │
+│   ┌──────────────────────────┼────────────────────────┘                    │
+│   │              ActivityManagerAdapter                                     │
+│   │      (extends IActivityManager.Stub)                                   │
+└───┼────────────────────────────────────────────────────────────────────────┘
+    │
+    │  broadcastIntentWithFeature()     registerReceiverWithFeature()
+    │  unbroadcastIntent()             unregisterReceiver()
+    │  finishReceiver()
+    │
+    ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Adapter Layer (Java + JNI + C++)                          │
+│                                                                             │
+│  ┌─────────────────────────┐    ┌──────────────────────────────────┐       │
+│  │  BroadcastEventBridge   │    │  CommonEventReceiverBridge       │       │
+│  │  (Java, in AMA)         │    │  (Java, callback)                │       │
+│  │                         │    │                                  │       │
+│  │ • IntentFilter →        │    │ • OH CommonEventData →           │       │
+│  │   MatchingSkills 转换    │    │   Android Intent 转换            │       │
+│  │ • Intent → Want 转换    │    │ • NotifyEvent() →                │       │
+│  │ • IIntentReceiver 管理  │    │   IIntentReceiver               │       │
+│  │ • 有序广播状态机         │    │   .performReceive()              │       │
+│  └──────────┬──────────────┘    └──────────────┬───────────────────┘       │
+│             │ JNI                               │ JNI (reverse callback)   │
+│  ┌──────────┴──────────────────────────────────┴───────────────────┐       │
+│  │                    adapter_bridge.cpp                            │       │
+│  │  nativeSubscribeCommonEvent()    nativeOnCommonEventReceived()  │       │
+│  │  nativeUnsubscribeCommonEvent()  (C++ → Java callback)         │       │
+│  │  nativePublishCommonEvent()                                     │       │
+│  └──────────┬──────────────────────────────────────────────────────┘       │
+│             │                                                              │
+│  ┌──────────┴──────────────────────────────────────────────────────┐       │
+│  │              OHCommonEventClient (C++)                           │       │
+│  │  • 管理 CES IPC 连接                                            │       │
+│  │  • CommonEventSubscriber 实例池                                  │       │
+│  │  • 事件名映射表                                                  │       │
+│  └──────────┬──────────────────────────────────────────────────────┘       │
+└─────────────┼──────────────────────────────────────────────────────────────┘
+              │ OH IPC
+              ↓
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    OH CommonEventService (CES)                               │
+│                                                                             │
+│  SubscribeCommonEvent()    PublishCommonEvent()    FinishReceiver()          │
+│  UnsubscribeCommonEvent()  GetStickyCommonEvent()                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>3.3 事件名称映射</h3>
+
+<p>Android 广播 Action 和 OH CommonEvent 事件名之间需要双向映射。映射表在 Adapter 层维护。</p>
+
+<h4>3.3.1 系统事件映射表（部分）</h4>
+
+<table>
+<tr><th>Android Broadcast Action</th><th>OH CommonEvent</th><th>附加数据映射</th></tr>
+<tr>
+  <td><code>android.intent.action.BOOT_COMPLETED</code></td>
+  <td><code>usual.event.BOOT_COMPLETED</code></td>
+  <td>无额外数据</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.BATTERY_CHANGED</code></td>
+  <td><code>usual.event.BATTERY_CHANGED</code></td>
+  <td>level/scale/status/plugged → Want params</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.BATTERY_LOW</code></td>
+  <td><code>usual.event.BATTERY_LOW</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.BATTERY_OKAY</code></td>
+  <td><code>usual.event.BATTERY_OKAY</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.POWER_CONNECTED</code></td>
+  <td><code>usual.event.POWER_CONNECTED</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.POWER_DISCONNECTED</code></td>
+  <td><code>usual.event.POWER_DISCONNECTED</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.SCREEN_ON</code></td>
+  <td><code>usual.event.SCREEN_ON</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.SCREEN_OFF</code></td>
+  <td><code>usual.event.SCREEN_OFF</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.USER_PRESENT</code></td>
+  <td><code>usual.event.USER_PRESENT</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.TIME_TICK</code></td>
+  <td><code>usual.event.TIME_TICK</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.TIME_SET</code></td>
+  <td><code>usual.event.TIME_CHANGED</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.TIMEZONE_CHANGED</code></td>
+  <td><code>usual.event.TIMEZONE_CHANGED</code></td>
+  <td>time-zone → Want param</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.DATE_CHANGED</code></td>
+  <td><code>usual.event.DATE_CHANGED</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.net.conn.CONNECTIVITY_CHANGE</code></td>
+  <td><code>usual.event.CONNECTIVITY_CHANGE</code></td>
+  <td>networkInfo → Want params</td>
+</tr>
+<tr>
+  <td><code>android.net.wifi.STATE_CHANGE</code></td>
+  <td><code>usual.event.WIFI_CONN_STATE</code></td>
+  <td>wifiState → Want params</td>
+</tr>
+<tr>
+  <td><code>android.net.wifi.WIFI_STATE_CHANGED</code></td>
+  <td><code>usual.event.WIFI_POWER_STATE</code></td>
+  <td>wifi_state int → Want param</td>
+</tr>
+<tr>
+  <td><code>android.bluetooth.adapter.action.STATE_CHANGED</code></td>
+  <td><code>usual.event.BLUETOOTH_HOST_STATE_UPDATE</code></td>
+  <td>state → Want param</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.AIRPLANE_MODE</code></td>
+  <td><code>usual.event.AIRPLANE_MODE_CHANGED</code></td>
+  <td>state bool → Want param</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.PACKAGE_ADDED</code></td>
+  <td><code>usual.event.PACKAGE_ADDED</code></td>
+  <td>data URI → Want bundleName</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.PACKAGE_REMOVED</code></td>
+  <td><code>usual.event.PACKAGE_REMOVED</code></td>
+  <td>data URI → Want bundleName</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.LOCALE_CHANGED</code></td>
+  <td><code>usual.event.LOCALE_CHANGED</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.CONFIGURATION_CHANGED</code></td>
+  <td><code>usual.event.CONFIGURATION_CHANGED</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.CLOSE_SYSTEM_DIALOGS</code></td>
+  <td><code>usual.event.CLOSE_SYSTEM_DIALOGS</code></td>
+  <td>reason → Want param</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.USER_SWITCHED</code></td>
+  <td><code>usual.event.USER_SWITCHED</code></td>
+  <td>userId → Want param</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.DEVICE_STORAGE_LOW</code></td>
+  <td><code>usual.event.DEVICE_STORAGE_LOW</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><code>android.intent.action.DEVICE_STORAGE_OK</code></td>
+  <td><code>usual.event.DEVICE_STORAGE_OK</code></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td>（自定义 Action）</td>
+  <td><code>adapter.custom.{原始 Action}</code></td>
+  <td>Intent extras → Want params JSON</td>
+</tr>
+</table>
+
+<div class="note">
+<b>映射规则：</b>
+<ol>
+<li>系统广播 Action 通过硬编码映射表双向转换（约 30 个高频 Action）</li>
+<li>自定义 Action：加前缀 <code>adapter.custom.</code> 作为 OH 事件名，保证不与 OH 系统事件冲突</li>
+<li>OH 系统事件若无对应 Android Action：保留 OH 原始事件名作为 Intent Action</li>
+</ol>
+</div>
+
+<h3>3.4 接口适配详细设计</h3>
+
+<h4>3.4.1 registerReceiverWithFeature → CES.SubscribeCommonEvent</h4>
+
+<p>当 Android 应用调用 <code>registerReceiver(receiver, filter)</code> 时：</p>
+
+<ol>
+<li><b>IntentFilter → MatchingSkills 转换</b>
+<pre>
+// IntentFilter 中的每个 Action
+for (action : filter.actions) {
+    String ohEvent = ActionMapper.androidToOH(action);
+    matchingSkills.AddEvent(ohEvent);
+}
+// Category → Entity
+for (category : filter.categories) {
+    matchingSkills.AddEntity(category);
+}
+// Data Scheme
+for (scheme : filter.dataSchemes) {
+    matchingSkills.AddScheme(scheme);
+}
+</pre>
+</li>
+<li><b>创建订阅信息</b>
+<pre>
+CommonEventSubscribeInfo subscribeInfo(matchingSkills);
+subscribeInfo.SetPriority(filter.getPriority());
+if (requiredPermission != null) {
+    subscribeInfo.SetPermission(requiredPermission);
+}
+</pre>
+</li>
+<li><b>JNI 调用订阅</b>：传递序列化的 MatchingSkills + 订阅 ID 到 C++ 层</li>
+<li><b>C++ 层创建 CommonEventSubscriber</b>：保存订阅 ID 和 IIntentReceiver 的 JNI 引用</li>
+<li><b>注册到 CES</b>：<code>CommonEventManager::SubscribeCommonEvent(subscriber)</code></li>
+<li><b>返回 sticky Intent</b>：如果有匹配的 sticky 事件，查询 <code>GetStickyCommonEvent()</code> 并转换返回</li>
+</ol>
+
+<h4>3.4.2 broadcastIntentWithFeature → CES.PublishCommonEvent</h4>
+
+<p>当 Android 应用调用 <code>sendBroadcast(intent)</code> 时：</p>
+
+<ol>
+<li><b>Intent → CommonEventData 转换</b>
+<pre>
+// Action 映射
+String ohAction = ActionMapper.androidToOH(intent.getAction());
+Want want;
+want.SetAction(ohAction);
+
+// Extras → Want Params
+if (intent.getExtras() != null) {
+    String json = bundleToJson(intent.getExtras());
+    want.SetParam("android_extras_json", json);
+}
+
+// Data URI → Want URI
+if (intent.getData() != null) {
+    want.SetUri(intent.getData().toString());
+}
+
+CommonEventData eventData;
+eventData.SetWant(want);
+eventData.SetCode(resultCode);
+eventData.SetData(resultData);
+</pre>
+</li>
+<li><b>发布参数转换</b>
+<pre>
+CommonEventPublishInfo publishInfo;
+publishInfo.SetOrdered(serialized);   // ordered broadcast
+publishInfo.SetSticky(sticky);        // sticky broadcast
+if (requiredPermissions != null) {
+    publishInfo.SetSubscriberPermissions(requiredPermissions);
+}
+</pre>
+</li>
+<li><b>JNI 调用发布</b></li>
+<li><b>C++ 层调用</b>：<code>CommonEventManager::PublishCommonEvent(eventData, publishInfo)</code></li>
+</ol>
+
+<h4>3.4.3 OH CommonEvent → IIntentReceiver.performReceive (反向回调)</h4>
+
+<p>当 CES 投递事件给 Adapter 的 CommonEventSubscriber 时：</p>
+
+<ol>
+<li><b>C++ OnReceiveEvent 回调触发</b>：Adapter 的 CommonEventSubscriber 子类收到事件</li>
+<li><b>CommonEventData → Intent 转换</b>
+<pre>
+// Action 映射
+String androidAction = ActionMapper.ohToAndroid(want.GetAction());
+Intent intent = new Intent(androidAction);
+
+// Want params → Bundle extras
+String json = want.GetStringParam("android_extras_json");
+if (json != null) {
+    intent.putExtras(jsonToBundle(json));
+}
+
+// Want URI → Intent data
+if (!want.GetUri().empty()) {
+    intent.setData(Uri.parse(want.GetUri()));
+}
+</pre>
+</li>
+<li><b>JNI 回调到 Java</b>：调用 <code>CommonEventReceiverBridge.onCommonEventReceived(subscriptionId, intent, code, data, ordered, sticky)</code></li>
+<li><b>Java 层分发到 IIntentReceiver</b>
+<pre>
+IIntentReceiver receiver = mReceiverMap.get(subscriptionId);
+receiver.performReceive(intent, resultCode, resultData,
+    extras, ordered, sticky, sendingUser);
+</pre>
+</li>
+</ol>
+
+<h4>3.4.4 finishReceiver → CES.FinishReceiver</h4>
+
+<p>有序广播中，当 BroadcastReceiver 处理完毕调用 <code>PendingResult.finish()</code> 时：</p>
+
+<ol>
+<li>AMA 收到 <code>finishReceiver(who, resultCode, resultData, map, abortBroadcast)</code></li>
+<li>通过 JNI 调用 C++ <code>nativeFinishCommonEvent(subscriptionId, resultCode, resultData, abortEvent)</code></li>
+<li>C++ 层调用 <code>AsyncCommonEventResult::FinishCommonEvent()</code> 或设置结果并通知 CES</li>
+</ol>
+
+<h3>3.5 数据结构管理</h3>
+
+<h4>3.5.1 订阅管理 (Java 层)</h4>
+
+<p>在 <code>ActivityManagerAdapter</code> 中维护订阅映射：</p>
+
+<pre>
+// 订阅 ID → IIntentReceiver Binder (回调引用)
+private final Map&lt;Integer, IIntentReceiver&gt; mSubscriptionReceivers = new ConcurrentHashMap&lt;&gt;();
+
+// IIntentReceiver Binder → 订阅 ID (反向查找，用于 unregister)
+private final Map&lt;IBinder, Integer&gt; mReceiverToSubscription = new ConcurrentHashMap&lt;&gt;();
+
+// 订阅 ID → IntentFilter (用于有序广播结果路由)
+private final Map&lt;Integer, IntentFilter&gt; mSubscriptionFilters = new ConcurrentHashMap&lt;&gt;();
+
+// 有序广播状态：订阅 ID → PendingResult (finishReceiver 需要)
+private final Map&lt;Integer, OrderedBroadcastState&gt; mOrderedBroadcastState = new ConcurrentHashMap&lt;&gt;();
+
+// 自增订阅 ID
+private final AtomicInteger mNextSubscriptionId = new AtomicInteger(1);
+</pre>
+
+<h4>3.5.2 C++ 层订阅管理</h4>
+
+<pre>
+class OHCommonEventClient {
+    // subscriptionId → CommonEventSubscriber 实例
+    std::unordered_map&lt;int32_t, std::shared_ptr&lt;AdapterEventSubscriber&gt;&gt; subscribers_;
+
+    // 事件名映射表 (双向)
+    static const std::unordered_map&lt;std::string, std::string&gt; androidToOHActions_;
+    static const std::unordered_map&lt;std::string, std::string&gt; ohToAndroidActions_;
+};
+</pre>
+
+<h3>3.6 完整调用链路</h3>
+
+<h4>3.6.1 订阅流程（registerReceiver）</h4>
+
+<div class="diagram">
+Android App                 ActivityManagerAdapter              JNI / C++                    CES
+    │                              │                              │                           │
+    │ registerReceiver             │                              │                           │
+    │  (receiver, filter)          │                              │                           │
+    │─────────────────────────────>│                              │                           │
+    │                              │ 1. 分配 subscriptionId       │                           │
+    │                              │ 2. 保存 receiver → id 映射   │                           │
+    │                              │ 3. IntentFilter → actions[]  │                           │
+    │                              │                              │                           │
+    │                              │ nativeSubscribeCommonEvent   │                           │
+    │                              │  (id, ohActions[], priority, │                           │
+    │                              │   permission)                │                           │
+    │                              │─────────────────────────────>│                           │
+    │                              │                              │ 创建 MatchingSkills        │
+    │                              │                              │ 创建 SubscribeInfo         │
+    │                              │                              │ 创建 AdapterEventSubscriber│
+    │                              │                              │                           │
+    │                              │                              │ CommonEventManager         │
+    │                              │                              │  ::SubscribeCommonEvent()  │
+    │                              │                              │──────────────────────────>│
+    │                              │                              │                           │ 记录
+    │                              │                              │   return OK               │ 订阅
+    │                              │                              │<──────────────────────────│
+    │                              │   return subscriptionId      │                           │
+    │                              │<─────────────────────────────│                           │
+    │                              │                              │                           │
+    │                              │ 4. 查询 sticky 事件          │                           │
+    │                              │    nativeGetStickyEvent()    │                           │
+    │                              │─────────────────────────────>│                           │
+    │                              │                              │ GetStickyCommonEvent()    │
+    │                              │                              │──────────────────────────>│
+    │                              │   sticky Intent (or null)    │                           │
+    │                              │<─────────────────────────────│<──────────────────────────│
+    │  return sticky Intent        │                              │                           │
+    │<─────────────────────────────│                              │                           │
+</div>
+
+<h4>3.6.2 事件接收流程（OH → Android App）</h4>
+
+<div class="diagram">
+CES                         C++ AdapterEventSubscriber    JNI Callback              AMA (Java)          Android App
+ │                              │                           │                        │                      │
+ │ NotifyEvent                  │                           │                        │                      │
+ │  (CommonEventData,           │                           │                        │                      │
+ │   ordered, sticky)           │                           │                        │                      │
+ │─────────────────────────────>│                           │                        │                      │
+ │                              │ OnReceiveEvent(data)      │                        │                      │
+ │                              │   ↓                       │                        │                      │
+ │                              │ 1. Want → Intent 数据准备  │                        │                      │
+ │                              │ 2. OH action → Android    │                        │                      │
+ │                              │    action 映射             │                        │                      │
+ │                              │                           │                        │                      │
+ │                              │ callbackOnEventReceived   │                        │                      │
+ │                              │  (subscriptionId,         │                        │                      │
+ │                              │   androidAction,          │                        │                      │
+ │                              │   extrasJson, uri,        │                        │                      │
+ │                              │   code, data,             │                        │                      │
+ │                              │   ordered, sticky)        │                        │                      │
+ │                              │──────────────────────────>│                        │                      │
+ │                              │                           │ onCommonEventReceived  │                      │
+ │                              │                           │──────────────────────>│                      │
+ │                              │                           │                        │ 1. 构造 Intent        │
+ │                              │                           │                        │ 2. 查找 receiver      │
+ │                              │                           │                        │    by subscriptionId  │
+ │                              │                           │                        │ 3. 调用 performReceive│
+ │                              │                           │                        │                      │
+ │                              │                           │                        │ IIntentReceiver      │
+ │                              │                           │                        │  .performReceive(    │
+ │                              │                           │                        │   intent, code, data,│
+ │                              │                           │                        │   extras, ordered,   │
+ │                              │                           │                        │   sticky, userId)    │
+ │                              │                           │                        │─────────────────────>│
+ │                              │                           │                        │                      │ onReceive()
+ │                              │                           │                        │                      │
+</div>
+
+<h4>3.6.3 发送广播流程（Android App → OH）</h4>
+
+<div class="diagram">
+Android App          AMA (Java)                  JNI / C++                    CES
+    │                    │                           │                          │
+    │ sendBroadcast      │                           │                          │
+    │  (intent)          │                           │                          │
+    │───────────────────>│                           │                          │
+    │                    │ 1. Intent.action →        │                          │
+    │                    │    OH action 映射          │                          │
+    │                    │ 2. extras → JSON          │                          │
+    │                    │                           │                          │
+    │                    │ nativePublishCommonEvent   │                          │
+    │                    │  (ohAction, extrasJson,   │                          │
+    │                    │   uri, code, data,        │                          │
+    │                    │   ordered, sticky,        │                          │
+    │                    │   permissions[])           │                          │
+    │                    │──────────────────────────>│                          │
+    │                    │                           │ 1. 构造 Want             │
+    │                    │                           │ 2. 构造 CommonEventData  │
+    │                    │                           │ 3. 构造 PublishInfo      │
+    │                    │                           │                          │
+    │                    │                           │ PublishCommonEvent()     │
+    │                    │                           │─────────────────────────>│
+    │                    │                           │                          │ 匹配订阅者
+    │                    │                           │   return OK             │ 分发事件
+    │                    │                           │<─────────────────────────│
+    │                    │   return 0                │                          │
+    │                    │<──────────────────────────│                          │
+    │  return 0          │                           │                          │
+    │<───────────────────│                           │                          │
+</div>
+
+<h3>3.7 有序广播适配</h3>
+
+<p>有序广播是适配的难点，因为 Android 和 OH 的有序机制存在差异：</p>
+
+<table>
+<tr><th>差异点</th><th>Android</th><th>OH</th></tr>
+<tr><td>完成通知</td><td><code>finishReceiver()</code> IPC 到 AMS</td><td><code>AsyncCommonEventResult</code> 或自动完成</td></tr>
+<tr><td>中止机制</td><td><code>abortBroadcast()</code></td><td><code>AbortCommonEvent()</code></td></tr>
+<tr><td>结果传递</td><td>resultCode + resultData + resultExtras</td><td>code + data（无 extras 链式传递）</td></tr>
+<tr><td>最终接收者</td><td>sender 提供 resultReceiver</td><td>不直接支持</td></tr>
+</table>
+
+<h4>3.7.1 有序广播处理方案</h4>
+
+<div class="info">
+<b>核心思路：</b>Adapter 层在 C++ 端使用 OH 有序事件机制（GoAsyncCommonEvent），在完成通知路径上桥接 Android 的 finishReceiver 语义。
+</div>
+
+<p><b>订阅有序事件：</b></p>
+<ul>
+<li>C++ <code>AdapterEventSubscriber</code> 在 <code>OnReceiveEvent()</code> 中：
+<ul>
+<li>检测 <code>ordered == true</code>，调用 <code>GoAsyncCommonEvent()</code> 获取 <code>AsyncCommonEventResult</code></li>
+<li>保存 <code>AsyncCommonEventResult</code> 到 <code>mOrderedBroadcastState[subscriptionId]</code></li>
+<li>回调 Java 层时传递 <code>ordered=true</code></li>
+</ul>
+</li>
+</ul>
+
+<p><b>finishReceiver 桥接：</b></p>
+<ul>
+<li>Java 层 <code>finishReceiver(who, resultCode, resultData, map, abortBroadcast)</code> 被调用</li>
+<li>查找 <code>who</code> (IBinder) → <code>subscriptionId</code></li>
+<li>JNI 调用 <code>nativeFinishCommonEvent(subscriptionId, resultCode, resultData, abortEvent)</code></li>
+<li>C++ 层从 <code>mOrderedBroadcastState</code> 取出 <code>AsyncCommonEventResult</code></li>
+<li>设置 code/data，若 abort 则调用 <code>AbortCommonEvent()</code></li>
+<li>调用 <code>AsyncCommonEventResult::FinishCommonEvent()</code>，CES 继续投递下一个订阅者</li>
+</ul>
+
+<p><b>最终接收者（resultReceiver）：</b></p>
+<ul>
+<li>Android 发送有序广播时的 <code>resultTo</code>（IIntentReceiver）在 Adapter 层保存</li>
+<li>Adapter 发布有序事件时附带一个自身的 <code>CommonEventListener</code> 作为"最终回调"</li>
+<li>CES 有序分发全部完成后，回调此 listener，Adapter 再调用 <code>resultTo.performReceive()</code></li>
+</ul>
+
+<h3>3.8 粘性广播适配</h3>
+
+<table>
+<tr><th>场景</th><th>处理方式</th></tr>
+<tr>
+  <td><code>sendStickyBroadcast(intent)</code></td>
+  <td>调用 <code>PublishCommonEvent()</code> 时设置 <code>publishInfo.SetSticky(true)</code></td>
+</tr>
+<tr>
+  <td><code>registerReceiver()</code> 返回 sticky Intent</td>
+  <td>注册完成后调用 <code>GetStickyCommonEvent(event)</code> 获取缓存事件，转换为 Intent 返回</td>
+</tr>
+<tr>
+  <td><code>removeStickyBroadcast(intent)</code></td>
+  <td>调用 <code>RemoveStickyCommonEvent(action)</code></td>
+</tr>
+</table>
+
+<h3>3.9 权限适配</h3>
+
+<table>
+<tr><th>Android 权限场景</th><th>OH 适配</th></tr>
+<tr>
+  <td>发送广播时要求接收方权限：<code>sendBroadcast(intent, permission)</code></td>
+  <td><code>publishInfo.SetSubscriberPermissions({permission})</code></td>
+</tr>
+<tr>
+  <td>注册时要求发送方权限：<code>registerReceiver(rcvr, filter, permission, handler)</code></td>
+  <td><code>subscribeInfo.SetPermission(permission)</code></td>
+</tr>
+</table>
+
+<div class="note">
+<b>权限名映射：</b>Android 权限名（如 <code>android.permission.RECEIVE_SMS</code>）需要映射到 OH 权限名
+（如 <code>ohos.permission.RECEIVE_SMS</code>）。无法直接映射的权限，由 Adapter 层在回调时自行做权限过滤。
+</div>
+
+<h3>3.10 自定义广播（App-to-App）适配</h3>
+
+<p>Android 应用之间的自定义广播（非系统广播）也需要支持：</p>
+
+<ul>
+<li><b>发送</b>：自定义 Action（如 <code>com.example.MY_ACTION</code>）映射为 OH 事件名 <code>adapter.custom.com.example.MY_ACTION</code></li>
+<li><b>订阅</b>：IntentFilter 中的自定义 Action 同样加 <code>adapter.custom.</code> 前缀后订阅到 CES</li>
+<li><b>限制</b>：仅适配层内的 Android 应用之间可互通自定义广播。OH 原生应用不会收到这些事件（除非显式订阅带 <code>adapter.custom.</code> 前缀的事件）</li>
+</ul>
+
+<h3>3.11 Intent extras 与 Want params 转换</h3>
+
+<p>Android Intent extras（Bundle）与 OH Want params 的数据格式不同，通过 JSON 序列化桥接：</p>
+
+<pre>
+// Android → OH（发送方）
+Bundle extras = intent.getExtras();
+String json = BundleJsonConverter.toJson(extras);
+want.SetParam("android_extras_json", json);
+
+// OH → Android（接收方）
+String json = want.GetStringParam("android_extras_json");
+Bundle extras = BundleJsonConverter.fromJson(json);
+intent.putExtras(extras);
+</pre>
+
+<p>对于已知系统广播的特定 extras key，进行原生 Want param 映射：</p>
+
+<pre>
+// 例如 BATTERY_CHANGED
+// Android extras: "level"=80, "scale"=100, "status"=2
+// OH Want params: want.SetParam("level", 80), want.SetParam("scale", 100), ...
+// 通过 EventDataMapper 类根据 action 做专门映射
+</pre>
+
+<!-- ============================================================ -->
+<h2>第四部分：文件清单与修改范围</h2>
+<!-- ============================================================ -->
+
+<h3>4.1 新增文件</h3>
+
+<table>
+<tr><th>文件路径</th><th>说明</th></tr>
+<tr>
+  <td><code>framework/broadcast/java/BroadcastEventConverter.java</code></td>
+  <td>Action 名称映射表 + Intent ↔ CommonEventData 转换 + extras 转换</td>
+</tr>
+<tr>
+  <td><code>framework/broadcast/java/CommonEventReceiverBridge.java</code></td>
+  <td>OH 事件 → Android IIntentReceiver 反向回调桥接</td>
+</tr>
+<tr>
+  <td><code>framework/broadcast/jni/oh_common_event_client.h</code></td>
+  <td>C++ OH CES IPC 客户端头文件</td>
+</tr>
+<tr>
+  <td><code>framework/broadcast/jni/oh_common_event_client.cpp</code></td>
+  <td>C++ OH CES IPC 客户端实现：订阅/取消/发布/finish</td>
+</tr>
+<tr>
+  <td><code>framework/broadcast/jni/common_event_subscriber_adapter.h</code></td>
+  <td>C++ AdapterEventSubscriber：继承 CommonEventSubscriber，回调 JNI</td>
+</tr>
+<tr>
+  <td><code>framework/broadcast/jni/common_event_subscriber_adapter.cpp</code></td>
+  <td>OnReceiveEvent → JNI → Java 回调实现</td>
+</tr>
+</table>
+
+<h3>4.2 修改文件</h3>
+
+<table>
+<tr><th>文件路径</th><th>修改内容</th></tr>
+<tr>
+  <td><code>framework/activity/java/ActivityManagerAdapter.java</code></td>
+  <td>6 个 [STUB] → [BRIDGED]：registerReceiverWithFeature, unregisterReceiver, broadcastIntentWithFeature, broadcastIntent, finishReceiver, unbroadcastIntent</td>
+</tr>
+<tr>
+  <td><code>framework/core/jni/adapter_bridge.cpp</code></td>
+  <td>新增 6 个 JNI 方法 + 反向回调入口</td>
+</tr>
+<tr>
+  <td><code>framework/CMakeLists.txt</code></td>
+  <td>新增 oh_common_event_client.cpp, common_event_subscriber_adapter.cpp；链接 CES 库</td>
+</tr>
+<tr>
+  <td><code>build/Android.bp</code></td>
+  <td>新增源文件引用</td>
+</tr>
+</table>
+
+<h3>4.3 不需要修改的 OH 系统文件</h3>
+
+<div class="ok">
+<b>本方案无需修改 OH CES 系统源码。</b><br>
+CES 的 SubscribeCommonEvent / PublishCommonEvent / FinishReceiver 等 IPC 接口完全满足需求。
+Adapter 作为普通 CES 客户端订阅和发布事件，与 OH 原生应用使用相同的公共接口。
+</div>
+
+<!-- ============================================================ -->
+<h2>第五部分：JNI 接口设计</h2>
+<!-- ============================================================ -->
+
+<h3>5.1 Java Native 方法声明</h3>
+
+<p>在 <code>ActivityManagerAdapter.java</code> 中新增：</p>
+
+<pre>
+// Subscribe to OH CommonEvent (one subscription per call)
+private static native int nativeSubscribeCommonEvent(
+    int subscriptionId,        // Adapter 分配的订阅 ID
+    String[] ohEventNames,     // MatchingSkills 事件名数组 (已映射为 OH 名)
+    int priority,              // 优先级
+    String permission          // 要求发布者持有的权限 (可 null)
+);
+
+// Unsubscribe from OH CommonEvent
+private static native int nativeUnsubscribeCommonEvent(int subscriptionId);
+
+// Publish OH CommonEvent
+private static native int nativePublishCommonEvent(
+    String ohAction,           // OH 事件名 (已映射)
+    String extrasJson,         // Intent extras 序列化 JSON
+    String uri,                // Intent data URI (可 null)
+    int code,                  // Result code
+    String data,               // Result data (可 null)
+    boolean ordered,           // 是否有序
+    boolean sticky,            // 是否粘性
+    String[] subscriberPermissions  // 要求接收者持有的权限数组 (可 null)
+);
+
+// Finish ordered event processing
+private static native int nativeFinishCommonEvent(
+    int subscriptionId,        // 完成的订阅 ID
+    int resultCode,            // 结果码
+    String resultData,         // 结果数据
+    boolean abortEvent         // 是否中止后续接收者
+);
+
+// Query sticky event
+private static native String nativeGetStickyCommonEvent(
+    String ohEventName         // OH 事件名
+);  // 返回 JSON 格式的事件数据，null 表示无粘性事件
+</pre>
+
+<h3>5.2 反向回调（C++ → Java）</h3>
+
+<p>C++ 层收到 OH 事件后通过 JNI 回调 Java：</p>
+
+<pre>
+// Java 端静态方法（在 CommonEventReceiverBridge 或 ActivityManagerAdapter 中）
+static void onCommonEventReceived(
+    int subscriptionId,        // 订阅 ID（用于查找 IIntentReceiver）
+    String androidAction,      // 已映射回 Android 的 Action
+    String extrasJson,         // extras JSON
+    String uri,                // data URI
+    int code,                  // 事件 code
+    String data,               // 事件 data
+    boolean ordered,           // 是否有序
+    boolean sticky             // 是否粘性
+);
+</pre>
+
+<p>C++ 端缓存 Java 方法 ID：</p>
+
+<pre>
+// 在 AdapterBridge::initialize() 中缓存
+jclass cesClass = env-&gt;FindClass("adapter/broadcast/CommonEventReceiverBridge");
+jmethodID onEventMethod = env-&gt;GetStaticMethodID(cesClass,
+    "onCommonEventReceived",
+    "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;ZZ)V");
+</pre>
+
+<!-- ============================================================ -->
+<h2>第六部分：核心类设计</h2>
+<!-- ============================================================ -->
+
+<h3>6.1 BroadcastEventConverter.java</h3>
+
+<pre>
+package adapter.broadcast;
+
+/**
+ * Bidirectional converter between Android broadcast Actions and OH CommonEvent names.
+ * Also handles Intent extras &lt;-&gt; Want params conversion for known system events.
+ */
+public class BroadcastEventConverter {
+
+    // Android Action -&gt; OH Event Name
+    private static final Map&lt;String, String&gt; ANDROID_TO_OH = new HashMap&lt;&gt;();
+    // OH Event Name -&gt; Android Action
+    private static final Map&lt;String, String&gt; OH_TO_ANDROID = new HashMap&lt;&gt;();
+
+    static {
+        mapAction("android.intent.action.BOOT_COMPLETED",         "usual.event.BOOT_COMPLETED");
+        mapAction("android.intent.action.BATTERY_CHANGED",        "usual.event.BATTERY_CHANGED");
+        mapAction("android.intent.action.BATTERY_LOW",            "usual.event.BATTERY_LOW");
+        mapAction("android.intent.action.BATTERY_OKAY",           "usual.event.BATTERY_OKAY");
+        mapAction("android.intent.action.POWER_CONNECTED",        "usual.event.POWER_CONNECTED");
+        mapAction("android.intent.action.POWER_DISCONNECTED",     "usual.event.POWER_DISCONNECTED");
+        mapAction("android.intent.action.SCREEN_ON",              "usual.event.SCREEN_ON");
+        mapAction("android.intent.action.SCREEN_OFF",             "usual.event.SCREEN_OFF");
+        mapAction("android.intent.action.USER_PRESENT",           "usual.event.USER_PRESENT");
+        mapAction("android.intent.action.TIME_TICK",              "usual.event.TIME_TICK");
+        mapAction("android.intent.action.TIME_SET",               "usual.event.TIME_CHANGED");
+        mapAction("android.intent.action.TIMEZONE_CHANGED",       "usual.event.TIMEZONE_CHANGED");
+        mapAction("android.intent.action.DATE_CHANGED",           "usual.event.DATE_CHANGED");
+        mapAction("android.net.conn.CONNECTIVITY_CHANGE",         "usual.event.CONNECTIVITY_CHANGE");
+        mapAction("android.net.wifi.STATE_CHANGE",                "usual.event.WIFI_CONN_STATE");
+        mapAction("android.net.wifi.WIFI_STATE_CHANGED",          "usual.event.WIFI_POWER_STATE");
+        mapAction("android.bluetooth.adapter.action.STATE_CHANGED","usual.event.BLUETOOTH_HOST_STATE_UPDATE");
+        mapAction("android.intent.action.AIRPLANE_MODE",          "usual.event.AIRPLANE_MODE_CHANGED");
+        mapAction("android.intent.action.PACKAGE_ADDED",          "usual.event.PACKAGE_ADDED");
+        mapAction("android.intent.action.PACKAGE_REMOVED",        "usual.event.PACKAGE_REMOVED");
+        mapAction("android.intent.action.LOCALE_CHANGED",         "usual.event.LOCALE_CHANGED");
+        mapAction("android.intent.action.CONFIGURATION_CHANGED",  "usual.event.CONFIGURATION_CHANGED");
+        mapAction("android.intent.action.CLOSE_SYSTEM_DIALOGS",   "usual.event.CLOSE_SYSTEM_DIALOGS");
+        mapAction("android.intent.action.USER_SWITCHED",          "usual.event.USER_SWITCHED");
+        mapAction("android.intent.action.DEVICE_STORAGE_LOW",     "usual.event.DEVICE_STORAGE_LOW");
+        mapAction("android.intent.action.DEVICE_STORAGE_OK",      "usual.event.DEVICE_STORAGE_OK");
+        // ... 可按需扩展
+    }
+
+    private static void mapAction(String android, String oh) {
+        ANDROID_TO_OH.put(android, oh);
+        OH_TO_ANDROID.put(oh, android);
+    }
+
+    /** Map Android broadcast Action to OH event name. Custom actions get "adapter.custom." prefix. */
+    public static String androidActionToOH(String androidAction) { ... }
+
+    /** Map OH event name to Android broadcast Action. */
+    public static String ohEventToAndroid(String ohEvent) { ... }
+
+    /** Convert Android IntentFilter actions to OH event name array. */
+    public static String[] filterActionsToOH(IntentFilter filter) { ... }
+}
+</pre>
+
+<h3>6.2 OHCommonEventClient (C++)</h3>
+
+<pre>
+class OHCommonEventClient {
+public:
+    static OHCommonEventClient&amp; getInstance();
+
+    int subscribe(int32_t subscriptionId, const std::vector&lt;std::string&gt;&amp; events,
+                  int32_t priority, const std::string&amp; permission);
+
+    int unsubscribe(int32_t subscriptionId);
+
+    int publish(const std::string&amp; event, const std::string&amp; extrasJson,
+                const std::string&amp; uri, int32_t code, const std::string&amp; data,
+                bool ordered, bool sticky,
+                const std::vector&lt;std::string&gt;&amp; subscriberPermissions);
+
+    int finishReceiver(int32_t subscriptionId, int32_t code,
+                       const std::string&amp; data, bool abortEvent);
+
+    std::string getStickyEvent(const std::string&amp; event);
+
+private:
+    std::mutex mutex_;
+    std::unordered_map&lt;int32_t, std::shared_ptr&lt;AdapterEventSubscriber&gt;&gt; subscribers_;
+};
+</pre>
+
+<h3>6.3 AdapterEventSubscriber (C++)</h3>
+
+<pre>
+class AdapterEventSubscriber : public OHOS::EventFwk::CommonEventSubscriber {
+public:
+    AdapterEventSubscriber(const OHOS::EventFwk::CommonEventSubscribeInfo&amp; info,
+                           int32_t subscriptionId);
+
+    void OnReceiveEvent(const OHOS::EventFwk::CommonEventData&amp; data) override;
+
+private:
+    int32_t subscriptionId_;
+    // For ordered events: stored async result handle
+    std::shared_ptr&lt;OHOS::EventFwk::AsyncCommonEventResult&gt; asyncResult_;
+};
+</pre>
+
+<!-- ============================================================ -->
+<h2>第七部分：实施计划</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>阶段</th><th>工作项</th><th>估算</th></tr>
+<tr>
+  <td>Phase 1：基础订阅/发布</td>
+  <td>BroadcastEventConverter 映射表 + OHCommonEventClient + AdapterEventSubscriber +
+  JNI 方法 + AMA registerReceiver/broadcastIntent 桥接实现</td>
+  <td>1.5 人周</td>
+</tr>
+<tr>
+  <td>Phase 2：反向回调</td>
+  <td>CommonEventReceiverBridge + C++ → JNI 回调 + IIntentReceiver.performReceive() 调用链路</td>
+  <td>1 人周</td>
+</tr>
+<tr>
+  <td>Phase 3：有序广播</td>
+  <td>GoAsyncCommonEvent 集成 + finishReceiver 桥接 + 结果传递 + abortBroadcast</td>
+  <td>1 人周</td>
+</tr>
+<tr>
+  <td>Phase 4：粘性广播 + extras 映射</td>
+  <td>GetStickyCommonEvent + RemoveStickyCommonEvent + 已知系统事件 extras 专项映射</td>
+  <td>0.5 人周</td>
+</tr>
+<tr>
+  <td>Phase 5：测试</td>
+  <td>系统事件接收测试 + 自定义广播测试 + 有序广播测试 + 粘性广播测试</td>
+  <td>0.5 人周</td>
+</tr>
+<tr>
+  <td><b>合计</b></td>
+  <td></td>
+  <td><b>4.5 人周</b></td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>第八部分：风险与缓解</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>风险</th><th>影响</th><th>缓解措施</th></tr>
+<tr>
+  <td>IntentFilter 的 Data Host/Path/Type 匹配在 OH MatchingSkills 中不支持</td>
+  <td>部分精细过滤失效，接收者收到不应收到的事件</td>
+  <td>Adapter 层在 Java 回调路径上做二次过滤：收到事件后检查完整 IntentFilter 匹配，不匹配则丢弃</td>
+</tr>
+<tr>
+  <td>系统事件 extras 格式差异</td>
+  <td>Android 应用读取 extras 时 key/type 不匹配</td>
+  <td>对高频系统事件（BATTERY_CHANGED、CONNECTIVITY_CHANGE 等）编写专用 EventDataMapper，精确转换每个 extra 字段</td>
+</tr>
+<tr>
+  <td>Android 权限名与 OH 权限名不同</td>
+  <td>权限过滤可能不生效</td>
+  <td>维护权限映射表；无法映射时在 Adapter 层做本地权限检查</td>
+</tr>
+<tr>
+  <td>有序广播 resultExtras (Bundle) 链式传递</td>
+  <td>OH 有序事件仅支持 code + data 传递，不支持 extras 链式修改</td>
+  <td>Adapter 层本地维护 extras 传递状态。每个接收者的 setResultExtras 保存在 Adapter 的 OrderedBroadcastState 中，下一个接收者的 performReceive 使用上一个的 extras</td>
+</tr>
+<tr>
+  <td>Manifest 静态注册的 BroadcastReceiver</td>
+  <td>Android 应用的 AndroidManifest.xml 中声明的静态 receiver 不经过 registerReceiver()</td>
+  <td>Adapter 启动时解析 AndroidManifest，提取静态 receiver 声明，自动注册到 CES。或利用 OH StaticSubscriberExtension 机制</td>
+</tr>
+<tr>
+  <td>大量 Android 应用注册相同 Action 的性能</td>
+  <td>每个 registerReceiver 都产生一个 CES 订阅</td>
+  <td>Adapter 层合并相同 Action 的订阅：多个 IIntentReceiver 共享一个 CES 订阅，由 Adapter 做本地分发</td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>第九部分：实现状态</h2>
+<!-- ============================================================ -->
+
+<p class="version">更新日期：2026年3月11日</p>
+
+<table>
+<tr><th>阶段</th><th>工作项</th><th>状态</th><th>文件</th></tr>
+<tr>
+  <td rowspan="4">Phase 1：基础订阅/发布</td>
+  <td>BroadcastEventConverter 映射表（40+ 系统 Action 双向映射）</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>BroadcastEventConverter.java</code></td>
+</tr>
+<tr>
+  <td>OHCommonEventClient C++ 客户端（subscribe/unsubscribe/publish/finish/getStickyEvent）</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>oh_common_event_client.h/cpp</code></td>
+</tr>
+<tr>
+  <td>JNI 方法（5 个：subscribe/unsubscribe/publish/finish/getStickyEvent）</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>adapter_bridge.cpp</code></td>
+</tr>
+<tr>
+  <td>AMA 6 个 [STUB]→[BRIDGED]：registerReceiver, unregisterReceiver, broadcastIntent, broadcastIntentWithFeature, unbroadcastIntent, finishReceiver</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ActivityManagerAdapter.java</code></td>
+</tr>
+<tr>
+  <td rowspan="2">Phase 2：反向回调</td>
+  <td>AdapterEventSubscriber C++（继承 CommonEventSubscriber，JNI 回调）</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>common_event_subscriber_adapter.h/cpp</code></td>
+</tr>
+<tr>
+  <td>CommonEventReceiverBridge Java（OH 事件 → IIntentReceiver.performReceive）</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>CommonEventReceiverBridge.java</code></td>
+</tr>
+<tr>
+  <td>Phase 3：有序广播</td>
+  <td>GoAsyncCommonEvent + finishReceiver 桥接 + abort 支持</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>oh_common_event_client.cpp + adapter_bridge.cpp</code></td>
+</tr>
+<tr>
+  <td>Phase 4：粘性广播</td>
+  <td>GetStickyCommonEvent 查询 + registerReceiver 返回 sticky Intent</td>
+  <td style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ActivityManagerAdapter.java + oh_common_event_client.cpp</code></td>
+</tr>
+<tr>
+  <td rowspan="3">待完善</td>
+  <td>已知系统事件 extras 专项映射（BATTERY_CHANGED 等字段级映射）</td>
+  <td style="background:#fff3e0;">⏳ 待实现</td>
+  <td>需扩展 BroadcastEventConverter</td>
+</tr>
+<tr>
+  <td>有序广播 resultReceiver（最终接收者）支持</td>
+  <td style="background:#fff3e0;">⏳ 待实现</td>
+  <td>需在发布路径中注册临时订阅</td>
+</tr>
+<tr>
+  <td>IntentFilter 二次过滤（data host/path/type）</td>
+  <td style="background:#fff3e0;">⏳ 待实现</td>
+  <td>在 CommonEventReceiverBridge 中校验完整 IntentFilter</td>
+</tr>
+</table>
+
+</body>
+</html>

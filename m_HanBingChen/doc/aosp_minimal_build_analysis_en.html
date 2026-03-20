@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOSP 14 Minimal Build Analysis Report — App Runtime Trimming Strategy</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+    --include: #2e7d32;
+    --exclude: #c62828;
+    --optional: #ef6c00;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(90deg, #e3f2fd, transparent); padding: 10px 16px; border-radius: 4px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #f0f7ff, transparent); padding: 6px 12px; border-radius: 0 4px 4px 0; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #1565c0, #00695c); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; font-size: 2.2em; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-include { background: var(--include); }
+  .tag-exclude { background: var(--exclude); }
+  .tag-optional { background: var(--optional); }
+  .tag-dep { background: #5c6bc0; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.78em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>AOSP 14 Minimal Build Analysis Report</h1>
+  <p>App Runtime Trimming Strategy for the Android-OH Adapter Project</p>
+  <p>Version 1.0 | March 18, 2026 | Adapter Team</p>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <ul>
+    <li><a href="#ch1">1. Background and Objectives</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 Background</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 Trimming Objectives</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 Server Environment</a></li>
+    <li><a href="#ch2">2. AOSP 14 Build System Analysis</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 AOSP Source Top-Level Structure</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 Framework Build Target Hierarchy</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 Natural Client-Server Separation</a></li>
+    <li><a href="#ch3">3. Module Trimming Analysis</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 Required Modules</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 Excluded Modules</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 Optional Modules</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 Trimming Overview Diagram</a></li>
+    <li><a href="#ch4">4. Required Modules Detailed Analysis</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 Framework Client (frameworks/base/core)</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 ART Virtual Machine (art/)</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 Java Core Libraries (libcore/)</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 C Runtime (bionic/)</a></li>
+    <li class="sub"><a href="#ch4-5">4.5 Native Framework Libraries (frameworks/native/)</a></li>
+    <li class="sub"><a href="#ch4-6">4.6 System Base Libraries (system/)</a></li>
+    <li class="sub"><a href="#ch4-7">4.7 Prebuilt Toolchains (prebuilts/)</a></li>
+    <li><a href="#ch5">5. Excluded Modules Detailed Analysis</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 System Services (frameworks/base/services/)</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 System Apps (packages/)</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 HAL Layer (hardware/)</a></li>
+    <li><a href="#ch6">6. Adapter Layer Integration Points with AOSP</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 AOSP Source Modification Points</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 Adapter Layer Build Integration</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 Relationship Between app_process and appspawn-x</a></li>
+    <li><a href="#ch7">7. Build Strategy</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 Option A: Module-Level On-Demand Build</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 Option B: Custom Product</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 Comparison and Recommendation</a></li>
+    <li><a href="#ch8">8. Build Artifact Inventory</a></li>
+    <li><a href="#ch9">9. Conclusion</a></li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch1">1. Background and Objectives</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch1-1">1.1 Background</h2>
+
+<p>The core architecture of the Android-OH adapter project is: running Android Apps on an OH system while retaining the Android Framework client-side code and ART virtual machine, but replacing system services with OH implementations. Therefore, we need to build a <strong>subset of AOSP containing only the App runtime</strong>, excluding system_server and all the system services it hosts.</p>
+
+<p>This report analyzes the source code structure and build system of AOSP 14 (android-14.0.0_r1), identifies which modules need to be compiled and which can be excluded, and provides build strategy recommendations.</p>
+
+<h2 id="ch1-2">1.2 Trimming Objectives</h2>
+
+<div class="card">
+  <h4>To Retain (Runs Within App Process)</h4>
+  <ul>
+    <li>ART Virtual Machine — Dex bytecode loading and execution, JIT/AOT compilation, GC, JNI</li>
+    <li>Framework Client Code — ActivityThread, View system, Intent, all AIDL-generated Stub/Proxy classes</li>
+    <li>Framework Native Libraries — libandroid_runtime (JNI bridge), Binder client, Surface client</li>
+    <li>Java Core Libraries — java.lang.*, java.util.*, java.io.*, etc.</li>
+    <li>C Runtime — libc, libm, dynamic linker</li>
+    <li>System Resources — framework-res.apk</li>
+  </ul>
+
+  <h4>To Exclude (Replaced by OH System Services)</h4>
+  <ul>
+    <li>system_server process and all system services (AMS, WMS, PMS, etc.)</li>
+    <li>System apps (SystemUI, Launcher, Settings, etc.)</li>
+    <li>HAL service layer</li>
+  </ul>
+</div>
+
+<h2 id="ch1-3">1.3 Server Environment</h2>
+
+<p>Analysis is based on the following cloud server environment (<code>oh-build</code>, 1.95.175.212):</p>
+
+<table>
+  <tr><th>Item</th><th>Status</th><th>Details</th></tr>
+  <tr><td>Operating System</td><td>✅</td><td>Ubuntu 20.04.6 LTS</td></tr>
+  <tr><td>CPU</td><td>✅</td><td>16 cores</td></tr>
+  <tr><td>Memory</td><td>✅</td><td>60 GB</td></tr>
+  <tr><td>Disk</td><td>✅</td><td>493 GB (95G used, 378G available)</td></tr>
+  <tr><td>JDK</td><td>✅</td><td>OpenJDK 11.0.27</td></tr>
+  <tr><td>GCC/G++</td><td>✅</td><td>9.4.0</td></tr>
+  <tr><td>repo</td><td>✅</td><td>2.8</td></tr>
+  <tr><td>AOSP Source</td><td>✅</td><td><code>/root/aosp</code>, android-14.0.0_r1</td></tr>
+  <tr><td>Build Dependencies</td><td>✅</td><td>libncurses, libssl, flex, bison, zip, zlib1g-dev, etc. all ready</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h1 id="ch2">2. AOSP 14 Build System Analysis</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch2-1">2.1 AOSP Source Top-Level Structure</h2>
+
+<p>The AOSP 14 source code on the server is located at <code>/root/aosp/</code>, containing the following core directories:</p>
+
+<div class="diagram">
+/root/aosp/
+├── art/                  # ART virtual machine runtime
+├── bionic/               # Android C runtime (libc, libm, linker)
+├── build/                # Build system (Soong/Blueprint)
+├── external/             # Third-party dependency libraries
+├── frameworks/           # Android Framework
+│   ├── base/             #   Core framework (Java + JNI + resources)
+│   └── native/           #   Native framework libraries (Binder, Surface, Input)
+├── libcore/              # Java core libraries (java.lang.*, java.util.*)
+├── libnativehelper/      # JNI helper library
+├── prebuilts/            # Prebuilt toolchains (Clang, JDK, SDK tools)
+└── system/               # System base libraries (libbase, liblog, libutils)
+</div>
+
+<h2 id="ch2-2">2.2 Framework Build Target Hierarchy</h2>
+
+<p>The AOSP 14 Framework build defines a clear hierarchy in <code>frameworks/base/Android.bp</code>:</p>
+
+<div class="card">
+  <table>
+    <tr><th>Level</th><th>Build Target</th><th>Type</th><th>Description</th></tr>
+    <tr>
+      <td>1</td>
+      <td><code>framework-core-sources</code></td>
+      <td>filegroup</td>
+      <td>Core source collection: all <code>*.java</code> + <code>*.aidl</code> files under <code>core/java/</code>, including android.app.*, android.view.*, android.content.*, android.os.*, and all other client APIs</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>framework-non-updatable-sources</code></td>
+      <td>filegroup</td>
+      <td>Aggregates framework-core-sources + domain sources (graphics, telephony, media, wifi, location, opengl, etc.) + native/HAL AIDL interfaces</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>framework-minus-apex-defaults</code></td>
+      <td>java_defaults</td>
+      <td>Build configuration: compiles framework-non-updatable-sources, enables AIDL processing (<code>generate_get_transaction_name: true</code>)</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>framework-minus-apex</code></td>
+      <td>java_library<br>(installable)</td>
+      <td><strong>The actual framework.jar</strong>, installed on device. Uses <code>stem: "framework"</code>. This is the <strong>client-side Framework</strong> — contains no system service code</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>framework</code></td>
+      <td>java_library<br>(not installable)</td>
+      <td>Compile-time dependency target: framework-minus-apex + framework-updatable-stubs. Used only for other modules to reference during compilation</td>
+    </tr>
+  </table>
+</div>
+
+<div class="info">
+  <strong>Key Finding:</strong> <code>framework-minus-apex</code> is the final artifact <code>framework.jar</code>, and it <strong>contains only client-side code</strong>. System services (services.jar) are a completely independent build target, defined in <code>frameworks/base/services/Android.bp</code>. There is no compile-time dependency between the two.
+</div>
+
+<h2 id="ch2-3">2.3 Natural Client-Server Separation</h2>
+
+<p>The AOSP 14 build system naturally separates the App runtime and system services into two independent JARs:</p>
+
+<div class="diagram">
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        AOSP 14 Build Targets                            │
+│                                                                         │
+│  ┌─ Client Side (Runs Within App Process) ─────────────────────────┐   │
+│  │                                                                  │   │
+│  │  framework-minus-apex  ──→  framework.jar                        │   │
+│  │                                                                  │   │
+│  │  Contains:                                                       │   │
+│  │  • android.app.* (ActivityThread, Application, Intent, ...)      │   │
+│  │  • android.view.* (View, ViewGroup, Window, Surface, ...)        │   │
+│  │  • android.content.* (ContentProvider, ContentResolver, ...)     │   │
+│  │  • android.os.* (Binder, IBinder, Parcel, Handler, Looper, ...) │   │
+│  │  • All AIDL-generated Stub/Proxy classes                         │   │
+│  │  • com.android.internal.* (internal utility classes)             │   │
+│  │                                                                  │   │
+│  │  Does NOT contain: any *Service implementation classes           │   │
+│  │                                                                  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌─ Server Side (Runs in system_server) ── NOT needed ─────────────┐   │
+│  │                                                                  │   │
+│  │  services  ──→  services.jar                                     │   │
+│  │                                                                  │   │
+│  │  Contains:                                                       │   │
+│  │  • ActivityManagerService, WindowManagerService                   │   │
+│  │  • PackageManagerService, PowerManagerService                    │   │
+│  │  • SystemServer.java (entry point)                               │   │
+│  │  • services.core, services.accessibility, services.autofill, ... │   │
+│  │                                                                  │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<div class="ok">
+  <strong>Conclusion:</strong> The AOSP build system has already done the separation for us. Building <code>framework-minus-apex</code> yields a framework.jar containing only client-side code, requiring no additional trimming. The <code>services</code> target does not need to be built at all.
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch3">3. Module Trimming Analysis</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch3-1">3.1 Required Modules</h2>
+
+<table>
+  <tr><th>Module</th><th>AOSP Path</th><th>Build Target</th><th>Artifact</th><th>Purpose</th></tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> Framework Client</td>
+    <td><code>frameworks/base/core/</code></td>
+    <td><code>framework-minus-apex</code></td>
+    <td>framework.jar</td>
+    <td>All client APIs, AIDL Stub/Proxy, ActivityThread, View system</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> Framework JNI</td>
+    <td><code>frameworks/base/core/jni/</code></td>
+    <td><code>libandroid_runtime</code></td>
+    <td>libandroid_runtime.so</td>
+    <td>Framework Java↔Native bridge (Surface JNI, Input JNI, etc.)</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> Framework Resources</td>
+    <td><code>frameworks/base/core/res/</code></td>
+    <td><code>framework-res</code></td>
+    <td>framework-res.apk</td>
+    <td>System themes, default configurations, string resources</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> ART VM</td>
+    <td><code>art/</code></td>
+    <td><code>libart</code>, <code>dex2oat</code></td>
+    <td>libart.so, dex2oat</td>
+    <td>Dex execution, JIT/AOT compilation, GC, JNI support</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> Java Core Libraries</td>
+    <td><code>libcore/</code></td>
+    <td><code>core-oj</code>, <code>core-libart</code></td>
+    <td>core-oj.jar, core-libart.jar</td>
+    <td>java.lang.*, java.util.*, java.io.* and other standard APIs</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> C Runtime</td>
+    <td><code>bionic/</code></td>
+    <td><code>libc</code>, <code>libm</code>, <code>linker</code></td>
+    <td>libc.so, libm.so, linker64</td>
+    <td>C standard library, math library, dynamic linker</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> Native Framework Libraries</td>
+    <td><code>frameworks/native/</code></td>
+    <td><code>libbinder</code>, <code>libui</code>, <code>libgui</code></td>
+    <td>libbinder.so, libui.so, etc.</td>
+    <td>Binder IPC client, Surface/graphics client, Input client</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> System Base Libraries</td>
+    <td><code>system/core/</code></td>
+    <td><code>libutils</code>, <code>liblog</code>, <code>libcutils</code></td>
+    <td>libutils.so, liblog.so, etc.</td>
+    <td>Logging, utility functions, property system client</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> JNI Helper Library</td>
+    <td><code>libnativehelper/</code></td>
+    <td><code>libnativehelper</code></td>
+    <td>libnativehelper.so</td>
+    <td>JNI registration and exception handling helpers</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">Required</span> Prebuilt Toolchains</td>
+    <td><code>prebuilts/</code></td>
+    <td>—</td>
+    <td>clang, javac, aapt2, etc.</td>
+    <td>Build tools (no runtime artifacts)</td>
+  </tr>
+</table>
+
+<h2 id="ch3-2">3.2 Excluded Modules</h2>
+
+<table>
+  <tr><th>Module</th><th>AOSP Path</th><th>Reason for Exclusion</th></tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> System Services</td>
+    <td><code>frameworks/base/services/</code></td>
+    <td>AMS/WMS/PMS etc. all replaced by OH system services</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> SystemServer Entry</td>
+    <td><code>frameworks/base/services/java/.../SystemServer.java</code></td>
+    <td>No system_server process exists</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> SystemUI</td>
+    <td><code>frameworks/base/packages/SystemUI/</code></td>
+    <td>Uses OH SystemUI</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> Launcher</td>
+    <td><code>packages/apps/Launcher3/</code></td>
+    <td>Uses OH Launcher</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> Settings</td>
+    <td><code>packages/apps/Settings/</code></td>
+    <td>Uses OH Settings</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> Other System Apps</td>
+    <td><code>packages/apps/*</code></td>
+    <td>No need for Android preinstalled apps</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> HAL Implementations</td>
+    <td><code>hardware/</code></td>
+    <td>Uses OH HDI/HAL</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">Exclude</span> Kernel</td>
+    <td><code>kernel/</code></td>
+    <td>Uses OH Linux kernel</td>
+  </tr>
+</table>
+
+<h2 id="ch3-3">3.3 Optional Modules</h2>
+
+<table>
+  <tr><th>Module</th><th>AOSP Path</th><th>Description</th></tr>
+  <tr>
+    <td><span class="tag tag-optional">Optional</span> Graphics Extensions</td>
+    <td><code>frameworks/base/graphics/</code></td>
+    <td>Canvas, Bitmap, and other advanced graphics APIs. Used by most apps, recommended to include</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">Optional</span> Media Framework</td>
+    <td><code>frameworks/base/media/</code></td>
+    <td>MediaPlayer, AudioTrack, etc. Include if audio/video app support is needed</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">Optional</span> OpenGL ES</td>
+    <td><code>frameworks/base/opengl/</code></td>
+    <td>OpenGL ES Java bindings. Required for game apps</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">Optional</span> WebView</td>
+    <td><code>external/chromium-webview/</code></td>
+    <td>Embedded browser. Required for web hybrid apps, large in size</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-optional">Optional</span> app_process</td>
+    <td><code>frameworks/base/cmds/app_process/</code></td>
+    <td>Standard app process entry point. Replaced by appspawn-x in this project, but useful for debugging/comparison</td>
+  </tr>
+</table>
+
+<div class="note">
+  <strong>Note:</strong> Graphics extensions (<code>graphics/</code>) and OpenGL ES (<code>opengl/</code>) sources are already included in the <code>framework-non-updatable-sources</code> filegroup and will be automatically included when building <code>framework-minus-apex</code>, requiring no separate handling.
+</div>
+
+<h2 id="ch3-4">3.4 Trimming Overview Diagram</h2>
+
+<div class="diagram">
+/root/aosp/
+│
+├── ✅ art/                          # ART VM — Required
+│   ├── runtime/                     #   VM core
+│   ├── dex2oat/                     #   AOT compiler
+│   ├── dalvikvm/                    #   VM launcher
+│   ├── libdexfile/                  #   DEX file parsing
+│   ├── libartbase/                  #   ART base library
+│   ├── libprofile/                  #   Profile collection
+│   ├── openjdkjvm/                  #   JVM interface
+│   └── sigchainlib/                 #   Signal chain handling
+│
+├── ✅ bionic/                       # C Runtime — Required
+│   ├── libc/                        #   C standard library
+│   ├── libm/                        #   Math library
+│   ├── libdl/                       #   Dynamic loading
+│   └── linker/                      #   Dynamic linker
+│
+├── ✅ libcore/                      # Java Core Libraries — Required
+│   ├── ojluni/                      #   OpenJDK classes (java.lang.*, java.util.*)
+│   ├── dalvik/                      #   Dalvik-specific APIs
+│   ├── luni/                        #   Legacy support
+│   └── json/, xml/                  #   JSON/XML parsing
+│
+├── ✅ libnativehelper/              # JNI Helper Library — Required
+│
+├── frameworks/
+│   ├── base/
+│   │   ├── ✅ core/                 # Client Framework — Required
+│   │   │   ├── java/                #   android.app.*, android.view.*, android.content.*
+│   │   │   │                        #   All AIDL files (IActivityManager, IWindowManager, ...)
+│   │   │   │                        #   ActivityThread, Application, Intent, View, ...
+│   │   │   ├── jni/                 #   libandroid_runtime (JNI bridge)
+│   │   │   └── res/                 #   framework-res.apk (system resources)
+│   │   │
+│   │   ├── ✅ graphics/             # Graphics library — Automatically included
+│   │   ├── ✅ media/                # Media client — Automatically included
+│   │   ├── ✅ opengl/               # OpenGL ES bindings — Automatically included
+│   │   ├── 🔶 cmds/app_process/     # Process entry — Optional (replaced by appspawn-x)
+│   │   │
+│   │   ├── ❌ services/             # System Services — Excluded
+│   │   │   ├── core/                #   AMS, WMS, PMS, etc.
+│   │   │   ├── accessibility/       #   Accessibility service
+│   │   │   ├── autofill/            #   Autofill service
+│   │   │   └── java/.../SystemServer.java  # system_server entry
+│   │   │
+│   │   └── ❌ packages/             # System Apps — Excluded
+│   │       └── SystemUI/            #   SystemUI
+│   │
+│   └── ✅ native/                   # Native Framework Libraries — Required
+│       ├── libs/binder/             #   Binder IPC client
+│       ├── libs/gui/                #   Surface client
+│       ├── libs/ui/                 #   Graphics UI base
+│       └── libs/input/              #   Input client
+│
+├── ✅ system/                       # System Base Libraries — Partially required
+│   ├── core/                        #   libutils, liblog, libcutils, libbase
+│   └── logging/                     #   liblog
+│
+├── ✅ prebuilts/                    # Build Toolchains — Required
+│   ├── clang/                       #   C/C++ compiler
+│   ├── jdk/                         #   Java compiler
+│   └── build-tools/                 #   aapt2, zipalign, d8
+│
+├── ✅ build/                        # Build System — Required
+│
+├── ❌ packages/                     # Preinstalled Apps — Excluded
+│   └── apps/ (Launcher3, Settings, ...)
+│
+├── ❌ hardware/                     # HAL — Excluded
+│
+└── ❌ kernel/                       # Kernel — Excluded
+
+Legend: ✅ Required   🔶 Optional   ❌ Excluded
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch4">4. Required Modules Detailed Analysis</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch4-1">4.1 Framework Client (frameworks/base/core)</h2>
+
+<p>This is the most critical dependency for the adapter project. <code>core/java/</code> contains all Framework code that runs within the App process:</p>
+
+<div class="card">
+  <h4>Key Packages (Directly Related to the Adapter Layer)</h4>
+  <table>
+    <tr><th>Package</th><th>Key Files</th><th>Adapter Layer Relevance</th></tr>
+    <tr>
+      <td><code>android.app</code></td>
+      <td>ActivityThread.java (369KB)<br>ActivityManager.java<br>ActivityTaskManager.java<br>Application.java</td>
+      <td>App process entry point; adapter installation points (AOSP modifications); source of Stub classes inherited by adapters</td>
+    </tr>
+    <tr>
+      <td><code>android.app</code> (AIDL)</td>
+      <td>IActivityManager.aidl (249 methods)<br>IActivityTaskManager.aidl (95 methods)<br>IApplicationThread.aidl<br>IServiceConnection.aidl</td>
+      <td>Generates Stub abstract classes inherited by adapters</td>
+    </tr>
+    <tr>
+      <td><code>android.view</code></td>
+      <td>View.java, ViewGroup.java<br>WindowManagerGlobal.java<br>ViewRootImpl.java<br>Surface.java</td>
+      <td>Adapter installation points (AOSP modifications); client-side entry for Surface bridging</td>
+    </tr>
+    <tr>
+      <td><code>android.view</code> (AIDL)</td>
+      <td>IWindowManager.aidl (144 methods)<br>IWindowSession.aidl (42 methods)<br>IWindow.aidl</td>
+      <td>Window adapters inherit these Stubs</td>
+    </tr>
+    <tr>
+      <td><code>android.content</code></td>
+      <td>Intent.java, ContentProvider.java<br>ContentResolver.java<br>IContentProvider.java</td>
+      <td>Intent↔Want conversion; ContentProvider bridging</td>
+    </tr>
+    <tr>
+      <td><code>android.os</code></td>
+      <td>Binder.java, IBinder.java<br>Parcel.java, Bundle.java<br>Handler.java, Looper.java</td>
+      <td>IPC infrastructure; base classes for all Stub/Proxy</td>
+    </tr>
+  </table>
+
+  <h4>JNI Layer (core/jni/)</h4>
+  <p><code>libandroid_runtime</code> (cc_library_shared) is the Framework's Java↔Native bridge library, containing:</p>
+  <ul>
+    <li><code>android_app_ActivityThread.cpp</code> — ActivityThread native methods</li>
+    <li><code>android_view_Surface*.cpp</code> — Surface-related JNI</li>
+    <li><code>android_view_InputEventReceiver.cpp</code> — Input event receiving</li>
+    <li><code>android_graphics_*.cpp</code> — Graphics system JNI</li>
+    <li><code>AndroidRuntime.cpp</code> — ART VM initialization and JNI registration entry point</li>
+  </ul>
+
+  <h4>Resources (core/res/)</h4>
+  <p>Produces <code>framework-res.apk</code>, containing system default themes, layouts, strings, etc. Required during appspawn-x preloading.</p>
+</div>
+
+<h2 id="ch4-2">4.2 ART Virtual Machine (art/)</h2>
+
+<div class="card">
+  <table>
+    <tr><th>Subdirectory</th><th>Artifact</th><th>Description</th></tr>
+    <tr><td><code>runtime/</code></td><td>libart.so</td><td>VM core: class loading, interpreter, JIT compilation, GC, JNI implementation</td></tr>
+    <tr><td><code>dex2oat/</code></td><td>dex2oat</td><td>AOT compiler: classes.dex → .odex/.vdex native machine code</td></tr>
+    <tr><td><code>dalvikvm/</code></td><td>dalvikvm64</td><td>VM launcher (optional, appspawn-x replaces the startup path)</td></tr>
+    <tr><td><code>libdexfile/</code></td><td>libdexfile.so</td><td>DEX file format parsing</td></tr>
+    <tr><td><code>libartbase/</code></td><td>libartbase.so</td><td>ART base utility library</td></tr>
+    <tr><td><code>openjdkjvm/</code></td><td>libopenjdkjvm.so</td><td>JVM standard interface implementation (JNI_CreateJavaVM, etc.)</td></tr>
+    <tr><td><code>sigchainlib/</code></td><td>libsigchain.so</td><td>Signal chain handling (ensures correct VM signal processing)</td></tr>
+  </table>
+  <p><strong>dex2oat</strong> is used in two phases: AOT pre-compilation during APK installation; processing boot images during appspawn-x preloading.</p>
+</div>
+
+<h2 id="ch4-3">4.3 Java Core Libraries (libcore/)</h2>
+
+<div class="card">
+  <table>
+    <tr><th>Subdirectory</th><th>Artifact</th><th>Description</th></tr>
+    <tr><td><code>ojluni/</code></td><td>core-oj.jar</td><td>OpenJDK classes: java.lang.*, java.util.*, java.io.*, java.net.*, java.nio.*, java.security.*, etc.</td></tr>
+    <tr><td><code>dalvik/</code></td><td>core-libart.jar</td><td>Dalvik/ART-specific APIs: dalvik.system.*, dalvik.annotation.*</td></tr>
+    <tr><td><code>luni/</code></td><td>(merged into above jars)</td><td>Legacy Apache Harmony compatibility layer</td></tr>
+    <tr><td><code>json/</code></td><td>core-oj.jar</td><td>org.json.* JSON parsing</td></tr>
+    <tr><td><code>xml/</code></td><td>core-oj.jar</td><td>XML parser</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-4">4.4 C Runtime (bionic/)</h2>
+
+<div class="card">
+  <p>Android's own C runtime implementation, replacing glibc. All native code (ART, Framework JNI, adapter layer JNI) depends on bionic.</p>
+  <table>
+    <tr><th>Library</th><th>Description</th></tr>
+    <tr><td><code>libc.so</code></td><td>C standard library (malloc, pthread, stdio, socket, etc.)</td></tr>
+    <tr><td><code>libm.so</code></td><td>Math library (sin, cos, sqrt, etc.)</td></tr>
+    <tr><td><code>libdl.so</code></td><td>Dynamic library loading (dlopen, dlsym)</td></tr>
+    <tr><td><code>linker64</code></td><td>Dynamic linker (loads .so dependencies at program startup)</td></tr>
+  </table>
+
+  <div class="warn">
+    <strong>Cross-Compilation Note:</strong> The current adapter project targets ARM64 (DAYU600 / ums9620). bionic needs to be cross-compiled for ARM64. The AOSP build system will automatically select the correct ABI based on the <code>lunch</code> target. The coexistence of bionic with OH system's libc (musl) will also need to be addressed later.
+  </div>
+</div>
+
+<h2 id="ch4-5">4.5 Native Framework Libraries (frameworks/native/)</h2>
+
+<div class="card">
+  <table>
+    <tr><th>Library</th><th>Path</th><th>Description</th></tr>
+    <tr><td><code>libbinder.so</code></td><td><code>libs/binder/</code></td><td>Binder IPC client implementation. Framework's AIDL Proxies communicate with system services through this library. The adapter layer intercepts at the Java layer (Stub inheritance), bypassing libbinder</td></tr>
+    <tr><td><code>libgui.so</code></td><td><code>libs/gui/</code></td><td>Surface/BufferQueue client. ViewRootImpl manages graphics buffers through this library. Required for Surface bridging</td></tr>
+    <tr><td><code>libui.so</code></td><td><code>libs/ui/</code></td><td>Graphics base types (GraphicBuffer, Fence, Region, etc.)</td></tr>
+    <tr><td><code>libinput.so</code></td><td><code>libs/input/</code></td><td>Input event processing client. Required by InputEventBridge</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-6">4.6 System Base Libraries (system/)</h2>
+
+<div class="card">
+  <table>
+    <tr><th>Library</th><th>Path</th><th>Description</th></tr>
+    <tr><td><code>libutils.so</code></td><td><code>system/core/libutils/</code></td><td>RefBase, String8/16, Vector, and other utility classes. Depended upon by nearly all native code</td></tr>
+    <tr><td><code>liblog.so</code></td><td><code>system/logging/liblog/</code></td><td>Android logging system (__android_log_print)</td></tr>
+    <tr><td><code>libcutils.so</code></td><td><code>system/core/libcutils/</code></td><td>Property system client (property_get/set), ashmem, atomic operations, etc.</td></tr>
+    <tr><td><code>libbase.so</code></td><td><code>system/libbase/</code></td><td>Modern C++ utility library (logging, strings, file, result, etc.)</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-7">4.7 Prebuilt Toolchains (prebuilts/)</h2>
+
+<div class="card">
+  <p>Used at build time only, producing no runtime artifacts:</p>
+  <table>
+    <tr><th>Tool</th><th>Path</th><th>Purpose</th></tr>
+    <tr><td>Clang/LLVM</td><td><code>prebuilts/clang/</code></td><td>C/C++ cross-compiler (ARM64 target)</td></tr>
+    <tr><td>JDK</td><td><code>prebuilts/jdk/</code></td><td>Java compilation (javac)</td></tr>
+    <tr><td>aapt2</td><td><code>prebuilts/build-tools/</code></td><td>Android resource compilation (generates framework-res.apk)</td></tr>
+    <tr><td>d8/r8</td><td><code>prebuilts/build-tools/</code></td><td>Java → Dex bytecode conversion</td></tr>
+    <tr><td>zipalign</td><td><code>prebuilts/build-tools/</code></td><td>APK alignment optimization</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch5">5. Excluded Modules Detailed Analysis</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch5-1">5.1 System Services (frameworks/base/services/)</h2>
+
+<p>The <code>services/</code> directory contains all system services running in the system_server process. In the adapter project, all of these are replaced by OH system services:</p>
+
+<div class="card">
+  <table>
+    <tr><th>Android Service</th><th>services/ Subdirectory</th><th>OH Replacement</th></tr>
+    <tr><td>ActivityManagerService</td><td><code>services/core/</code></td><td>AbilityManagerService (SA 180)</td></tr>
+    <tr><td>WindowManagerService</td><td><code>services/core/</code></td><td>SceneSessionManager (SA 4607)</td></tr>
+    <tr><td>PackageManagerService</td><td><code>services/core/</code></td><td>BundleManagerService (SA 401)</td></tr>
+    <tr><td>PowerManagerService</td><td><code>services/core/</code></td><td>PowerMgrService</td></tr>
+    <tr><td>InputManagerService</td><td><code>services/core/</code></td><td>MultimodalInput</td></tr>
+    <tr><td>SurfaceFlinger</td><td><code>frameworks/native/services/surfaceflinger/</code></td><td>RenderService</td></tr>
+    <tr><td>SystemServer.java</td><td><code>services/java/.../</code></td><td>Does not exist, managed by OH foundation</td></tr>
+  </table>
+  <p><strong>The build target <code>services</code> does not need to be compiled at all.</strong></p>
+</div>
+
+<h2 id="ch5-2">5.2 System Apps (packages/)</h2>
+
+<div class="card">
+  <p>All preinstalled system apps are replaced by their OH counterparts:</p>
+  <ul>
+    <li><code>packages/apps/Launcher3/</code> → OH Launcher</li>
+    <li><code>frameworks/base/packages/SystemUI/</code> → OH SystemUI</li>
+    <li><code>packages/apps/Settings/</code> → OH Settings</li>
+    <li><code>packages/apps/Contacts/</code> → OH Contacts</li>
+    <li><code>packages/apps/Dialer/</code> → OH Dialer</li>
+    <li>All other <code>packages/apps/*</code></li>
+  </ul>
+</div>
+
+<h2 id="ch5-3">5.3 HAL Layer (hardware/)</h2>
+
+<div class="card">
+  <p>The Android HAL (Hardware Abstraction Layer) is replaced by OH's HDI (Hardware Device Interface). This includes:</p>
+  <ul>
+    <li>Graphics HAL (gralloc, HWC) → OH Graphics HDI</li>
+    <li>Audio HAL → OH Audio HDI</li>
+    <li>Camera HAL → OH Camera HDI</li>
+    <li>Sensors HAL → OH Sensors HDI</li>
+  </ul>
+  <p>Nothing under the <code>hardware/</code> directory needs to be compiled.</p>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch6">6. Adapter Layer Integration Points with AOSP</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch6-1">6.1 AOSP Source Modification Points</h2>
+
+<p>The adapter project requires modifications to 4 AOSP source files (managed via <code>aosp_patches/</code> patches):</p>
+
+<div class="card">
+  <table>
+    <tr><th>File</th><th>Modification</th><th>Effect</th></tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/app/<br>ActivityManager.java</code></td>
+      <td>Insert OH environment detection in <code>IActivityManagerSingleton.create()</code></td>
+      <td>Returns <code>new ActivityManagerAdapter()</code></td>
+    </tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/app/<br>ActivityTaskManager.java</code></td>
+      <td>Insert OH environment detection in <code>IActivityTaskManagerSingleton.create()</code></td>
+      <td>Returns <code>new ActivityTaskManagerAdapter()</code></td>
+    </tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/app/<br>ActivityThread.java</code></td>
+      <td>Insert OH environment detection in <code>getPackageManager()</code></td>
+      <td>Returns <code>new PackageManagerAdapter()</code></td>
+    </tr>
+    <tr>
+      <td><code>frameworks/base/core/java/android/view/<br>WindowManagerGlobal.java</code></td>
+      <td>Insert OH environment detection in <code>getWindowManagerService()</code> and <code>getWindowSession()</code></td>
+      <td>Returns <code>new WindowManagerAdapter()</code> / <code>new WindowSessionAdapter()</code></td>
+    </tr>
+  </table>
+  <p>All modifications are within <code>frameworks/base/core/java/</code>, which falls within the scope of modules that must be compiled. Patches can be automatically applied before compilation.</p>
+</div>
+
+<h2 id="ch6-2">6.2 Adapter Layer Build Integration</h2>
+
+<p>The adapter layer code is integrated into the AOSP build via <code>Android.bp</code>:</p>
+
+<div class="card">
+  <table>
+    <tr><th>Build Target</th><th>Type</th><th>Artifact</th><th>Dependencies</th></tr>
+    <tr><td><code>liboh_adapter_bridge</code></td><td>cc_library_shared</td><td>liboh_adapter_bridge.so</td><td>libandroid_runtime, libnativehelper</td></tr>
+    <tr><td><code>oh-adapter-framework</code></td><td>java_library</td><td>oh-adapter-framework.jar</td><td>framework (compile-time dependency)</td></tr>
+    <tr><td><code>OHAdapterHelloWorld</code></td><td>android_app</td><td>OHAdapterHelloWorld.apk</td><td>oh-adapter-framework, platform certificate</td></tr>
+  </table>
+  <p>The adapter layer's Java code (all Adapters, Bridges, Converters) is compiled into <code>oh-adapter-framework.jar</code>, depending on the <code>framework</code> target (to obtain AIDL Stub classes).</p>
+</div>
+
+<h2 id="ch6-3">6.3 Relationship Between app_process and appspawn-x</h2>
+
+<div class="card">
+  <p>In standard AOSP, App processes are forked from Zygote, with the entry point being <code>app_process64</code> (<code>frameworks/base/cmds/app_process/app_main.cpp</code>). In the adapter project:</p>
+  <ul>
+    <li><code>app_process64</code> is replaced by <strong>appspawn-x</strong></li>
+    <li>appspawn-x's ART initialization logic is based on <code>AndroidRuntime::start()</code> from <code>app_main.cpp</code></li>
+    <li><code>app_process64</code> can serve as an optional build target for debugging and comparison verification</li>
+    <li>appspawn-x itself is built via the OH build system (BUILD.gn), not through the AOSP build</li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch7">7. Build Strategy</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch7-1">7.1 Option A: Module-Level On-Demand Build</h2>
+
+<div class="card">
+  <p>Use the standard AOSP build system, compiling only the required modules:</p>
+
+<pre><code># Initialize the build environment
+source build/envsetup.sh
+lunch aosp_arm64-eng
+
+# Build core modules (dependencies resolved automatically)
+m framework-minus-apex     # → framework.jar (client-side Framework)
+m libandroid_runtime       # → libandroid_runtime.so (JNI bridge)
+m framework-res            # → framework-res.apk (system resources)
+m dex2oat                  # → dex2oat (AOT compiler)
+
+# Adapter layer modules
+m liboh_adapter_bridge     # → liboh_adapter_bridge.so
+m oh-adapter-framework     # → oh-adapter-framework.jar
+
+# ART / bionic / libcore are compiled automatically as dependencies, no explicit specification needed</code></pre>
+
+  <h4>Advantages</h4>
+  <ul>
+    <li>Simple and straightforward, leverages AOSP's existing dependency resolution</li>
+    <li>No need to create custom makefiles</li>
+    <li>Quick to verify</li>
+  </ul>
+
+  <h4>Disadvantages</h4>
+  <ul>
+    <li>First build still takes considerable time (long dependency chain)</li>
+    <li>May pull in unnecessary dependency modules</li>
+    <li><code>lunch aosp_arm64-eng</code> configures a full device product, some configurations may not apply</li>
+  </ul>
+</div>
+
+<h2 id="ch7-2">7.2 Option B: Custom Product</h2>
+
+<div class="card">
+  <p>Create a minimal Product makefile to precisely control the build scope:</p>
+
+<pre><code># device/adapter/oh_adapter/AndroidProducts.mk
+PRODUCT_MAKEFILES := \
+    $(LOCAL_DIR)/oh_adapter.mk
+
+COMMON_LUNCH_CHOICES := \
+    oh_adapter-eng
+
+# device/adapter/oh_adapter/oh_adapter.mk
+$(call inherit-product, build/target/product/core_64_bit_only.mk)
+
+PRODUCT_NAME := oh_adapter
+PRODUCT_DEVICE := generic_arm64
+PRODUCT_BRAND := Android
+
+# Include only artifacts required for App runtime
+PRODUCT_PACKAGES += \
+    framework \
+    framework-res \
+    libandroid_runtime \
+    core-oj \
+    core-libart \
+    libart \
+    dex2oat \
+    oh-adapter-framework \
+    liboh_adapter_bridge
+
+# Exclude system services and system apps
+PRODUCT_PACKAGES_REMOVE += \
+    SystemUI \
+    Launcher3 \
+    Settings</code></pre>
+
+  <h4>Advantages</h4>
+  <ul>
+    <li>Precise control over build scope, excludes unnecessary modules</li>
+    <li>Faster build times (reduces unnecessary builds)</li>
+    <li>Better suited for long-term maintenance</li>
+    <li>Can define custom lunch targets</li>
+  </ul>
+
+  <h4>Disadvantages</h4>
+  <ul>
+    <li>Requires understanding of the AOSP Product build system</li>
+    <li>Higher initial configuration effort</li>
+    <li>Need to handle implicit product configurations in the dependency chain</li>
+  </ul>
+</div>
+
+<h2 id="ch7-3">7.3 Comparison and Recommendation</h2>
+
+<table>
+  <tr><th>Dimension</th><th>Option A (On-Demand Build)</th><th>Option B (Custom Product)</th></tr>
+  <tr><td>Startup Cost</td><td>Low (ready to use)</td><td>Medium (requires creating mk files)</td></tr>
+  <tr><td>Build Speed</td><td>Medium (may pull extra dependencies)</td><td>Fast (precise scope control)</td></tr>
+  <tr><td>Maintainability</td><td>Low (no centralized configuration)</td><td>High (centralized product definition)</td></tr>
+  <tr><td>Reproducibility</td><td>Medium (depends on manually specifying targets)</td><td>High (just lunch + make)</td></tr>
+  <tr><td>Applicable Phase</td><td>Early validation</td><td>Ongoing development</td></tr>
+</table>
+
+<div class="ok">
+  <strong>Recommendation:</strong> Start with <strong>Option A</strong> to quickly validate the build process and artifact completeness, then migrate to <strong>Option B</strong> to establish a formal build configuration once verified.
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch8">8. Build Artifact Inventory</h1>
+<!-- ================================================================ -->
+
+<p>Runtime artifacts that ultimately need to be obtained from the AOSP build:</p>
+
+<div class="card">
+  <h4>Java Artifacts</h4>
+  <table>
+    <tr><th>Artifact</th><th>Source Module</th><th>Deployment Location</th></tr>
+    <tr><td><code>framework.jar</code></td><td>framework-minus-apex</td><td>/system/framework/</td></tr>
+    <tr><td><code>framework-res.apk</code></td><td>framework-res</td><td>/system/framework/</td></tr>
+    <tr><td><code>core-oj.jar</code></td><td>core-oj</td><td>/apex/com.android.art/javalib/</td></tr>
+    <tr><td><code>core-libart.jar</code></td><td>core-libart</td><td>/apex/com.android.art/javalib/</td></tr>
+    <tr><td><code>oh-adapter-framework.jar</code></td><td>oh-adapter-framework</td><td>/system/framework/</td></tr>
+  </table>
+
+  <h4>Native Artifacts</h4>
+  <table>
+    <tr><th>Artifact</th><th>Source Module</th><th>Description</th></tr>
+    <tr><td><code>libart.so</code></td><td>art/runtime</td><td>ART VM core</td></tr>
+    <tr><td><code>libandroid_runtime.so</code></td><td>frameworks/base/core/jni</td><td>Framework JNI bridge</td></tr>
+    <tr><td><code>liboh_adapter_bridge.so</code></td><td>Adapter layer</td><td>Adapter layer JNI</td></tr>
+    <tr><td><code>libbinder.so</code></td><td>frameworks/native</td><td>Binder IPC</td></tr>
+    <tr><td><code>libgui.so</code></td><td>frameworks/native</td><td>Surface client</td></tr>
+    <tr><td><code>libui.so</code></td><td>frameworks/native</td><td>Graphics base types</td></tr>
+    <tr><td><code>libc.so</code>, <code>libm.so</code></td><td>bionic</td><td>C runtime</td></tr>
+    <tr><td><code>libutils.so</code>, <code>liblog.so</code></td><td>system/core</td><td>System utility libraries</td></tr>
+    <tr><td><code>libnativehelper.so</code></td><td>libnativehelper</td><td>JNI helper</td></tr>
+    <tr><td><code>linker64</code></td><td>bionic/linker</td><td>Dynamic linker</td></tr>
+  </table>
+
+  <h4>Tool Artifacts</h4>
+  <table>
+    <tr><th>Artifact</th><th>Source Module</th><th>Description</th></tr>
+    <tr><td><code>dex2oat</code></td><td>art/dex2oat</td><td>AOT compiler (used during APK installation)</td></tr>
+    <tr><td><code>app_process64</code></td><td>cmds/app_process (optional)</td><td>Process entry point for debugging</td></tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch9">9. Conclusion</h1>
+<!-- ================================================================ -->
+
+<div class="card">
+  <h4>Key Conclusions</h4>
+  <ol>
+    <li><strong>The AOSP build system natively supports client/server separation</strong> — <code>framework.jar</code> (client) and <code>services.jar</code> (server) are completely independent build targets. The client portion can be built without any additional trimming.</li>
+    <li><strong>Build scope is well-defined</strong> — 9 core modules need to be built (Framework client, ART, libcore, bionic, native framework libraries, system base libraries, JNI helper library, adapter layer, prebuilt toolchains), while system services, system apps, and the HAL layer are excluded.</li>
+    <li><strong>AOSP modification points are concentrated</strong> — All 4 source file modifications are within <code>frameworks/base/core/java/</code>, which falls within the scope of modules that must be compiled.</li>
+    <li><strong>Server environment is ready</strong> — The oh-build server (16 cores, 60GB memory, 378GB available disk) fully meets build requirements.</li>
+    <li><strong>Recommended two-phase approach</strong> — Start with Option A (module-level on-demand build) for quick validation, then migrate to Option B (custom Product) to establish a formal build process.</li>
+  </ol>
+</div>
+
+<footer>
+  Android-OpenHarmony Adapter Project &mdash; AOSP 14 Minimal Build Analysis Report v1.0 &mdash; March 18, 2026
+</footer>
+
+</div>
+</body>
+</html>

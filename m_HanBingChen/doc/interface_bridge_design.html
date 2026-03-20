@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android-OpenHarmony 正向接口桥接层 - 详细设计文档</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --unmapped: #c62828;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 2em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; }
+  h2 { color: var(--primary); font-size: 1.5em; margin: 30px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; }
+  h3 { color: var(--text); font-size: 1.15em; margin: 20px 0 10px; }
+  p { margin: 8px 0; }
+  .header { background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .card h3 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; font-weight: 600; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-bridged { background: var(--bridged); }
+  .tag-stub { background: var(--stub); }
+  .tag-partial { background: var(--partial); }
+  .tag-unmapped { background: var(--unmapped); }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .arch-diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.85em; line-height: 1.6; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 4px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .flow-arrow { color: var(--primary); font-weight: bold; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.9em; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>Android-OpenHarmony 正向接口桥接层</h1>
+  <p>详细设计文档 &mdash; 应用到系统服务的IPC接口桥接层</p>
+  <p>版本 1.0 | 2026年3月</p>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 概述</a></li>
+    <li><a href="#ch2">2. 架构设计</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 整体架构</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 拦截机制</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 桥接类设计模式</a></li>
+    <li><a href="#ch3">3. 接口映射总览</a></li>
+    <li><a href="#ch4">4. IActivityManager 桥接</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 目标OH接口</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 方法映射表</a></li>
+    <li><a href="#ch5">5. IActivityTaskManager 桥接</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 目标OH接口</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 方法映射表</a></li>
+    <li><a href="#ch6">6. IWindowManager 桥接</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 目标OH接口</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 方法映射表</a></li>
+    <li><a href="#ch7">7. IWindowSession 桥接</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 目标OH接口</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 方法映射表</a></li>
+    <li><a href="#ch8">8. ServiceInterceptor 设计</a></li>
+    <li><a href="#ch9">9. 调用流程示例</a></li>
+    <li><a href="#ch10">10. 文件结构</a></li>
+    <li><a href="#ch11">11. 构建配置</a></li>
+    <li><a href="#ch12">12. 当前限制与后续工作</a></li>
+  </ul>
+</div>
+
+<!-- Chapter 1 -->
+<h1 id="ch1">1. 概述</h1>
+
+<p>本文档描述了 Android 到 OpenHarmony（OH）接口桥接层的详细设计。桥接层拦截 Android 应用对四个关键 SystemServer 接口的 Binder IPC 调用，并将其路由到等效的 OpenHarmony 系统服务接口。</p>
+
+<div class="card">
+  <h3>设计目标</h3>
+  <ul>
+    <li><strong>完整 API 覆盖</strong>：4 个 Android 接口中的每个方法都被显式处理——要么桥接到 OH 等效接口，要么部分映射，要么以安全默认返回值进行存根处理。</li>
+    <li><strong>非侵入式</strong>：使用 Java 动态代理拦截调用，无需修改 Android 框架源代码或 AIDL 定义。</li>
+    <li><strong>Android API 兼容性</strong>：应用继续使用标准 Android API；桥接层对应用代码完全透明。</li>
+    <li><strong>分类映射</strong>：方法按功能类别组织，并带有清晰的映射状态标签。</li>
+  </ul>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="tag tag-bridged">BRIDGED</span> 已映射到 OH 等效接口</div>
+  <div class="legend-item"><span class="tag tag-partial">PARTIAL</span> 部分映射</div>
+  <div class="legend-item"><span class="tag tag-stub">STUB</span> 无 OH 等效接口，返回安全默认值</div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-box"><div class="number">530</div><div class="label">Android 方法总数</div></div>
+  <div class="stat-box"><div class="number">4</div><div class="label">桥接接口数</div></div>
+  <div class="stat-box"><div class="number">6+</div><div class="label">目标 OH 接口数</div></div>
+  <div class="stat-box"><div class="number">100%</div><div class="label">方法覆盖率</div></div>
+</div>
+
+<!-- Chapter 2 -->
+<h1 id="ch2">2. 架构设计</h1>
+
+<h2 id="ch2-1">2.1 整体架构</h2>
+
+<div class="arch-diagram">
++------------------------------------------------------------------+
+|                        Android App Process                        |
+|                                                                   |
+|  +-----------+    +------------------+                            |
+|  | App Code  | -> | Android API      |                            |
+|  | (Intent,  |    | (ActivityManager |                            |
+|  |  Window)  |    |  WindowManager)  |                            |
+|  +-----------+    +--------+---------+                            |
+|                            |                                      |
+|                            v                                      |
+|  +-------------------------------------------------------------+ |
+|  |              Adapter Layer (extends IXxx.Stub)               | |
+|  |  +------------------------+ +----------------------------+  | |
+|  |  | ActivityManager        | | ActivityTaskManager        |  | |
+|  |  | Adapter                | | Adapter                    |  | |
+|  |  | (extends IAM.Stub)     | | (extends IATM.Stub)       |  | |
+|  |  +------------------------+ +----------------------------+  | |
+|  |  +------------------------+ +----------------------------+  | |
+|  |  | WindowManager          | | WindowSession              |  | |
+|  |  | Adapter                | | Adapter                    |  | |
+|  |  | (extends IWM.Stub)     | | (extends IWS.Stub)        |  | |
+|  |  +------------------------+ +----------------------------+  | |
+|  +----------------------------+--------------------------------+ |
+|                               |                                  |
+|                       JNI (adapter_bridge.cpp)                   |
++-------------------------------|----------------------------------+
+                                |
+                                v
++------------------------------------------------------------------+
+|                  OpenHarmony System Services                       |
+|                                                                   |
+|  +----------------+ +------------+ +-----------+ +-----------+   |
+|  | IAbilityManager| | IAppMgr    | | IMission  | | IExtension|   |
+|  |                | |            | | Manager   | | Manager   |   |
+|  +----------------+ +------------+ +-----------+ +-----------+   |
+|  +-------------------------------+ +-----------+                 |
+|  | ISceneSessionManager (SA4607)| | ISession  |                 |
+|  | (extends IWindowManager(OH)) | |(per-window)|                |
+|  +-------------------------------+ +-----------+                |
++------------------------------------------------------------------+
+</div>
+
+<h2 id="ch2-2">2.2 适配安装机制</h2>
+
+<div class="card">
+  <p>采用类继承方式（<code>extends IXxx.Stub</code>）替代动态代理。安装方式有两种：</p>
+
+  <h4>方式一：运行时替换（当前实现）</h4>
+  <p><code>ServiceInterceptor</code> 通过反射将 Adapter 实例设入框架的单例字段：</p>
+  <ol>
+    <li>创建 Adapter 实例（如 <code>new ActivityManagerAdapter(adaptationLayer)</code>）</li>
+    <li>通过反射定位 <code>Singleton&lt;T&gt;</code> 的 <code>mInstance</code> 字段</li>
+    <li>直接将 Adapter 实例设入 <code>mInstance</code>（无需动态代理）</li>
+  </ol>
+
+  <h4>方式二：AOSP 源码修改（已实现，推荐生产方式）</h4>
+  <p>直接修改 Android 框架源码，在 <code>Singleton&lt;T&gt;.create()</code> 和初始化方法中增加OH环境检测。
+  修改后的AOSP源码位于 <code>aosp_patches/</code> 目录，同时原始AOSP文件已直接修改。</p>
+
+  <h4>修改的AOSP文件：</h4>
+  <table>
+    <tr><th>AOSP 文件</th><th>修改位置</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>ActivityManager.java</code></td>
+      <td><code>IActivityManagerSingleton.create()</code></td>
+      <td>检测OH环境 → 返回 <code>ActivityManagerAdapter</code></td>
+    </tr>
+    <tr>
+      <td><code>ActivityTaskManager.java</code></td>
+      <td><code>IActivityTaskManagerSingleton.create()</code></td>
+      <td>检测OH环境 → 返回 <code>ActivityTaskManagerAdapter</code></td>
+    </tr>
+    <tr>
+      <td><code>WindowManagerGlobal.java</code></td>
+      <td><code>getWindowManagerService()</code></td>
+      <td>检测OH环境 → 返回 <code>WindowManagerAdapter</code></td>
+    </tr>
+    <tr>
+      <td><code>WindowManagerGlobal.java</code></td>
+      <td><code>getWindowSession()</code></td>
+      <td>检测OH环境 → 返回 <code>WindowSessionAdapter</code></td>
+    </tr>
+  </table>
+
+  <h4>修改模式（条件式替换，保留回退）：</h4>
+<pre><code>// 示例：ActivityManager.java 中修改后的 create() 方法
+private static final Singleton&lt;IActivityManager&gt; IActivityManagerSingleton =
+    new Singleton&lt;IActivityManager&gt;() {
+        @Override
+        protected IActivityManager create() {
+            // [OH_ADAPTER] 检测是否运行在OH环境
+            if (OHEnvironment.isOHEnvironment()) {
+                try {
+                    return new ActivityManagerAdapter();
+                } catch (Exception e) {
+                    Log.w("ActivityManager",
+                        "OH adapter init failed, falling back to original", e);
+                }
+            }
+            // 原始AOSP实现（回退路径）
+            final IBinder b = ServiceManager.getService(Context.ACTIVITY_SERVICE);
+            final IActivityManager am = IActivityManager.Stub.asInterface(b);
+            return am;
+        }
+    };</code></pre>
+
+  <h4>OH环境检测机制：</h4>
+<pre><code>// OHEnvironment.java
+public static boolean isOHEnvironment() {
+    // 1. 检查系统属性 persist.oh.adapter.enabled
+    // 2. 回退：通过native方法检测OH IPC框架是否可用
+    return nativeIsOHEnvironment();
+}</code></pre>
+  <p><strong>设计优势：</strong>修改后的AOSP代码在非OH设备上完全兼容原始行为（<code>isOHEnvironment()</code>返回false），无需条件编译。</p>
+</div>
+
+<h2 id="ch2-3">2.3 Adapter 类设计模式</h2>
+
+<div class="card">
+  <p>所有 4 个 Adapter 类都采用相同的类继承模式（<code>extends IXxx.Stub</code>）：</p>
+<pre><code>public class ActivityManagerAdapter extends IActivityManager.Stub {
+    private final long mOhAbilityManager;    // OH 服务句柄
+
+    public ActivityManagerAdapter() {
+        mOhAbilityManager = OHEnvironment.nativeGetOHAbilityManagerService();
+    }
+
+    // [BRIDGED] 每个 AIDL 方法都有精确类型签名的 @Override
+    @Override
+    public int startActivityWithFeature(IApplicationThread caller,
+            String callingPackage, String callingFeatureId,
+            Intent intent, ...) {
+        IntentWantConverter.WantParams want =
+            IntentWantConverter.intentToWant(intent);
+        return mAdapter.nativeStartAbility(want.bundleName, ...);
+    }
+
+    // [STUB] 无 OH 等效接口，返回安全默认值
+    @Override
+    public void setDebugApp(String packageName, boolean waitForDebugger,
+            boolean persistent) {
+        logStub("setDebugApp", "No OH equivalent");
+    }
+}</code></pre>
+
+  <h4>与动态代理方式的对比</h4>
+  <table>
+    <tr><th>特性</th><th>动态代理（旧）</th><th>类继承（新）</th></tr>
+    <tr><td>类型安全</td><td>运行时字符串匹配</td><td>编译时类型检查</td></tr>
+    <tr><td>性能</td><td>反射调用开销</td><td>直接方法调用</td></tr>
+    <tr><td>代码可读性</td><td>switch/case 字符串分发</td><td>标准方法覆写</td></tr>
+    <tr><td>框架依赖</td><td>不修改 AOSP 源码</td><td>可选修改 AOSP 源码</td></tr>
+    <tr><td>方法遗漏风险</td><td>遗漏方法走 default 分支</td><td>编译时强制实现所有方法</td></tr>
+  </table>
+</div>
+
+<!-- Chapter 3 -->
+<h1 id="ch3">3. 接口映射概览</h1>
+
+<table>
+  <tr>
+    <th>Android 接口</th>
+    <th>方法数</th>
+    <th>OH 目标接口</th>
+    <th>已桥接</th>
+    <th>部分映射</th>
+    <th>存根</th>
+  </tr>
+  <tr>
+    <td><code>IActivityManager</code></td>
+    <td>249</td>
+    <td>IAbilityManager, IAppMgr, IMissionManager</td>
+    <td>~80</td>
+    <td>~20</td>
+    <td>~149</td>
+  </tr>
+  <tr>
+    <td><code>IActivityTaskManager</code></td>
+    <td>95</td>
+    <td>IAbilityManager, IMissionManager, ISceneSessionManager</td>
+    <td>~35</td>
+    <td>~8</td>
+    <td>~52</td>
+  </tr>
+  <tr>
+    <td><code>IWindowManager</code></td>
+    <td>144</td>
+    <td>ISceneSessionManager (SA 4607, 含 IWindowManager(OH)), ISession</td>
+    <td>~40</td>
+    <td>~10</td>
+    <td>~94</td>
+  </tr>
+  <tr>
+    <td><code>IWindowSession</code></td>
+    <td>42</td>
+    <td>ISession (每窗口代理), ISceneSessionManager (仅创建/销毁)</td>
+    <td>~22</td>
+    <td>~4</td>
+    <td>~16</td>
+  </tr>
+  <tr style="font-weight: bold; background: #e8f0fe;">
+    <td>合计</td>
+    <td>530</td>
+    <td>7 个 OH 接口</td>
+    <td>~177</td>
+    <td>~42</td>
+    <td>~311</td>
+  </tr>
+</table>
+
+<p>Android 与 OH 接口之间的多对多映射关系：</p>
+<div class="arch-diagram">
+  Android                        OpenHarmony
+  ========                       ===========
+  IActivityManager --------+---> IAbilityManager
+                           +---> IAppMgr
+                           +---> IMissionManager
+
+  IActivityTaskManager ----+---> IAbilityManager
+                           +---> IMissionManager
+                           +---> ISceneSessionManager
+
+  IWindowManager ----------+---> ISceneSessionManager (SA 4607, 含 IWindowManager(OH))
+                           +---> ISession (每窗口代理)
+                           +---> DisplayManager
+
+  IWindowSession ----------+---> ISceneSessionManager (仅 CreateAndConnect / Destroy)
+                           +---> ISession (每窗口操作: UpdateRect, DrawingCompleted...)
+</div>
+
+<!-- Chapter 4 -->
+<h1 id="ch4">4. IActivityManager 桥接</h1>
+
+<p>源文件：<code>bridge/IActivityManagerBridge.java</code>（249 个方法）</p>
+
+<h2 id="ch4-1">4.1 目标 OH 接口</h2>
+
+<div class="card">
+  <table>
+    <tr><th>OH 接口</th><th>职责</th><th>关键方法</th></tr>
+    <tr>
+      <td><code>IAbilityManager</code></td>
+      <td>Ability 生命周期管理</td>
+      <td>StartAbility, CloseAbility, MinimizeAbility, ConnectAbility, DisconnectAbility</td>
+    </tr>
+    <tr>
+      <td><code>IAppMgr</code></td>
+      <td>应用进程管理</td>
+      <td>AttachApplication, ApplicationForegrounded/Backgrounded, KillApplication, GetRunningProcessInfo, UpdateConfiguration</td>
+    </tr>
+    <tr>
+      <td><code>IMissionManager</code></td>
+      <td>任务/Mission 管理</td>
+      <td>GetMissionInfos, CleanMission, MoveMissionToFront, RegisterMissionListener</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch4-2">4.2 方法映射表</h2>
+
+<table>
+  <tr><th>分类</th><th>Android 方法</th><th>状态</th><th>OH 目标</th></tr>
+  <tr>
+    <td>Activity 生命周期</td>
+    <td><code>startActivity</code>, <code>startActivityAsUser</code>, <code>startActivityIntentSender</code>, <code>startActivityWithConfig</code>, <code>startActivityAsCaller</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager.StartAbility(Want)</td>
+  </tr>
+  <tr>
+    <td>Activity 结束</td>
+    <td><code>finishActivity</code>, <code>finishActivityAffinity</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager.CloseAbility</td>
+  </tr>
+  <tr>
+    <td>Activity 状态</td>
+    <td><code>activityResumed</code>, <code>activityTopResumedStateLost</code>, <code>activityPaused</code>, <code>activityStopped</code>, <code>activityDestroyed</code>, <code>activityRelaunched</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager 生命周期通知</td>
+  </tr>
+  <tr>
+    <td>Service 生命周期</td>
+    <td><code>startService</code>, <code>stopService</code>, <code>bindService</code>, <code>unbindService</code>, <code>bindIsolatedService</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager.ConnectAbility / DisconnectAbility</td>
+  </tr>
+  <tr>
+    <td>Service 状态</td>
+    <td><code>publishService</code>, <code>serviceDoneExecuting</code>, <code>setServiceForeground</code>, <code>stopServiceToken</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager 服务状态</td>
+  </tr>
+  <tr>
+    <td>应用进程</td>
+    <td><code>attachApplication</code>, <code>applicationIdle</code>, <code>getRunningAppProcesses</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAppMgr.AttachApplication / GetRunningProcessInfo</td>
+  </tr>
+  <tr>
+    <td>进程状态</td>
+    <td><code>killBackgroundProcesses</code>, <code>forceStopPackage</code>, <code>killApplication</code>, <code>killApplicationProcess</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAppMgr.KillApplication</td>
+  </tr>
+  <tr>
+    <td>广播</td>
+    <td><code>broadcastIntent</code>, <code>broadcastIntentWithFeature</code>, <code>unbroadcastIntent</code>, <code>registerReceiver</code>, <code>unregisterReceiver</code>, <code>finishReceiver</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 使用 CommonEventManager（不同模式）</td>
+  </tr>
+  <tr>
+    <td>ContentProvider</td>
+    <td><code>getContentProvider</code>, <code>publishContentProviders</code>, <code>refContentProvider</code>, <code>removeContentProvider</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH DataShareExtensionAbility（不同模式）</td>
+  </tr>
+  <tr>
+    <td>任务/Mission</td>
+    <td><code>getServices</code>, <code>getRunningServiceControlPanel</code>, <code>getRecentTasks</code>, <code>moveTaskToFront</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IMissionManager.GetMissionInfos / MoveMissionToFront</td>
+  </tr>
+  <tr>
+    <td>配置</td>
+    <td><code>getConfiguration</code>, <code>updateConfiguration</code>, <code>updateMccMncConfiguration</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAppMgr.UpdateConfiguration</td>
+  </tr>
+  <tr>
+    <td>权限</td>
+    <td><code>checkPermission</code>, <code>checkUriPermission</code>, <code>grantUriPermission</code>, <code>revokeUriPermission</code> 等</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH AccessTokenKit（不同框架）</td>
+  </tr>
+  <tr>
+    <td>IntentSender/WantAgent</td>
+    <td><code>getIntentSender</code>, <code>cancelIntentSender</code>, <code>getIntentForIntentSender</code>, <code>sendIntentSender</code></td>
+    <td><span class="tag tag-partial">PARTIAL</span></td>
+    <td>OH WantAgentHelper（部分映射）</td>
+  </tr>
+  <tr>
+    <td>UID 观察者</td>
+    <td><code>registerUidObserver</code>, <code>unregisterUidObserver</code></td>
+    <td><span class="tag tag-partial">PARTIAL</span></td>
+    <td>IAppMgr.RegisterApplicationStateObserver</td>
+  </tr>
+  <tr>
+    <td>内存</td>
+    <td><code>getMemoryInfo</code>, <code>getProcessMemoryInfo</code>, <code>getMyMemoryState</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAppMgr 内存查询</td>
+  </tr>
+  <tr>
+    <td>系统/调试</td>
+    <td><code>peekService</code>, <code>profileControl</code>, <code>dumpHeap</code>, <code>getProcessPss</code> 等调试方法</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>无直接 OH 等效接口</td>
+  </tr>
+  <tr>
+    <td>备份、Bug 报告、Instrumentation</td>
+    <td>约 30 个方法</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>无 OH 等效接口</td>
+  </tr>
+</table>
+
+<!-- Chapter 5 -->
+<h1 id="ch5">5. IActivityTaskManager 桥接</h1>
+
+<p>源文件：<code>bridge/IActivityTaskManagerBridge.java</code>（95 个方法）</p>
+
+<h2 id="ch5-1">5.1 目标 OH 接口</h2>
+
+<div class="card">
+  <table>
+    <tr><th>OH 接口</th><th>职责</th><th>关键方法</th></tr>
+    <tr>
+      <td><code>IAbilityManager</code></td>
+      <td>Activity/Ability 启动</td>
+      <td>StartAbility(Want)</td>
+    </tr>
+    <tr>
+      <td><code>IMissionManager</code></td>
+      <td>任务/Mission 管理</td>
+      <td>MoveMissionToFront, CleanMission, GetMissionInfos, RegisterMissionListener</td>
+    </tr>
+    <tr>
+      <td><code>ISceneSessionManager</code></td>
+      <td>窗口组织管理</td>
+      <td>GetSessionSnapshot, SceneSession 管理</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch5-2">5.2 方法映射表</h2>
+
+<table>
+  <tr><th>分类</th><th>Android 方法</th><th>状态</th><th>OH 目标</th></tr>
+  <tr>
+    <td>Activity 启动</td>
+    <td><code>startActivity</code>, <code>startActivities</code>, <code>startActivityAsUser</code>, <code>startActivityIntentSender</code>, <code>startActivityWithConfig</code>, <code>startActivityAsCaller</code>, <code>startVoiceActivity</code>, <code>startAssistantActivity</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager.StartAbility(Want)，通过 IntentWantConverter 转换</td>
+  </tr>
+  <tr>
+    <td>Activity 同步启动</td>
+    <td><code>startActivityAndWait</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAbilityManager.StartAbility（同步等待）</td>
+  </tr>
+  <tr>
+    <td>最近任务</td>
+    <td><code>startRecentsActivity</code>, <code>startActivityFromRecents</code>, <code>cancelRecentsAnimation</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IMissionManager.MoveMissionToFront</td>
+  </tr>
+  <tr>
+    <td>任务管理</td>
+    <td><code>setFocusedTask</code>, <code>removeTask</code>, <code>removeAllVisibleRecentTasks</code>, <code>getTasks</code>, <code>moveTaskToFront</code>, <code>getRecentTasks</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IMissionManager (GetMissionInfos, CleanMission, MoveMissionToFront)</td>
+  </tr>
+  <tr>
+    <td>根任务/任务栈</td>
+    <td><code>setFocusedRootTask</code>, <code>getFocusedRootTaskInfo</code>, <code>getAllRootTaskInfos</code>, <code>getRootTaskInfo</code>, <code>moveRootTaskToDisplay</code>, <code>moveTaskToRootTask</code>, <code>removeRootTasksInWindowingModes</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IMissionManager 任务操作</td>
+  </tr>
+  <tr>
+    <td>任务调整大小</td>
+    <td><code>setTaskResizeable</code>, <code>resizeTask</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.UpdateSessionRect</td>
+  </tr>
+  <tr>
+    <td>锁定任务</td>
+    <td><code>startSystemLockTaskMode</code>, <code>stopSystemLockTaskMode</code>, <code>isInLockTaskMode</code>, <code>getLockTaskModeState</code></td>
+    <td><span class="tag tag-partial">PARTIAL</span></td>
+    <td>IMissionManager.LockMissionForCleanup / UnlockMissionForCleanup</td>
+  </tr>
+  <tr>
+    <td>任务栈监听器</td>
+    <td><code>registerTaskStackListener</code>, <code>unregisterTaskStackListener</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IMissionManager.RegisterMissionListener</td>
+  </tr>
+  <tr>
+    <td>任务快照</td>
+    <td><code>getTaskSnapshot</code>, <code>takeTaskSnapshot</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISceneSessionManager.GetSessionSnapshot</td>
+  </tr>
+  <tr>
+    <td>配置</td>
+    <td><code>updateConfiguration</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>IAppMgr.UpdateConfiguration</td>
+  </tr>
+  <tr>
+    <td>窗口组织器</td>
+    <td><code>getWindowOrganizerController</code></td>
+    <td><span class="tag tag-partial">PARTIAL</span></td>
+    <td>ISceneSessionManager（部分）</td>
+  </tr>
+  <tr>
+    <td>返回导航</td>
+    <td><code>unhandledBack</code>, <code>startBackNavigation</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.RequestSessionBack</td>
+  </tr>
+  <tr>
+    <td>屏幕兼容</td>
+    <td><code>getFrontActivityScreenCompatMode</code>, <code>setFrontActivityScreenCompatMode</code> 等</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>无 OH 等效接口</td>
+  </tr>
+  <tr>
+    <td>语音/VR</td>
+    <td><code>finishVoiceTask</code>, <code>setVoiceKeepAwake</code>, <code>setVrThread</code>, <code>setPersistentVrThread</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>无 OH 等效接口</td>
+  </tr>
+  <tr>
+    <td>辅助/自动填充</td>
+    <td><code>reportAssistContextExtras</code>, <code>getAssistContextExtras</code>, <code>requestAutofillData</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>无 OH 等效接口</td>
+  </tr>
+</table>
+
+<div class="card">
+  <h3>关键实现：handleStartActivity</h3>
+  <p><code>handleStartActivity</code> 方法展示了 Activity 启动的核心桥接逻辑：</p>
+<pre><code>private Object handleStartActivity(String methodName, Object[] args) {
+    Intent intent = findInArgs(args, Intent.class);
+    if (intent == null) {
+        Intent[] intents = findInArgs(args, Intent[].class);
+        if (intents != null && intents.length > 0) intent = intents[0];
+    }
+    if (intent == null) return 0;
+
+    // 将 Android Intent 转换为 OH Want 参数
+    IntentWantConverter.WantParams want = IntentWantConverter.intentToWant(intent);
+
+    // 通过 JNI 调用 OH AbilityManager
+    return mAdapter.nativeStartAbility(
+        want.bundleName, want.abilityName,
+        want.action, want.uri, want.extrasJson);
+}</code></pre>
+</div>
+
+<!-- Chapter 6 -->
+<h1 id="ch6">6. IWindowManager 桥接</h1>
+
+<p>源文件：<code>bridge/IWindowManagerBridge.java</code>（144 个方法）</p>
+
+<h2 id="ch6-1">6.1 目标 OH 接口</h2>
+
+<div class="card">
+  <table>
+    <tr><th>OH 接口</th><th>职责</th><th>关键方法</th></tr>
+    <tr>
+      <td><code>ISceneSessionManager</code><br/><small>(SA 4607, extends IWindowManager(OH))</small></td>
+      <td>系统单例 — 会话创建/销毁 + IWindowManager 全部 31 个基础窗口方法</td>
+      <td>CreateAndConnectSpecificSession, DestroyAndDisconnectSpecificSession, GetSessionSnapshot, CreateWindow*, GetSnapshot*<br/><small>* 继承自 IWindowManager(OH)</small></td>
+    </tr>
+    <tr>
+      <td><code>ISession</code></td>
+      <td>每窗口代理 — 由 CreateAndConnectSpecificSession 返回</td>
+      <td>UpdateSessionRect, DrawingCompleted, GetAvoidAreaByType, GetAllAvoidAreas, UpdateRotationChangeRegistered, Foreground, Background, Disconnect</td>
+    </tr>
+    <tr>
+      <td><code>DisplayManager</code></td>
+      <td>显示信息和旋转</td>
+      <td>GetDefaultDisplayInfo, FreezeRotation, ThawRotation</td>
+    </tr>
+  </table>
+  <p><strong>注：</strong><code>ISceneSessionManager : public IWindowManager</code>，是 IWindowManager(OH) 的超集。
+  适配层无需单独连接 SA 4606（旧版 IWindowManager），SA 4607 已覆盖全部方法。</p>
+</div>
+
+<h2 id="ch6-2">6.2 方法映射表</h2>
+
+<table>
+  <tr><th>分类</th><th>Android 方法</th><th>状态</th><th>OH 目标</th></tr>
+  <tr>
+    <td>会话管理</td>
+    <td><code>openSession</code>, <code>useBLAST</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISceneSessionManager.CreateAndConnectSpecificSession</td>
+  </tr>
+  <tr>
+    <td>显示尺寸</td>
+    <td><code>getInitialDisplaySize</code>, <code>getBaseDisplaySize</code>, <code>setForcedDisplaySize</code>, <code>clearForcedDisplaySize</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>DisplayManager.GetDefaultDisplayInfo</td>
+  </tr>
+  <tr>
+    <td>显示密度</td>
+    <td><code>getInitialDisplayDensity</code>, <code>getBaseDisplayDensity</code>, <code>setForcedDisplayDensityForUser</code>, <code>clearForcedDisplayDensityForUser</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>DisplayManager 密度管理</td>
+  </tr>
+  <tr>
+    <td>窗口令牌</td>
+    <td><code>addWindowToken</code>, <code>removeWindowToken</code>, <code>isWindowToken</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISceneSessionManager（继承自 IWindowManager(OH)，隐含在 CreateWindow / RemoveWindow 中）</td>
+  </tr>
+  <tr>
+    <td>旋转</td>
+    <td><code>getDefaultDisplayRotation</code>, <code>watchRotation</code>, <code>removeRotationWatcher</code>, <code>freezeRotation</code>, <code>thawRotation</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>DisplayManager / ISession.UpdateRotationChangeRegistered</td>
+  </tr>
+  <tr>
+    <td>系统 UI / 触摸</td>
+    <td><code>setInTouchMode</code>, <code>isInTouchMode</code>, <code>closeSystemDialogs</code>, <code>hideTransientBars</code>, <code>hasNavigationBar</code></td>
+    <td><span class="tag tag-partial">PARTIAL</span></td>
+    <td>ISceneSessionManager 输入模式 / 系统栏控制（继承自 IWindowManager(OH)）</td>
+  </tr>
+  <tr>
+    <td>锁屏</td>
+    <td><code>disableKeyguard</code>, <code>reenableKeyguard</code>, <code>isKeyguardLocked</code>, <code>dismissKeyguard</code> 等（9 个方法）</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 锁屏未映射</td>
+  </tr>
+  <tr>
+    <td>动画</td>
+    <td><code>getAnimationScale</code>, <code>setAnimationScale</code>, <code>getCurrentAnimatorScale</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 动画缩放未映射</td>
+  </tr>
+  <tr>
+    <td>屏幕截图</td>
+    <td><code>captureDisplay</code>, <code>notifyScreenshotListeners</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISceneSessionManager.GetSnapshot（继承自 IWindowManager(OH)）</td>
+  </tr>
+  <tr>
+    <td>窗口边衬区</td>
+    <td><code>getStableInsets</code>, <code>getWindowInsets</code>, <code>setDisplayWindowInsetsController</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.GetAvoidAreaByType / GetAllAvoidAreas</td>
+  </tr>
+  <tr>
+    <td>显示管理</td>
+    <td><code>registerDisplayFoldListener</code>, <code>registerDisplayWindowListener</code>, <code>getPossibleDisplayInfo</code>, <code>getWindowingMode</code>, <code>setWindowingMode</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>DisplayManager / ISceneSessionManager.GetWindowModeType（继承自 IWindowManager(OH)）</td>
+  </tr>
+  <tr>
+    <td>画中画</td>
+    <td><code>registerPinnedTaskListener</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession 画中画监听器</td>
+  </tr>
+  <tr>
+    <td>任务快照</td>
+    <td><code>isTaskSnapshotSupported</code>, <code>snapshotTaskForRecents</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISceneSessionManager.GetSessionSnapshot</td>
+  </tr>
+  <tr>
+    <td>追踪</td>
+    <td><code>startWindowTrace</code>, <code>stopWindowTrace</code>, <code>isWindowTraceEnabled</code> 等（11 个方法）</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>追踪功能未映射</td>
+  </tr>
+  <tr>
+    <td>过渡动画</td>
+    <td><code>overridePendingAppTransitionRemote</code>, <code>startFreezingScreen</code>, <code>stopFreezingScreen</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 过渡动画管理方式不同</td>
+  </tr>
+  <tr>
+    <td>壁纸</td>
+    <td><code>screenshotWallpaper</code>, <code>mirrorWallpaperSurface</code> 等</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>无 OH 壁纸映射</td>
+  </tr>
+  <tr>
+    <td>其他</td>
+    <td><code>lockNow</code>, <code>mirrorDisplay</code>, <code>syncInputTransactions</code>, <code>holdLock</code>，上下文绑定/解绑、模糊监听器等</td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>各类 / 无 OH 等效接口</td>
+  </tr>
+</table>
+
+<!-- Chapter 7 -->
+<h1 id="ch7">7. IWindowSession 桥接</h1>
+
+<p>源文件：<code>bridge/IWindowSessionBridge.java</code>（42 个方法）</p>
+
+<h2 id="ch7-1">7.1 目标 OH 接口</h2>
+
+<div class="card">
+  <table>
+    <tr><th>OH 接口</th><th>职责</th><th>关键方法</th></tr>
+    <tr>
+      <td><code>ISceneSessionManager</code><br/><small>(SA 4607, 系统单例)</small></td>
+      <td>会话创建/销毁（仅用于 addToDisplay 和 remove）</td>
+      <td>CreateAndConnectSpecificSession, DestroyAndDisconnectSpecificSession</td>
+    </tr>
+    <tr>
+      <td><code>ISession</code><br/><small>(每窗口代理)</small></td>
+      <td>所有每窗口操作（由 CreateAndConnect 返回）</td>
+      <td>UpdateSessionRect, DrawingCompleted, Foreground, Background, Disconnect, GetGlobalScaledRect, SetAvoidArea</td>
+    </tr>
+  </table>
+  <p><strong>注：</strong><code>DrawingCompleted</code> 是 ISession 的方法（非 ISessionStage）。ISessionStage 是反向回调接口（OH→App 方向），不在此正向桥接范围内。</p>
+</div>
+
+<h2 id="ch7-2">7.2 方法映射表</h2>
+
+<table>
+  <tr><th>分类</th><th>Android 方法</th><th>状态</th><th>OH 目标</th></tr>
+  <tr>
+    <td>窗口生命周期</td>
+    <td><code>addToDisplay</code>, <code>addToDisplayAsUser</code>, <code>addToDisplayWithoutInputChannel</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISceneSessionManager.CreateAndConnectSpecificSession（返回 ISession 代理）</td>
+  </tr>
+  <tr>
+    <td>窗口移除</td>
+    <td><code>remove</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.Disconnect + ISceneSessionManager.DestroyAndDisconnectSpecificSession</td>
+  </tr>
+  <tr>
+    <td>窗口布局</td>
+    <td><code>relayout</code>, <code>relayoutAsync</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.UpdateSessionRect + UpdateSizeChangeReason</td>
+  </tr>
+  <tr>
+    <td>绘制</td>
+    <td><code>finishDrawing</code>, <code>setTransparentRegion</code>, <code>setInsets</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.DrawingCompleted / ISession.SetAvoidArea</td>
+  </tr>
+  <tr>
+    <td>Surface 操作</td>
+    <td><code>getDisplayFrame</code>, <code>performShow</code>, <code>performHide</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession.GetGlobalScaledRect / Foreground / Background</td>
+  </tr>
+  <tr>
+    <td>拖放</td>
+    <td><code>performDrag</code>, <code>reportDropResult</code>, <code>cancelDragAndDrop</code>, <code>dragRecipientEntered</code>, <code>dragRecipientExited</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>OH 拖放框架</td>
+  </tr>
+  <tr>
+    <td>输入</td>
+    <td><code>updatePointerIcon</code>, <code>grantInputChannel</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>OH 输入管理 / ISession 输入通道</td>
+  </tr>
+  <tr>
+    <td>壁纸</td>
+    <td><code>sendWallpaperCommand</code>, <code>wallpaperOffsetsComplete</code>, <code>setWallpaperPosition</code>, <code>setWallpaperDisplayOffset</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 壁纸未映射</td>
+  </tr>
+  <tr>
+    <td>窗口属性</td>
+    <td><code>setWindowScale</code>, <code>insetsModified</code>, <code>updateRequestedVisibleTypes</code></td>
+    <td><span class="tag tag-bridged">BRIDGED</span></td>
+    <td>ISession 属性更新</td>
+  </tr>
+  <tr>
+    <td>手势</td>
+    <td><code>reportSystemGestureExclusionChanged</code>, <code>reportDecorViewGestureInterceptionChanged</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 手势排除未映射</td>
+  </tr>
+  <tr>
+    <td>嵌入窗口</td>
+    <td><code>addWindowToTokenForTaskFragment</code>, <code>grantEmbeddedWindowFocus</code></td>
+    <td><span class="tag tag-stub">STUB</span></td>
+    <td>OH 子会话未映射</td>
+  </tr>
+  <tr>
+    <td>同步 / 其他</td>
+    <td><code>performDeferredDestroy</code>, <code>onWindowInfoChanged</code>, <code>prepareToReplaceWindows</code>, <code>updateTapExcludeRegion</code>, <code>moveFocusToAdjacentWindow</code></td>
+    <td><span class="tag tag-partial">PARTIAL</span></td>
+    <td>ISession 各类操作</td>
+  </tr>
+</table>
+
+<!-- Chapter 8 -->
+<h1 id="ch8">8. ServiceInterceptor 设计</h1>
+
+<p>源文件：<code>ServiceInterceptor.java</code></p>
+
+<div class="card">
+  <h3>拦截目标</h3>
+  <table>
+    <tr><th>Android 服务</th><th>Manager 类</th><th>字段</th><th>模式</th></tr>
+    <tr>
+      <td><code>IActivityManager</code></td>
+      <td><code>android.app.ActivityManager</code></td>
+      <td><code>IActivityManagerSingleton</code></td>
+      <td>Singleton&lt;T&gt;</td>
+    </tr>
+    <tr>
+      <td><code>IActivityTaskManager</code></td>
+      <td><code>android.app.ActivityTaskManager</code></td>
+      <td><code>IActivityTaskManagerSingleton</code></td>
+      <td>Singleton&lt;T&gt;</td>
+    </tr>
+    <tr>
+      <td><code>IWindowManager</code></td>
+      <td><code>android.view.WindowManagerGlobal</code></td>
+      <td><code>sWindowManagerService</code></td>
+      <td>直接字段</td>
+    </tr>
+    <tr>
+      <td><code>IWindowSession</code></td>
+      <td><code>android.view.WindowManagerGlobal</code></td>
+      <td><code>sWindowSession</code></td>
+      <td>直接字段（进程内单例）</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3>安装方式一：运行时替换（ServiceInterceptor）</h3>
+<pre><code>public void installInterceptors() {
+    // 1. 创建 Adapter 实例并设入 ActivityManager 单例
+    ActivityManagerAdapter amAdapter = new ActivityManagerAdapter();
+    replaceSingletonInstance("android.app.ActivityManager",
+        "IActivityManagerSingleton", amAdapter);
+
+    // 2. 创建 Adapter 实例并设入 ActivityTaskManager 单例
+    ActivityTaskManagerAdapter atmAdapter = new ActivityTaskManagerAdapter();
+    replaceSingletonInstance("android.app.ActivityTaskManager",
+        "IActivityTaskManagerSingleton", atmAdapter);
+
+    // 3. 替换 WindowManagerGlobal 中的 IWindowManager 静态字段
+    WindowManagerAdapter wmAdapter = new WindowManagerAdapter();
+    replaceStaticField("android.view.WindowManagerGlobal",
+        "sWindowManagerService", wmAdapter);
+
+    // 4. 替换 WindowManagerGlobal 中的 IWindowSession 静态字段
+    WindowSessionAdapter wsAdapter = new WindowSessionAdapter();
+    replaceStaticField("android.view.WindowManagerGlobal",
+        "sWindowSession", wsAdapter);
+}</code></pre>
+</div>
+
+<div class="card">
+  <h3>安装方式二：AOSP 源码修改（已实现，推荐生产方式）</h3>
+  <p>已修改 3 个 AOSP 框架源文件，所有修改均带有 <code>[OH_ADAPTER]</code> 注释标记。</p>
+
+  <h4>1. ActivityManager.java（<code>IActivityManagerSingleton.create()</code>）</h4>
+<pre><code>// frameworks/core/java/android/app/ActivityManager.java
+import com.android.adapter.core.OHEnvironment;
+import com.android.adapter.client.ActivityManagerAdapter;
+
+private static final Singleton&lt;IActivityManager&gt; IActivityManagerSingleton =
+    new Singleton&lt;IActivityManager&gt;() {
+        @Override
+        protected IActivityManager create() {
+            // [OH_ADAPTER] 检测OH环境
+            if (OHEnvironment.isOHEnvironment()) {
+                try {
+                    return new ActivityManagerAdapter();
+                } catch (Exception e) {
+                    Log.w("ActivityManager",
+                        "OH adapter init failed, falling back", e);
+                }
+            }
+            // 原始实现
+            final IBinder b = ServiceManager.getService(
+                Context.ACTIVITY_SERVICE);
+            return IActivityManager.Stub.asInterface(b);
+        }
+    };</code></pre>
+
+  <h4>2. ActivityTaskManager.java（<code>IActivityTaskManagerSingleton.create()</code>）</h4>
+<pre><code>// frameworks/core/java/android/app/ActivityTaskManager.java
+import com.android.adapter.core.OHEnvironment;
+import com.android.adapter.client.ActivityTaskManagerAdapter;
+
+// 同样的条件式替换模式</code></pre>
+
+  <h4>3. WindowManagerGlobal.java（两处修改）</h4>
+<pre><code>// frameworks/core/java/android/view/WindowManagerGlobal.java
+import com.android.adapter.core.OHEnvironment;
+import com.android.adapter.client.WindowManagerAdapter;
+import com.android.adapter.client.WindowSessionAdapter;
+
+// getWindowManagerService() 中：
+if (sWindowManagerService == null) {
+    if (OHEnvironment.isOHEnvironment()) {
+        sWindowManagerService = new WindowManagerAdapter();
+    }
+    if (sWindowManagerService == null) {
+        // 原始实现...
+    }
+}
+
+// getWindowSession() 中：
+if (sWindowSession == null) {
+    if (OHEnvironment.isOHEnvironment()) {
+        sWindowSession = new WindowSessionAdapter();
+    }
+    if (sWindowSession == null) {
+        // 原始实现...
+    }
+}</code></pre>
+
+  <p>Patch文件位于：<code>D:\code\adapter\aosp_patches\</code></p>
+</div>
+
+<!-- Chapter 9 -->
+<h1 id="ch9">9. 调用流程示例</h1>
+
+<h3>示例 1：startActivity</h3>
+<div class="card">
+<pre><code>App: context.startActivity(intent)
+  -> ActivityTaskManager.getService().startActivity(...)
+    -> [Proxy intercept] IActivityTaskManagerBridge.invoke()
+      -> handleStartActivity()
+        -> IntentWantConverter.intentToWant(intent)
+           {bundleName: "com.example.target",
+            abilityName: "MainAbility",
+            action: "ohos.want.action.viewData",
+            uri: "...", extrasJson: "{...}"}
+        -> OHEnvironment.nativeStartAbility(want)
+          -> [JNI] adapter_bridge.cpp
+            -> [OH IPC] IAbilityManager::StartAbility(Want)
+              -> OH AbilityManagerService
+                -> Target Ability launched</code></pre>
+</div>
+
+<h3>示例 2：窗口重新布局</h3>
+<div class="card">
+<pre><code>ViewRootImpl: mWindowSession.relayout(window, attrs, ...)
+  -> [Proxy intercept] IWindowSessionBridge.invoke()
+    -> case "relayout":
+      -> [BRIDGED] -> OH ISession.UpdateSessionRect
+      -> Phase 1: method.invoke(mOriginal, args) // passthrough
+      -> Future: OH IPC to ISession for actual layout update</code></pre>
+</div>
+
+<h3>示例 3：获取显示信息</h3>
+<div class="card">
+<pre><code>App: WindowManager.getDefaultDisplay().getSize(...)
+  -> WindowManagerGlobal.getWindowManagerService()
+       .getInitialDisplaySize(displayId, size)
+    -> [Proxy intercept] IWindowManagerBridge.invoke()
+      -> case "getInitialDisplaySize":
+        -> [BRIDGED] -> OH DisplayManager.GetDefaultDisplayInfo
+        -> Phase 1: method.invoke(mOriginal, args) // passthrough</code></pre>
+</div>
+
+<!-- Chapter 10 -->
+<h1 id="ch10">10. File Structure</h1>
+
+<pre><code>D:\code\adapter\
++-- framework/
+|   +-- java/com/android/adapter/
+|   |   +-- OHEnvironment.java           # OH environment detection, JNI declarations
+|   |   +-- ServiceInterceptor.java     # 安装 4 个 Adapter（替换 Singleton 实例）
+|   |   +-- IntentWantConverter.java     # Intent <-> Want 转换
+|   |   +-- LifecycleAdapter.java       # 生命周期状态映射
+|   |   +-- bridge/
+|   |       +-- ActivityManagerAdapter.java        # extends IActivityManager.Stub, 249 methods
+|   |       +-- ActivityTaskManagerAdapter.java     # extends IActivityTaskManager.Stub, 95 methods
+|   |       +-- WindowManagerAdapter.java           # extends IWindowManager.Stub, 144 methods
+|   |       +-- WindowSessionAdapter.java           # extends IWindowSession.Stub, 42 methods
+|   +-- jni/
+|       +-- adapter_bridge.h/cpp         # JNI bridge
+|       +-- oh_ability_manager_client.h/cpp  # OH AbilityManager IPC (SA 180)
+|       +-- oh_app_mgr_client.h/cpp      # OH AppMgr IPC (SA 501)
+|       +-- oh_window_manager_client.h/cpp # OH SceneSessionManager IPC (SA 4607)
+|       +-- oh_input_bridge.h/cpp        # OH MMI -> Android InputChannel
+|       +-- oh_callback_handler.h/cpp    # OH -> Android callbacks
+|       +-- intent_want_converter.h/cpp  # C++ Want params
+|       +-- lifecycle_state_mapper.h/cpp # C++ lifecycle mapping
+|       +-- CMakeLists.txt
++-- app/
+|   +-- java/com/example/helloworld/
+|   |   +-- HelloWorldApplication.java  # Initializes adapter
+|   |   +-- MainActivity.java           # Test UI
+|   |   +-- SecondActivity.java         # Cross-activity test
+|   +-- AndroidManifest.xml
+|   +-- res/layout/activity_main.xml
++-- build/
+    +-- Android.bp                       # AOSP build config</code></pre>
+
+<!-- Chapter 11 -->
+<h1 id="ch11">11. Build Configuration</h1>
+
+<div class="card">
+  <h3>Android.bp</h3>
+<pre><code>// JNI shared library
+cc_library_shared {
+    name: "liboh_adapter_bridge",
+    srcs: [
+        "framework/jni/adapter_bridge.cpp",
+        "framework/jni/oh_ability_manager_client.cpp",
+        "framework/jni/oh_app_mgr_client.cpp",
+        "framework/jni/oh_callback_handler.cpp",
+        "framework/jni/intent_want_converter.cpp",
+        "framework/jni/lifecycle_state_mapper.cpp",
+    ],
+}
+
+// Java library
+java_library {
+    name: "oh-adapter-framework",
+    srcs: ["framework/java/**/*.java"],
+    libs: ["framework"],
+    required: ["liboh_adapter_bridge"],
+}
+
+// Test application
+android_app {
+    name: "OHAdapterHelloWorld",
+    srcs: ["app/java/**/*.java"],
+    libs: ["oh-adapter-framework"],
+    platform_apis: true,
+    certificate: "platform",
+}</code></pre>
+</div>
+
+<!-- Chapter 12 -->
+<h1 id="ch12">12. Limitations and Future Work</h1>
+
+<div class="card">
+  <h3>当前限制（第一阶段）</h3>
+  <ul>
+    <li><strong>日志模式</strong>：大部分 BRIDGED 方法当前仅记录日志并返回默认值。OH IPC 调用尚未连接到真实的 OH 系统服务。</li>
+    <li><strong>存根方法</strong>：约 311 个方法返回安全默认值。部分方法（广播、ContentProvider、权限）需要完全不同的 OH 模式，无法直接桥接。</li>
+    <li><strong>反向回调</strong>：OH 到 Android 的回调（IAppScheduler、IAbilityScheduler、ISessionStage）已设计但尚未完全接通。</li>
+    <li><strong>单进程</strong>：当前适配仅在应用进程内工作。SystemServer 侧的桥接尚未实现。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>后续工作</h3>
+  <ul>
+    <li><strong>第二阶段</strong>：将日志模式替换为实际的 OH IPC 客户端调用，实现所有 BRIDGED 方法的真实桥接。</li>
+    <li><strong>第三阶段</strong>：实现反向回调桥接（OH 生命周期事件 &rarr; Android 生命周期回调）。</li>
+    <li><strong>第四阶段</strong>：处理广播 &rarr; CommonEventManager 和 ContentProvider &rarr; DataShareExtensionAbility 的模式适配。</li>
+    <li><strong>第五阶段</strong>：SystemServer 侧桥接，处理服务端发起的操作。</li>
+    <li><strong>测试</strong>：自动化测试套件，验证每个适配方法返回正确类型并处理边界情况。</li>
+  </ul>
+</div>
+
+<footer>
+  Android-OpenHarmony 接口桥接 &mdash; 详细设计文档 &mdash; v2.0（类继承架构） &mdash; 2026年3月
+</footer>
+
+</div>
+</body>
+</html>

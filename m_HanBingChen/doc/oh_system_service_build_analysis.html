@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenHarmony 系统服务构建分析报告 — 适配层所需 OH 模块编译方案</title>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #0d47a1;
+    --accent: #e8710a;
+    --bg: #fafafa;
+    --card-bg: #fff;
+    --text: #333;
+    --text-light: #666;
+    --border: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --bridged: #2e7d32;
+    --stub: #ef6c00;
+    --partial: #1565c0;
+    --ohonly: #7b1fa2;
+    --high: #c62828;
+    --medium: #ef6c00;
+    --low: #2e7d32;
+    --include: #2e7d32;
+    --exclude: #c62828;
+    --optional: #ef6c00;
+    --patch: #7b1fa2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px 30px; }
+  h1 { color: var(--primary-dark); font-size: 1.9em; border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin: 30px 0 20px; background: linear-gradient(90deg, #e3f2fd, transparent); padding: 10px 16px; border-radius: 4px; }
+  h2 { color: var(--primary); font-size: 1.4em; margin: 28px 0 14px; border-left: 4px solid var(--primary); padding-left: 12px; background: linear-gradient(90deg, #f0f7ff, transparent); padding: 6px 12px; border-radius: 0 4px 4px 0; }
+  h3 { color: var(--text); font-size: 1.1em; margin: 18px 0 10px; }
+  h4 { color: #5c6bc0; margin: 14px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+  .header { background: linear-gradient(135deg, #00695c, #1565c0); color: white; padding: 40px 30px; margin: -20px -30px 30px; }
+  .header h1 { color: white; border-bottom-color: rgba(255,255,255,0.3); background: none; font-size: 2.2em; }
+  .header p { color: rgba(255,255,255,0.9); font-size: 1.05em; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92em; }
+  th { background: var(--primary); color: white; padding: 10px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #f0f7ff; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 3px; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.9em; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 0.88em; line-height: 1.5; margin: 12px 0; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600; color: white; margin-right: 4px; }
+  .tag-include { background: var(--include); }
+  .tag-exclude { background: var(--exclude); }
+  .tag-optional { background: var(--optional); }
+  .tag-patch { background: var(--patch); }
+  .tag-dep { background: #5c6bc0; }
+  .tag-adapter { background: #00695c; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 16px 0; }
+  .stat-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-box .number { font-size: 2em; font-weight: 700; color: var(--primary); }
+  .stat-box .label { font-size: 0.9em; color: var(--text-light); }
+  .diagram { background: #f8f9fa; border: 2px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; font-family: 'Cascadia Code', Consolas, monospace; font-size: 0.78em; line-height: 1.5; white-space: pre; overflow-x: auto; }
+  .toc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 20px 0; }
+  .toc ul { list-style: none; padding-left: 0; }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 24px; }
+  .note { background: #fff3e0; border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .warn { background: #fce4ec; border-left: 4px solid var(--high); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  .info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
+  .ok { background: #e8f5e9; border-left: 4px solid var(--bridged); padding: 12px 16px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+  footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border); color: var(--text-light); font-size: 0.85em; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+  <h1>OpenHarmony 系统服务构建分析报告</h1>
+  <p>面向 Android-OH 适配项目的 OH 模块编译方案</p>
+  <p>版本 1.0 | 2026年3月20日 | Adapter Team</p>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h3>目录</h3>
+  <ul>
+    <li><a href="#ch1">1. 分析背景与目标</a></li>
+    <li class="sub"><a href="#ch1-1">1.1 分析背景</a></li>
+    <li class="sub"><a href="#ch1-2">1.2 与 AOSP 构建的对称关系</a></li>
+    <li class="sub"><a href="#ch1-3">1.3 构建目标</a></li>
+    <li class="sub"><a href="#ch1-4">1.4 服务器环境</a></li>
+    <li><a href="#ch2">2. OpenHarmony 构建体系分析</a></li>
+    <li class="sub"><a href="#ch2-1">2.1 OH 源码顶层结构</a></li>
+    <li class="sub"><a href="#ch2-2">2.2 GN + Ninja 构建系统</a></li>
+    <li class="sub"><a href="#ch2-3">2.3 组件（Component）与子系统（Subsystem）</a></li>
+    <li class="sub"><a href="#ch2-4">2.4 Inner Kits — 组件间依赖机制</a></li>
+    <li class="sub"><a href="#ch2-5">2.5 三层部署分组（base / fwk / service）</a></li>
+    <li><a href="#ch3">3. 适配层所需 OH 模块总览</a></li>
+    <li class="sub"><a href="#ch3-1">3.1 必须编译的模块</a></li>
+    <li class="sub"><a href="#ch3-2">3.2 需要打补丁的模块</a></li>
+    <li class="sub"><a href="#ch3-3">3.3 不需要编译的模块</a></li>
+    <li class="sub"><a href="#ch3-4">3.4 模块依赖总览图</a></li>
+    <li><a href="#ch4">4. 核心模块详细分析</a></li>
+    <li class="sub"><a href="#ch4-1">4.1 AbilityRuntime（ability_runtime）</a></li>
+    <li class="sub"><a href="#ch4-2">4.2 WindowManager（window_manager）</a></li>
+    <li class="sub"><a href="#ch4-3">4.3 图形子系统（graphic_2d + graphic_surface）</a></li>
+    <li class="sub"><a href="#ch4-4">4.4 BundleFramework（bundle_framework）</a></li>
+    <li class="sub"><a href="#ch4-5">4.5 CommonEventService（common_event_service）</a></li>
+    <li class="sub"><a href="#ch4-6">4.6 基础设施模块（ipc / samgr / hilog / c_utils）</a></li>
+    <li><a href="#ch5">5. 适配层自有模块的 OH 构建</a></li>
+    <li class="sub"><a href="#ch5-1">5.1 appspawn-x（混合进程孵化器）</a></li>
+    <li class="sub"><a href="#ch5-2">5.2 apk_installer（APK 安装库）</a></li>
+    <li class="sub"><a href="#ch5-3">5.3 oh_adapter_bridge（JNI 桥接库）</a></li>
+    <li><a href="#ch6">6. OH 源码补丁集成</a></li>
+    <li class="sub"><a href="#ch6-1">6.1 ability_runtime 补丁</a></li>
+    <li class="sub"><a href="#ch6-2">6.2 bundle_framework 补丁</a></li>
+    <li class="sub"><a href="#ch6-3">6.3 补丁应用策略</a></li>
+    <li><a href="#ch7">7. 构建策略</a></li>
+    <li class="sub"><a href="#ch7-1">7.1 方案 A：全量编译 + 模块裁剪</a></li>
+    <li class="sub"><a href="#ch7-2">7.2 方案 B：按需编译指定组件</a></li>
+    <li class="sub"><a href="#ch7-3">7.3 方案 C：自定义 Product 配置</a></li>
+    <li class="sub"><a href="#ch7-4">7.4 方案对比与建议</a></li>
+    <li><a href="#ch8">8. 构建产物清单</a></li>
+    <li><a href="#ch9">9. 与 AOSP 构建的协调</a></li>
+    <li><a href="#ch10">10. 结论</a></li>
+  </ul>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch1">1. 分析背景与目标</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch1-1">1.1 分析背景</h2>
+
+<p>Android-OH 适配项目的核心架构是：在 OH 系统上运行 Android App。Android App 进程内保留 AOSP Framework 客户端和 ART 虚拟机，系统服务侧则完全使用 OH 原生系统服务。适配层（Adapter）作为桥梁，拦截 Android App 发出的 Binder IPC 调用，转换为 OH 系统服务的 IPC 请求。</p>
+
+<p>前一份报告（《AOSP 14 最小化构建分析报告》）分析了 Android 侧"App 运行时"的编译裁剪方案。本报告从 OH 侧出发，分析适配层所需的 OH 系统服务模块该如何编译构建。</p>
+
+<h2 id="ch1-2">1.2 与 AOSP 构建的对称关系</h2>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>AOSP 侧（已分析）</th><th>OH 侧（本报告）</th></tr>
+    <tr>
+      <td>编译内容</td>
+      <td>Framework <strong>客户端</strong>代码（framework.jar）<br>ART 虚拟机 / C 运行时</td>
+      <td>系统<strong>服务端</strong>代码（各 SA 的 .z.so）<br>IPC 客户端库（inner_kits）</td>
+    </tr>
+    <tr>
+      <td>排除内容</td>
+      <td>system_server 及所有系统服务</td>
+      <td>OH 的 App 框架层（ArkUI、NAPI 等）</td>
+    </tr>
+    <tr>
+      <td>构建系统</td>
+      <td>Soong (Android.bp / Blueprint)</td>
+      <td>GN + Ninja (BUILD.gn)</td>
+    </tr>
+    <tr>
+      <td>产物用途</td>
+      <td>App 进程内运行</td>
+      <td>适配层 JNI 库链接 + OH 系统服务运行</td>
+    </tr>
+    <tr>
+      <td>源码修改</td>
+      <td>4 个 AOSP 文件（aosp_patches/）</td>
+      <td>2 个 OH 模块的多个文件（ohos_patches/）</td>
+    </tr>
+  </table>
+</div>
+
+<div class="info">
+  <strong>关键区别：</strong>AOSP 侧只需编译客户端（排除服务端），因此是"裁剪"。OH 侧需要<strong>完整的系统服务</strong>在设备上运行，同时适配层还需要链接 OH 的 IPC 客户端库（inner_kits），因此是"按需选择 + 补丁增强"。
+</div>
+
+<h2 id="ch1-3">1.3 构建目标</h2>
+
+<div class="card">
+  <h4>需要从 OH 编译获取的内容</h4>
+  <ul>
+    <li><strong>OH 系统服务 .z.so</strong> — AbilityManagerService、WindowManagerService、BundleManagerService 等系统 SA 的共享库，打补丁后重新编译部署到设备</li>
+    <li><strong>Inner Kits 客户端库</strong> — 适配层 JNI 代码链接 OH 服务时需要的头文件和客户端库（如 <code>ability_manager</code>、<code>app_manager</code>、<code>libwm</code>、<code>librender_service_client</code> 等）</li>
+    <li><strong>适配层自有模块</strong> — appspawn-x（混合孵化器）、apk_installer（APK 安装库）、oh_adapter_bridge（JNI 桥接库），通过 OH 构建系统编译为 OH 上运行的二进制</li>
+  </ul>
+
+  <h4>不需要从 OH 编译获取的内容</h4>
+  <ul>
+    <li>ArkUI / ArkTS / NAPI — Android App 不使用 OH 的 UI 框架</li>
+    <li>OH 应用框架（FA/Stage 模型的 App 侧代码） — Android App 有自己的 Framework</li>
+    <li>OH Launcher / SystemUI / Settings — 设备上已有，无需适配层参与</li>
+    <li>HAL / HDI 层 — 由厂商提供，不在本项目编译范围</li>
+  </ul>
+</div>
+
+<h2 id="ch1-4">1.4 服务器环境</h2>
+
+<p>分析基于以下云服务器环境（<code>oh-build</code>，1.95.175.212）：</p>
+
+<table>
+  <tr><th>项目</th><th>状态</th><th>详情</th></tr>
+  <tr><td>操作系统</td><td>✅</td><td>Ubuntu 20.04.6 LTS</td></tr>
+  <tr><td>CPU / 内存</td><td>✅</td><td>16 核 / 60 GB</td></tr>
+  <tr><td>磁盘</td><td>✅</td><td>493 GB（已用 ~95G，剩余 ~378G）</td></tr>
+  <tr><td>OH 源码</td><td>✅</td><td><code>/root/oh/</code>，OpenHarmony 6.1-Release（78 GB）</td></tr>
+  <tr><td>构建工具链</td><td>✅</td><td>gn, ninja, clang — 预置就绪</td></tr>
+  <tr><td>构建目标</td><td>✅</td><td><code>dayu210</code>（上层服务兼容 DAYU600/UMS9620）</td></tr>
+  <tr><td>首次编译</td><td>❌ 未执行</td><td>尚未执行第一次完整编译</td></tr>
+</table>
+
+<div class="note">
+  <strong>关于 dayu210：</strong>DAYU600 开发板使用 Unisoc UMS9620 SoC，但 OH 上层系统服务（libabilityms.z.so、libwms.z.so 等）均为 aarch64 架构，与 SoC 无关。使用 <code>dayu210</code> 产品配置编译上层模块，产物可直接通过 hdc 推送到 DAYU600 设备。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch2">2. OpenHarmony 构建体系分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch2-1">2.1 OH 源码顶层结构</h2>
+
+<p>服务器上的 OH 6.1 源码位于 <code>/root/oh/</code>，采用子系统（Subsystem）→ 组件（Component）的两级组织结构：</p>
+
+<div class="diagram">
+/root/oh/                               # OpenHarmony 6.1-Release (~78 GB)
+│
+├── build/                              # 构建系统 (GN + Ninja + Python 脚本)
+│   ├── ohos.gni                        #   所有 BUILD.gn 的入口 import
+│   ├── ohos_var.gni                    #   全局变量定义
+│   ├── config/                         #   编译器、链接器配置
+│   └── scripts/                        #   构建辅助脚本
+│
+├── foundation/                         # 系统能力层（核心系统服务）
+│   ├── ability/                        #   能力子系统
+│   │   ├── ability_base/               #     Want, ElementName 等基础类型
+│   │   └── ability_runtime/            #     AMS, AppMgr, Mission 服务 ★
+│   ├── window/
+│   │   └── window_manager/             #     WMS, SceneSession, DisplayMgr ★
+│   ├── graphic/
+│   │   ├── graphic_2d/                 #     RenderService, RSUIDirector ★
+│   │   └── graphic_surface/            #     Surface, BufferQueue, SyncFence ★
+│   ├── bundlemanager/
+│   │   └── bundle_framework/           #     BMS, installd, 包管理 ★
+│   ├── communication/
+│   │   └── ipc/                        #     IPC 框架 (Binder-like) ★
+│   ├── distributedschedule/
+│   │   └── samgr/                      #     SA 管理器 (服务注册/发现) ★
+│   └── notification/
+│       └── common_event_service/       #     CommonEvent 服务 ★
+│
+├── base/                               # 基础软件层
+│   ├── startup/
+│   │   ├── appspawn/                   #     App 进程孵化器 ★
+│   │   └── init/                       #     系统初始化 (属性系统) ★
+│   ├── hiviewdfx/
+│   │   └── hilog/                      #     日志框架 ★
+│   ├── security/
+│   │   └── access_token/               #     权限管理 ★
+│   └── global/
+│       └── resource_management/        #     资源管理
+│
+├── commonlibrary/
+│   └── c_utils/                        #   C++ 公共库 ★
+│
+├── third_party/                        # 第三方库
+│   ├── openssl/                        #   加密库 ★
+│   ├── json/                           #   nlohmann JSON ★
+│   ├── minizip/                        #   ZIP 解压 ★
+│   └── ...
+│
+├── productdefine/                      # 产品定义
+│   └── common/
+│       └── products/
+│           └── dayu210.json            #   我们的编译目标产品
+│
+├── vendor/                             # 厂商定制
+│   └── hihope/dayu210/                 #   DAYU210 厂商配置
+│
+└── build.sh                            # 编译入口脚本
+
+★ = 适配层所需模块
+</div>
+
+<h2 id="ch2-2">2.2 GN + Ninja 构建系统</h2>
+
+<p>OpenHarmony 使用 <strong>GN</strong>（Generate Ninja）作为构建元语言，生成 Ninja 构建文件后由 Ninja 执行实际编译。这与 AOSP 的 Soong/Blueprint 体系完全不同。</p>
+
+<div class="card">
+  <table>
+    <tr><th>维度</th><th>AOSP (Soong)</th><th>OH (GN)</th></tr>
+    <tr><td>构建定义文件</td><td><code>Android.bp</code> (Blueprint)</td><td><code>BUILD.gn</code></td></tr>
+    <tr><td>配置语言</td><td>JSON-like (声明式)</td><td>Python-like (过程式)</td></tr>
+    <tr><td>入口命令</td><td><code>m &lt;target&gt;</code></td><td><code>./build.sh --product-name &lt;product&gt;</code></td></tr>
+    <tr><td>依赖声明</td><td><code>static_libs</code>, <code>shared_libs</code></td><td><code>deps</code>, <code>external_deps</code></td></tr>
+    <tr><td>目标类型</td><td><code>cc_library_shared</code>, <code>java_library</code></td><td><code>ohos_shared_library</code>, <code>ohos_executable</code></td></tr>
+    <tr><td>模块导入</td><td>自动扫描 Android.bp</td><td><code>import("//build/ohos.gni")</code></td></tr>
+  </table>
+</div>
+
+<p>OH 构建入口命令：</p>
+
+<pre><code># 完整编译（dayu210 产品）
+cd /root/oh
+./build.sh --product-name dayu210 --ccache
+
+# 指定组件编译
+./build.sh --product-name dayu210 --build-target abilityms
+
+# 指定多个目标
+./build.sh --product-name dayu210 --build-target abilityms --build-target wms</code></pre>
+
+<h2 id="ch2-3">2.3 组件（Component）与子系统（Subsystem）</h2>
+
+<p>OH 的模块组织采用 <strong>子系统 → 组件</strong> 的两级结构，通过 <code>bundle.json</code> 定义每个组件的元数据：</p>
+
+<div class="card">
+  <h4>bundle.json 关键字段</h4>
+<pre><code>{
+  "name": "@ohos/ability_runtime",           // 包标识
+  "segment": {
+    "destPath": "foundation/ability/ability_runtime"  // OH 源码树中的路径
+  },
+  "component": {
+    "name": "ability_runtime",               // 组件名（用于 external_deps 引用）
+    "subsystem": "ability",                  // 所属子系统
+    "syscap": ["SystemCapability.Ability.AbilityRuntime.Core"],
+    "features": [],                          // 编译特性开关
+    "adapted_system_type": ["standard"],     // 适配系统类型
+    "deps": {
+      "components": [                        // 依赖的其他组件
+        "ability_base", "bundle_framework",
+        "common_event_service", "window_manager",
+        "graphic_2d", "ipc", "samgr", "hilog", "c_utils"
+      ],
+      "third_party": ["json", "openssl"]     // 第三方依赖
+    },
+    "build": {
+      "sub_component": ["//foundation/..."], // GN 构建目标
+      "inner_kits": [...]                    // 导出的库和头文件
+    }
+  }
+}</code></pre>
+</div>
+
+<div class="info">
+  <strong>关键概念：</strong><code>external_deps</code> 中的引用格式为 <code>"component_name:inner_kit_name"</code>，例如 <code>"ability_runtime:ability_manager"</code> 引用 ability_runtime 组件导出的 <code>ability_manager</code> inner_kit 库。
+</div>
+
+<h2 id="ch2-4">2.4 Inner Kits — 组件间依赖机制</h2>
+
+<p>Inner Kits 是 OH 组件对外暴露接口的机制，类似于 Android 的 AIDL Stub/Proxy 分离。每个组件通过 <code>bundle.json</code> 的 <code>build.inner_kits</code> 声明导出哪些库和头文件：</p>
+
+<div class="card">
+<pre><code>"inner_kits": [
+  {
+    "type": "so",                           // 共享库
+    "name": "//foundation/ability/ability_runtime/interfaces/inner_api/ability_manager:ability_manager",
+    "header": {
+      "header_files": ["ability_manager_interface.h", "ability_manager_client.h"],
+      "header_base": "//foundation/ability/ability_runtime/interfaces/inner_api/ability_manager/include"
+    }
+  }
+]</code></pre>
+
+  <p>适配层的 JNI 代码链接这些 inner_kit 库来访问 OH 系统服务。例如：</p>
+  <ul>
+    <li><code>oh_ability_manager_client.cpp</code> → 链接 <code>ability_runtime:ability_manager</code></li>
+    <li><code>oh_window_manager_client.cpp</code> → 链接 <code>window_manager:libwm</code></li>
+    <li><code>oh_bundle_mgr_client.cpp</code> → 链接 <code>bundle_framework:appexecfwk_core</code></li>
+    <li><code>oh_surface_bridge.cpp</code> → 链接 <code>graphic_2d:librender_service_client</code></li>
+    <li><code>oh_common_event_client.cpp</code> → 链接 <code>common_event_service:cesfwk_innerkits</code></li>
+  </ul>
+</div>
+
+<h2 id="ch2-5">2.5 三层部署分组（base / fwk / service）</h2>
+
+<p>每个 OH 组件将其构建目标分为三个部署层次：</p>
+
+<div class="card">
+  <table>
+    <tr><th>分组</th><th>名称</th><th>部署目标</th><th>说明</th></tr>
+    <tr>
+      <td><code>base_group</code></td>
+      <td>基础层</td>
+      <td>所有系统类型</td>
+      <td>App 面向的 API（NAPI 绑定、基础类型定义）</td>
+    </tr>
+    <tr>
+      <td><code>fwk_group</code></td>
+      <td>框架层</td>
+      <td>standard 系统</td>
+      <td>框架中间件（inner_kit 客户端库、工具库）<br><strong>适配层主要依赖此层</strong></td>
+    </tr>
+    <tr>
+      <td><code>service_group</code></td>
+      <td>服务层</td>
+      <td>standard 系统</td>
+      <td>系统服务 SA 实现（需打补丁后重新编译）</td>
+    </tr>
+  </table>
+</div>
+
+<div class="ok">
+  <strong>与 AOSP 的类比：</strong>OH 的 inner_kit（fwk_group）类似于 AOSP 的 AIDL Proxy 库；OH 的 service_group 类似于 AOSP 的 services.jar。适配层拦截点在 AOSP Stub 层（Java），但需要链接 OH 的 inner_kit 库来发出 OH 侧 IPC 调用。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch3">3. 适配层所需 OH 模块总览</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch3-1">3.1 必须编译的模块</h2>
+
+<div class="stat-grid">
+  <div class="stat-box"><div class="number">9</div><div class="label">核心组件</div></div>
+  <div class="stat-box"><div class="number">2</div><div class="label">打补丁模块</div></div>
+  <div class="stat-box"><div class="number">3</div><div class="label">适配层自有模块</div></div>
+  <div class="stat-box"><div class="number">~15</div><div class="label">产出 .z.so</div></div>
+</div>
+
+<table>
+  <tr><th>组件</th><th>子系统</th><th>OH 路径</th><th>适配层需要</th><th>是否需补丁</th></tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> ability_runtime</td>
+    <td>ability</td>
+    <td><code>foundation/ability/ability_runtime/</code></td>
+    <td>AbilityManager / AppMgr / Mission 客户端库 + 服务</td>
+    <td><span class="tag tag-patch">需补丁</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> ability_base</td>
+    <td>ability</td>
+    <td><code>foundation/ability/ability_base/</code></td>
+    <td>Want、ElementName、Skill 等基础类型</td>
+    <td>否</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> window_manager</td>
+    <td>window</td>
+    <td><code>foundation/window/window_manager/</code></td>
+    <td>WindowManager / SceneSession / Display 客户端库 + 服务</td>
+    <td>否</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> graphic_2d</td>
+    <td>graphic</td>
+    <td><code>foundation/graphic/graphic_2d/</code></td>
+    <td>RenderService 客户端（RSSurfaceNode、RSUIDirector）</td>
+    <td>否</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> graphic_surface</td>
+    <td>graphic</td>
+    <td><code>foundation/graphic/graphic_surface/</code></td>
+    <td>Surface、BufferQueue、SyncFence</td>
+    <td>否</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> bundle_framework</td>
+    <td>bundlemanager</td>
+    <td><code>foundation/bundlemanager/bundle_framework/</code></td>
+    <td>BMS 客户端库 + 服务 + installd</td>
+    <td><span class="tag tag-patch">需补丁</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> common_event_service</td>
+    <td>notification</td>
+    <td><code>foundation/notification/common_event_service/</code></td>
+    <td>CommonEvent 发布/订阅客户端库</td>
+    <td>否</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> ipc</td>
+    <td>communication</td>
+    <td><code>foundation/communication/ipc/</code></td>
+    <td>IPC 框架（IRemoteObject、IPCSkeleton）</td>
+    <td>否</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-include">必需</span> samgr</td>
+    <td>distributedschedule</td>
+    <td><code>foundation/distributedschedule/samgr/</code></td>
+    <td>SA 管理器（服务注册/发现）</td>
+    <td>否</td>
+  </tr>
+</table>
+
+<p>以下为传递依赖，会被上述核心组件自动拉入编译：</p>
+
+<table>
+  <tr><th>组件</th><th>说明</th></tr>
+  <tr><td><code>hilog</code></td><td>日志框架 — 所有 OH 模块依赖</td></tr>
+  <tr><td><code>c_utils</code></td><td>C++ 公共库 — 几乎所有模块依赖</td></tr>
+  <tr><td><code>access_token</code></td><td>权限管理 — appspawn-x 需要</td></tr>
+  <tr><td><code>appspawn</code></td><td>进程孵化器基础 — appspawn-x 继承</td></tr>
+  <tr><td><code>init</code></td><td>系统初始化 / 属性系统 — appspawn-x 需要</td></tr>
+  <tr><td><code>selinux_adapter</code></td><td>SELinux 适配 — appspawn-x 安全上下文</td></tr>
+  <tr><td><code>eventhandler</code></td><td>事件循环 — WMS、AMS 内部使用</td></tr>
+  <tr><td><code>safwk</code></td><td>SA 框架 — 所有系统服务注册依赖</td></tr>
+</table>
+
+<h2 id="ch3-2">3.2 需要打补丁的模块</h2>
+
+<table>
+  <tr><th>模块</th><th>补丁文件数</th><th>修改类型</th><th>目的</th></tr>
+  <tr>
+    <td><span class="tag tag-patch">补丁</span> ability_runtime</td>
+    <td>5 个文件</td>
+    <td>接口扩展 + 服务逻辑修改</td>
+    <td>Mission 多 Ability 栈支持；APP_ANDROID 进程路由</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-patch">补丁</span> bundle_framework</td>
+    <td>4 个文件</td>
+    <td>枚举扩展 + 接口扩展 + 新实现文件</td>
+    <td>APK 安装流水线；installd Android 扩展方法</td>
+  </tr>
+</table>
+
+<h2 id="ch3-3">3.3 不需要编译的模块</h2>
+
+<table>
+  <tr><th>模块</th><th>排除原因</th></tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> ArkUI / ACE</td>
+    <td>Android App 使用 AOSP View 体系，不使用 OH 的 ArkUI</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> NAPI (Node-API)</td>
+    <td>Android App 使用 JNI，不使用 NAPI</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> ArkTS / ets_runtime</td>
+    <td>Android App 使用 Java/Kotlin + ART，不使用 ArkTS</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> OH Launcher / SystemUI / Settings</td>
+    <td>设备上已有，适配层不参与</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> HAL / HDI</td>
+    <td>由厂商（HiHope）提供 vendor 镜像，不在项目编译范围</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> 分布式能力</td>
+    <td>distributed_ability、distributed_bundle 等，Android App 不使用</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-exclude">排除</span> Telephony / WiFi / Bluetooth</td>
+    <td>硬件相关服务，Phase 1 不涉及</td>
+  </tr>
+</table>
+
+<h2 id="ch3-4">3.4 模块依赖总览图</h2>
+
+<div class="diagram">
+                        ┌─────────────────────────────────────────────────────┐
+                        │              适配层自有模块 (OH BUILD.gn)              │
+                        │                                                     │
+                        │  ┌──────────────┐  ┌──────────┐  ┌───────────────┐  │
+                        │  │ appspawn-x   │  │apk_inst. │  │oh_adapter_    │  │
+                        │  │ (executable) │  │(.z.so)   │  │bridge (.z.so) │  │
+                        │  └──────┬───────┘  └────┬─────┘  └───────┬───────┘  │
+                        └─────────┼───────────────┼────────────────┼──────────┘
+                                  │               │                │
+          ┌───────────────────────┼───────────────┼────────────────┼──────────────┐
+          │                       ▼               ▼                ▼              │
+          │  ┌──────────────────────────────────────────────────────────────────┐ │
+          │  │                   Inner Kits 客户端库 (fwk_group)                │ │
+          │  │                                                                 │ │
+          │  │  ability_manager  app_manager  libwm  librender_service_client  │ │
+          │  │  appexecfwk_core  cesfwk_innerkits  libsurface  ipc_core       │ │
+          │  │  samgr_proxy  libhilog  c_utils  libaccesstoken_manager_sdk    │ │
+          │  │                                                                 │ │
+          │  └────────────────────────────┬────────────────────────────────────┘ │
+          │                               │                                      │
+          │                               ▼                                      │
+          │  ┌──────────────────────────────────────────────────────────────────┐ │
+          │  │              OH 系统服务 (service_group) — 需补丁                 │ │
+          │  │                                                                 │ │
+          │  │  ┌────────────────┐  ┌──────────────┐  ┌─────────────────────┐  │ │
+          │  │  │ libabilityms   │  │ libwms       │  │ libbms              │  │ │
+          │  │  │ (.z.so)        │  │ (.z.so)      │  │ (.z.so)             │  │ │
+          │  │  │ ★补丁:Mission栈│  │              │  │ ★补丁:APK安装流水线  │  │ │
+          │  │  │ ★补丁:AppSpawnX│  │              │  │ ★补丁:installd扩展  │  │ │
+          │  │  └────────────────┘  └──────────────┘  └─────────────────────┘  │ │
+          │  │                                                                 │ │
+          │  │  librender_service (.z.so)    libces (.z.so)                    │ │
+          │  │  libdms (.z.so)               libinstalld (.z.so)              │ │
+          │  └──────────────────────────────────────────────────────────────────┘ │
+          │                                                                      │
+          │                        OH 构建系统 (GN + Ninja)                       │
+          └──────────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+          ┌──────────────────────────────────────────────────────────────────────┐
+          │                  基础设施（自动作为传递依赖编译）                       │
+          │                                                                      │
+          │  ipc_core    samgr_proxy    libhilog    c_utils    eventhandler      │
+          │  safwk       access_token   selinux_adapter   init   appspawn       │
+          └──────────────────────────────────────────────────────────────────────┘
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch4">4. 核心模块详细分析</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch4-1">4.1 AbilityRuntime（ability_runtime）</h2>
+
+<p>这是适配层最核心的 OH 依赖。对应 Android 侧的 AMS + ATMS，承载 Activity/Service 生命周期管理和进程管理。</p>
+
+<div class="card">
+  <h4>组件结构</h4>
+  <table>
+    <tr><th>子模块</th><th>路径</th><th>产物</th><th>适配层使用方式</th></tr>
+    <tr>
+      <td>AbilityManager 接口</td>
+      <td><code>interfaces/inner_api/ability_manager/</code></td>
+      <td>libability_manager.z.so (inner_kit)</td>
+      <td>适配层 JNI 链接此库访问 AMS<br><code>oh_ability_manager_client.cpp</code> 调用 <code>AbilityManagerClient::GetInstance()</code></td>
+    </tr>
+    <tr>
+      <td>AppManager 接口</td>
+      <td><code>interfaces/inner_api/app_manager/</code></td>
+      <td>libapp_manager.z.so (inner_kit)</td>
+      <td>适配层 JNI 链接此库访问 AppMgr<br><code>oh_app_mgr_client.cpp</code> 调用进程生命周期 API</td>
+    </tr>
+    <tr>
+      <td>MissionManager 接口</td>
+      <td><code>interfaces/inner_api/mission_manager/</code></td>
+      <td>libmission_manager.z.so (inner_kit)</td>
+      <td>最近任务列表查询、Mission 操作</td>
+    </tr>
+    <tr>
+      <td>AMS 服务实现</td>
+      <td><code>services/abilitymgr/</code></td>
+      <td>libabilityms.z.so (SA)</td>
+      <td><span class="tag tag-patch">需补丁</span> Mission 多 Ability 栈</td>
+    </tr>
+    <tr>
+      <td>AppMgr 服务实现</td>
+      <td><code>services/appmgr/</code></td>
+      <td>libappmgr.z.so (SA)</td>
+      <td><span class="tag tag-patch">需补丁</span> APP_ANDROID 进程路由</td>
+    </tr>
+  </table>
+
+  <h4>适配层引用的关键 OH 接口（248+ 方法）</h4>
+  <table>
+    <tr><th>OH 接口</th><th>方法数</th><th>Android 对应</th></tr>
+    <tr><td><code>IAbilityManager</code></td><td>248</td><td>IActivityManager (249) + IActivityTaskManager (95)</td></tr>
+    <tr><td><code>IAppMgr</code></td><td>123</td><td>IActivityManager（进程管理部分）</td></tr>
+    <tr><td><code>IMissionManager</code></td><td>27</td><td>IActivityTaskManager（最近任务部分）</td></tr>
+  </table>
+
+  <h4>反向回调接口</h4>
+  <table>
+    <tr><th>OH 回调接口</th><th>方法数</th><th>适配层桥接目标</th></tr>
+    <tr><td><code>IAppScheduler</code></td><td>34</td><td>IApplicationThread（进程/内存生命周期）</td></tr>
+    <tr><td><code>IAbilityScheduler</code></td><td>35</td><td>IApplicationThread（Activity/Service 生命周期）</td></tr>
+    <tr><td><code>IAbilityConnection</code></td><td>2</td><td>IServiceConnection（服务绑定回调）</td></tr>
+  </table>
+</div>
+
+<div class="warn">
+  <strong>补丁影响：</strong>ability_runtime 有 5 个文件需要打补丁（Mission 多 Ability 栈 + AppSpawnX 路由），修改了 AMS 核心逻辑。这意味着打补丁后需要重新编译 <code>libabilityms.z.so</code> 和 <code>libappmgr.z.so</code>，并推送到设备替换原版。
+</div>
+
+<h2 id="ch4-2">4.2 WindowManager（window_manager）</h2>
+
+<p>对应 Android 侧的 WMS + WindowSession，管理窗口创建、布局、输入分发和 SceneBoard 场景管理。</p>
+
+<div class="card">
+  <h4>组件结构</h4>
+  <table>
+    <tr><th>子模块</th><th>路径</th><th>产物</th><th>适配层使用方式</th></tr>
+    <tr>
+      <td>Window 客户端库</td>
+      <td><code>wm/</code></td>
+      <td>libwm.z.so (inner_kit)</td>
+      <td>适配层 JNI 链接此库创建/管理窗口</td>
+    </tr>
+    <tr>
+      <td>Display 客户端库</td>
+      <td><code>dm/</code></td>
+      <td>libdm.z.so (inner_kit)</td>
+      <td>显示屏信息查询</td>
+    </tr>
+    <tr>
+      <td>SceneSession 管理器</td>
+      <td><code>window_scene/session_manager/</code></td>
+      <td>libscene_session_manager.z.so</td>
+      <td>CreateAndConnectSpecificSession() 创建窗口会话</td>
+    </tr>
+    <tr>
+      <td>Session 主机</td>
+      <td><code>window_scene/session/host/</code></td>
+      <td>libsession.z.so</td>
+      <td>ISession 接口：per-window 操作</td>
+    </tr>
+    <tr>
+      <td>WMS 服务实现</td>
+      <td><code>wmserver/</code></td>
+      <td>libwms.z.so (SA)</td>
+      <td>设备上运行的 WMS 服务（无需补丁）</td>
+    </tr>
+  </table>
+
+  <h4>适配层引用的关键 OH 接口</h4>
+  <table>
+    <tr><th>OH 接口</th><th>方法数</th><th>Android 对应</th></tr>
+    <tr><td><code>IWindowManager (OH)</code></td><td>102</td><td>IWindowManager (Android, 144)</td></tr>
+    <tr><td><code>ISceneSessionManager</code></td><td>26+</td><td>IWindowManager + IWindowSession（部分）</td></tr>
+    <tr><td><code>ISession</code></td><td>126+</td><td>IWindowSession (42)</td></tr>
+  </table>
+
+  <h4>反向回调接口</h4>
+  <table>
+    <tr><th>OH 回调接口</th><th>方法数</th><th>适配层桥接目标</th></tr>
+    <tr><td><code>IWindow (OH)</code></td><td>26</td><td>IWindow (Android)（窗口状态回调）</td></tr>
+    <tr><td><code>ISessionStage</code></td><td>94</td><td>IWindow (Android) + IApplicationThread</td></tr>
+    <tr><td><code>IWindowManagerAgent</code></td><td>19</td><td>内部处理（无 Android 等效接口）</td></tr>
+  </table>
+</div>
+
+<h2 id="ch4-3">4.3 图形子系统（graphic_2d + graphic_surface）</h2>
+
+<p>图形子系统分为两个组件：<code>graphic_2d</code>（渲染服务/合成器）和 <code>graphic_surface</code>（Surface/Buffer 管理）。对应 Android 侧的 SurfaceFlinger + libgui。</p>
+
+<div class="card">
+  <h4>graphic_2d — 渲染服务</h4>
+  <table>
+    <tr><th>子模块</th><th>产物</th><th>适配层使用方式</th></tr>
+    <tr>
+      <td>RenderService 客户端<br><code>rosen/modules/render_service_client/</code></td>
+      <td>librender_service_client.z.so</td>
+      <td><code>oh_surface_bridge.cpp</code> 调用 RSSurfaceNode::Create()、RSUIDirector 管理渲染树</td>
+    </tr>
+    <tr>
+      <td>RenderService 基础<br><code>rosen/modules/render_service_base/</code></td>
+      <td>librender_service_base.z.so</td>
+      <td>RSTransaction、RSRenderThread 等基础类型</td>
+    </tr>
+    <tr>
+      <td>RenderService 服务<br><code>rosen/modules/render_service/</code></td>
+      <td>librender_service.z.so (SA)</td>
+      <td>设备上运行的渲染合成服务（无需补丁）</td>
+    </tr>
+  </table>
+
+  <h4>graphic_surface — Surface/Buffer 管理</h4>
+  <table>
+    <tr><th>子模块</th><th>产物</th><th>适配层使用方式</th></tr>
+    <tr>
+      <td>Surface<br><code>surface/</code></td>
+      <td>libsurface.z.so</td>
+      <td><code>oh_graphic_buffer_producer.cpp</code> 将 Android IGraphicBufferProducer 映射到 OH Surface</td>
+    </tr>
+    <tr>
+      <td>BufferHandle<br><code>buffer_handle/</code></td>
+      <td>(头文件库)</td>
+      <td>图形缓冲区句柄抽象</td>
+    </tr>
+    <tr>
+      <td>SyncFence<br><code>sync_fence/</code></td>
+      <td>libsync_fence.z.so</td>
+      <td>GPU 同步围栏（确保缓冲区渲染完成后再提交）</td>
+    </tr>
+  </table>
+</div>
+
+<div class="note">
+  <strong>Surface 桥接核心链路：</strong>Android ViewRootImpl → Surface (Android) → <code>oh_surface_bridge</code> → RSSurfaceNode (OH) → RenderService → 合成显示。这条链路涉及 graphic_2d 和 graphic_surface 两个组件的协作。
+</div>
+
+<h2 id="ch4-4">4.4 BundleFramework（bundle_framework）</h2>
+
+<p>对应 Android 侧的 PMS（PackageManagerService），管理应用安装、包信息查询和权限管理。是补丁最多的模块。</p>
+
+<div class="card">
+  <h4>组件结构</h4>
+  <table>
+    <tr><th>子模块</th><th>产物</th><th>适配层使用方式</th></tr>
+    <tr>
+      <td>BMS 接口<br><code>interfaces/inner_api/</code></td>
+      <td>libappexecfwk_core.z.so (inner_kit)</td>
+      <td><code>oh_bundle_mgr_client.cpp</code> 查询包信息</td>
+    </tr>
+    <tr>
+      <td>BMS 服务<br><code>services/bundlemgr/</code></td>
+      <td>libbms.z.so (SA)</td>
+      <td><span class="tag tag-patch">需补丁</span> APK 安装流水线集成</td>
+    </tr>
+    <tr>
+      <td>installd 守护进程<br><code>services/bundlemgr/installd/</code></td>
+      <td>libinstalld.z.so</td>
+      <td><span class="tag tag-patch">需补丁</span> 5 个新 IPC 方法（Android 数据目录、native lib 提取、dex2oat、签名验证）</td>
+    </tr>
+  </table>
+
+  <h4>补丁修改详情</h4>
+  <table>
+    <tr><th>补丁文件</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>bundle_constants.h.patch</code></td>
+      <td>BundleType 枚举添加 <code>APP_ANDROID = 10</code></td>
+    </tr>
+    <tr>
+      <td><code>bundle_installer.cpp.patch</code></td>
+      <td>ProcessBundleInstall() 中检测 .apk 后缀，路由到 ProcessApkInstall()</td>
+    </tr>
+    <tr>
+      <td><code>installd_interface.h.patch</code></td>
+      <td>添加 5 个虚函数（IPC 码 90-94）：CreateAndroidDataDir / ExtractApkNativeLibs / DexOptAndroid / RemoveAndroidDataDir / VerifyApkSignature</td>
+    </tr>
+    <tr>
+      <td><code>installd_host_impl_android.cpp</code></td>
+      <td><strong>新增文件</strong>：5 个 IPC 方法的完整 C++ 实现</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch4-5">4.5 CommonEventService（common_event_service）</h2>
+
+<p>对应 Android 侧的 BroadcastReceiver 机制，提供事件发布/订阅功能。</p>
+
+<div class="card">
+  <table>
+    <tr><th>子模块</th><th>产物</th><th>适配层使用方式</th></tr>
+    <tr>
+      <td>CES 客户端库<br><code>frameworks/core/</code></td>
+      <td>libcesfwk_innerkits.z.so (inner_kit)</td>
+      <td><code>oh_common_event_client.cpp</code> 调用 CommonEventManager::PublishCommonEvent() / SubscribeCommonEvent()</td>
+    </tr>
+    <tr>
+      <td>CES 服务<br><code>services/</code></td>
+      <td>libces.z.so (SA)</td>
+      <td>设备上运行的事件服务（无需补丁）</td>
+    </tr>
+  </table>
+
+  <p>适配层的 <code>BroadcastEventConverter</code> 在 Java 层完成 Android Action 到 OH CommonEvent 的映射，然后通过 JNI 调用 CES 客户端库发布/订阅事件。</p>
+</div>
+
+<h2 id="ch4-6">4.6 基础设施模块（ipc / samgr / hilog / c_utils）</h2>
+
+<p>这些模块是所有 OH 系统服务的公共基础设施，会作为传递依赖自动编译。</p>
+
+<div class="card">
+  <table>
+    <tr><th>组件</th><th>产物</th><th>作用</th><th>适配层直接使用</th></tr>
+    <tr>
+      <td><code>ipc</code></td>
+      <td>libipc_core.z.so</td>
+      <td>OH IPC 框架（类似 Android Binder）：IPCSkeleton、IRemoteObject、IServiceRegistry</td>
+      <td>是 — 所有 JNI 客户端代码通过 IPC 与系统服务通信</td>
+    </tr>
+    <tr>
+      <td><code>samgr</code></td>
+      <td>libsamgr_proxy.z.so</td>
+      <td>SA 管理器代理：SystemAbilityManagerClient 用于发现和获取系统服务</td>
+      <td>是 — JNI 代码通过 samgr 获取 SA 句柄</td>
+    </tr>
+    <tr>
+      <td><code>hilog</code></td>
+      <td>libhilog.z.so</td>
+      <td>OH 日志系统</td>
+      <td>是 — 适配层 C++ 代码的日志输出</td>
+    </tr>
+    <tr>
+      <td><code>c_utils</code></td>
+      <td>libutils.z.so</td>
+      <td>C++ 公共工具库（RefBase、Parcel 等）</td>
+      <td>是 — IPC 数据序列化</td>
+    </tr>
+    <tr>
+      <td><code>eventhandler</code></td>
+      <td>libeventhandler.z.so</td>
+      <td>异步事件循环框架</td>
+      <td>间接 — 被 WMS/AMS 内部使用</td>
+    </tr>
+    <tr>
+      <td><code>safwk</code></td>
+      <td>libsafwk.z.so</td>
+      <td>系统能力框架（SA 注册/生命周期）</td>
+      <td>间接 — 被所有 SA 服务使用</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch5">5. 适配层自有模块的 OH 构建</h1>
+<!-- ================================================================ -->
+
+<p>适配层有 3 个模块需要通过 OH 构建系统（GN）编译，它们作为 OH 子系统的一部分部署到设备上。</p>
+
+<h2 id="ch5-1">5.1 appspawn-x（混合进程孵化器）</h2>
+
+<div class="card">
+  <h4>构建配置（BUILD.gn）</h4>
+  <table>
+    <tr><th>目标</th><th>类型</th><th>产物</th><th>说明</th></tr>
+    <tr><td><code>appspawn-x</code></td><td>ohos_executable</td><td>/system/bin/appspawn-x</td><td>混合孵化器主程序</td></tr>
+    <tr><td><code>appspawn_x_cfg</code></td><td>ohos_prebuilt_etc</td><td>/system/etc/init/appspawn_x.cfg</td><td>OH init 服务配置</td></tr>
+    <tr><td><code>appspawn_x_sandbox_config</code></td><td>ohos_prebuilt_etc</td><td>/system/etc/appspawn_x_sandbox.json</td><td>沙箱挂载规则</td></tr>
+    <tr><td><code>appspawnx_java</code></td><td>ohos_java_library</td><td>appspawnx.jar</td><td>Java 预加载 + 子进程初始化</td></tr>
+  </table>
+
+  <h4>依赖清单</h4>
+  <table>
+    <tr><th>依赖类型</th><th>依赖项</th><th>用途</th></tr>
+    <tr>
+      <td rowspan="2">OH 直接依赖</td>
+      <td><code>//base/startup/appspawn:appspawn_client</code></td>
+      <td>继承 appspawn 客户端协议</td>
+    </tr>
+    <tr>
+      <td><code>//base/startup/init:libbegetutil</code></td>
+      <td>系统属性访问</td>
+    </tr>
+    <tr>
+      <td rowspan="7">OH 外部依赖</td>
+      <td><code>hilog:libhilog</code></td>
+      <td>日志</td>
+    </tr>
+    <tr><td><code>c_utils:utils</code></td><td>公共工具</td></tr>
+    <tr><td><code>ipc:ipc_core</code></td><td>IPC 框架</td></tr>
+    <tr><td><code>samgr:samgr_proxy</code></td><td>SA 发现</td></tr>
+    <tr><td><code>access_token:libaccesstoken_manager_sdk</code></td><td>权限管理</td></tr>
+    <tr><td><code>selinux_adapter:librestorecon</code></td><td>SELinux 上下文</td></tr>
+    <tr><td><code>json:nlohmann_json_static</code></td><td>JSON 解析</td></tr>
+    <tr>
+      <td rowspan="4">Android 交叉编译</td>
+      <td><code>//third_party/android/art:libart</code></td>
+      <td>ART 虚拟机</td>
+    </tr>
+    <tr><td><code>//third_party/android/art:libdexfile</code></td><td>DEX 文件解析</td></tr>
+    <tr><td><code>//third_party/android/runtime:libandroid_runtime</code></td><td>Android 运行时</td></tr>
+    <tr><td><code>//third_party/android/runtime:libnativehelper</code></td><td>JNI 辅助</td></tr>
+  </table>
+</div>
+
+<div class="warn">
+  <strong>特殊依赖：</strong>appspawn-x 依赖 4 个"Android 交叉编译"库（libart、libdexfile、libandroid_runtime、libnativehelper），这些需要在 OH 构建环境中作为预编译库（prebuilt）或交叉编译目标引入。它们来自 AOSP 编译产物，需要两套构建系统协调。详见第 9 章。
+</div>
+
+<h2 id="ch5-2">5.2 apk_installer（APK 安装库）</h2>
+
+<div class="card">
+  <h4>构建配置（BUILD.gn）</h4>
+  <table>
+    <tr><th>目标</th><th>类型</th><th>产物</th><th>说明</th></tr>
+    <tr><td><code>apk_installer</code></td><td>ohos_shared_library</td><td>libapk_installer.z.so</td><td>APK 解析/安装/验证库</td></tr>
+  </table>
+
+  <h4>源文件</h4>
+  <ul>
+    <li><code>apk_manifest_parser.cpp</code> — AXML 二进制格式解析器</li>
+    <li><code>apk_bundle_parser.cpp</code> — ManifestData → InnerBundleInfo 转换</li>
+    <li><code>apk_installer.cpp</code> — APK 文件部署（复制、lib 提取、dex2oat）</li>
+    <li><code>permission_mapper.cpp</code> — Android ↔ OH 权限名映射</li>
+    <li><code>apk_signature_verifier.cpp</code> — APK V1/V2 签名验证</li>
+  </ul>
+
+  <h4>依赖</h4>
+  <table>
+    <tr><th>依赖项</th><th>用途</th></tr>
+    <tr><td><code>//third_party/minizip:minizip</code></td><td>ZIP 解压（提取 AndroidManifest.xml、.so 文件）</td></tr>
+    <tr><td><code>//third_party/openssl:libcrypto_shared</code></td><td>APK 签名验证（RSA、SHA）</td></tr>
+    <tr><td><code>//prebuilts/android/frameworks:libandroidfw</code></td><td>AXML 二进制解析（ResXMLParser）</td></tr>
+    <tr><td><code>bundle_framework:appexecfwk_core</code></td><td>BMS 接口类型</td></tr>
+    <tr><td><code>c_utils:utils</code>, <code>hilog:libhilog</code></td><td>基础工具</td></tr>
+  </table>
+</div>
+
+<h2 id="ch5-3">5.3 oh_adapter_bridge（JNI 桥接库）</h2>
+
+<div class="card">
+  <p><code>oh_adapter_bridge</code> 是适配层的核心 JNI 库，包含所有 OH IPC 客户端调用。目前通过 <strong>CMakeLists.txt</strong>（AOSP 侧 Android.bp）和 <strong>OH BUILD.gn</strong> 两种方式构建。</p>
+
+  <h4>OH 构建方式（BUILD.gn）</h4>
+  <table>
+    <tr><th>目标</th><th>类型</th><th>产物</th></tr>
+    <tr><td><code>oh_adapter_bridge</code></td><td>ohos_shared_library</td><td>liboh_adapter_bridge.z.so</td></tr>
+  </table>
+
+  <h4>链接的 OH Inner Kit 库</h4>
+  <table>
+    <tr><th>外部依赖</th><th>对应 JNI 客户端文件</th></tr>
+    <tr><td><code>ability_runtime:ability_manager</code></td><td>oh_ability_manager_client.cpp</td></tr>
+    <tr><td><code>ability_runtime:app_manager</code></td><td>oh_app_mgr_client.cpp</td></tr>
+    <tr><td><code>window_manager:libwm</code></td><td>oh_window_manager_client.cpp</td></tr>
+    <tr><td><code>graphic_2d:librender_service_client</code></td><td>oh_surface_bridge.cpp</td></tr>
+    <tr><td><code>graphic_surface:surface</code></td><td>oh_graphic_buffer_producer.cpp</td></tr>
+    <tr><td><code>common_event_service:cesfwk_innerkits</code></td><td>oh_common_event_client.cpp</td></tr>
+    <tr><td><code>bundle_framework:appexecfwk_core</code></td><td>oh_bundle_mgr_client.cpp</td></tr>
+    <tr><td><code>ipc:ipc_core</code></td><td>所有 IPC 通信</td></tr>
+    <tr><td><code>samgr:samgr_proxy</code></td><td>SA 服务发现</td></tr>
+    <tr><td><code>hilog:libhilog</code></td><td>日志输出</td></tr>
+  </table>
+
+  <p>源文件共 20 个 C++ 文件，覆盖 7 个功能域：core / activity / window / surface / broadcast / contentprovider / package-manager。</p>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch6">6. OH 源码补丁集成</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch6-1">6.1 ability_runtime 补丁</h2>
+
+<div class="card">
+  <h4>补丁 1：Mission 多 Ability 栈支持</h4>
+  <p><strong>背景：</strong>Android 中一个 Task 包含多个 Activity（栈结构），但 OH 原生设计是 1 个 Mission 对应 1 个 Ability（平铺模型）。</p>
+
+  <table>
+    <tr><th>文件</th><th>修改类型</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>interfaces/inner_api/ability_manager/<br>include/ability_manager_interface.h</code></td>
+      <td>接口扩展</td>
+      <td>添加 <code>virtual int StartAbilityInMission(const Want &want, int32_t missionId) = 0;</code><br>添加 IPC 码 <code>START_ABILITY_IN_MISSION</code></td>
+    </tr>
+    <tr>
+      <td><code>services/abilitymgr/include/mission/<br>mission.h</code></td>
+      <td><strong>整文件替换</strong></td>
+      <td><code>abilityRecord_</code> → <code>abilityStack_</code>（std::vector）<br>新增方法：PushAbility、PopAbility、FindAbilityByName、PopAbilitiesAbove、IsMultiAbilityMode 等</td>
+    </tr>
+    <tr>
+      <td><code>services/abilitymgr/src/mission/<br>mission.cpp</code></td>
+      <td><strong>整文件替换</strong></td>
+      <td>所有新方法的完整实现（~288 行）<br>GetAbilityRecord() 返回栈顶，兼容现有代码</td>
+    </tr>
+    <tr>
+      <td><code>services/abilitymgr/src/mission/<br>mission_list_manager_patch.cpp</code></td>
+      <td>逻辑修改</td>
+      <td>MissionListManager 对多 Ability 栈的调度逻辑</td>
+    </tr>
+  </table>
+
+  <h4>补丁 2：APP_ANDROID 进程路由</h4>
+  <table>
+    <tr><th>文件</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>services/appmgr/include/<br>remote_client_manager.h</code></td>
+      <td>添加 <code>GetAndroidSpawnClient()</code> 方法和 <code>androidSpawnClient_</code> 成员<br>（AppSpawnClient 连接到 "AppSpawnX" socket）</td>
+    </tr>
+    <tr>
+      <td><code>services/appmgr/src/<br>app_mgr_service_inner.cpp</code></td>
+      <td>StartProcess() 中检查 <code>bundleType == BundleType::APP_ANDROID</code><br>若为 Android App → 通过 <code>androidSpawnClient_->Send(msg)</code> 路由到 appspawn-x</td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch6-2">6.2 bundle_framework 补丁</h2>
+
+<div class="card">
+  <h4>补丁 1：Android Bundle 类型枚举</h4>
+  <table>
+    <tr><th>文件</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>interfaces/inner_api/appexecfwk_base/<br>include/bundle_constants.h</code></td>
+      <td>BundleType 枚举添加 <code>APP_ANDROID = 10</code>（保留值，不与 OH 原有值冲突）</td>
+    </tr>
+  </table>
+
+  <h4>补丁 2：APK 安装流水线</h4>
+  <table>
+    <tr><th>文件</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>services/bundlemgr/src/<br>bundle_installer.cpp</code></td>
+      <td>ProcessBundleInstall() 检测 .apk 后缀 → 路由到新增的 ProcessApkInstall() 方法<br>完整的 APK 安装 5 阶段流程（解析 → 签名验证 → 版本检查 → 文件部署 → BMS 注册）</td>
+    </tr>
+  </table>
+
+  <h4>补丁 3：installd 扩展</h4>
+  <table>
+    <tr><th>文件</th><th>修改内容</th></tr>
+    <tr>
+      <td><code>services/bundlemgr/include/installd/<br>installd_interface.h</code></td>
+      <td>添加 5 个虚函数声明（IPC 码 90-94）：<br>
+        <code>[90] CreateAndroidDataDir</code>（创建 Android 数据目录结构）<br>
+        <code>[91] ExtractApkNativeLibs</code>（从 APK 提取 native .so）<br>
+        <code>[92] DexOptAndroid</code>（调用 dex2oat 进行 AOT 编译）<br>
+        <code>[93] RemoveAndroidDataDir</code>（清理数据目录）<br>
+        <code>[94] VerifyApkSignature</code>（V1/V2 签名验证）
+      </td>
+    </tr>
+    <tr>
+      <td><code>services/bundlemgr/src/installd/<br>installd_host_impl_android.cpp</code></td>
+      <td><strong>新增文件</strong>（~274 行），5 个 IPC 方法的完整实现<br>
+        依赖 minizip（ZIP 解压）、dex2oat（fork+execv）、oh_adapter::ApkSignatureVerifier
+      </td>
+    </tr>
+  </table>
+</div>
+
+<h2 id="ch6-3">6.3 补丁应用策略</h2>
+
+<div class="card">
+  <p>所有补丁存放在 <code>ohos_patches/</code> 目录下，目录结构镜像 OH 源码树：</p>
+
+<pre><code>ohos_patches/
+├── ability_rt/                          # → foundation/ability/ability_runtime/
+│   ├── interfaces/inner_api/.../ability_manager_interface.h.patch
+│   ├── services/abilitymgr/include/mission/mission.h           (整文件)
+│   ├── services/abilitymgr/src/mission/mission.cpp             (整文件)
+│   ├── services/appmgr/include/remote_client_manager.h.patch
+│   └── services/appmgr/src/app_mgr_service_inner.cpp.patch
+│
+└── bundle_framework/                    # → foundation/bundlemanager/bundle_framework/
+    ├── interfaces/.../bundle_constants.h.patch
+    └── services/bundlemgr/
+        ├── include/installd/installd_interface.h.patch
+        └── src/
+            ├── bundle_installer.cpp.patch
+            └── installd/installd_host_impl_android.cpp         (新文件)</code></pre>
+
+  <h4>应用方式</h4>
+  <ol>
+    <li><strong>.patch 文件</strong>：使用 <code>patch -p1</code> 或 <code>git apply</code> 应用到 OH 源码</li>
+    <li><strong>整文件（mission.h / mission.cpp）</strong>：直接复制替换 OH 源码中的同名文件</li>
+    <li><strong>新文件（installd_host_impl_android.cpp）</strong>：复制到 OH 源码的对应目录</li>
+  </ol>
+
+  <h4>建议的自动化脚本</h4>
+<pre><code>#!/bin/bash
+# apply_oh_patches.sh — 在 OH 源码根目录执行
+OH_SRC="/root/oh"
+PATCHES="path/to/adapter/ohos_patches"
+
+# 1. 应用 .patch 文件
+for patch in $(find $PATCHES -name "*.patch"); do
+    target_dir=$(dirname "$patch" | sed "s|$PATCHES/ability_rt|$OH_SRC/foundation/ability/ability_runtime|" \
+                                  | sed "s|$PATCHES/bundle_framework|$OH_SRC/foundation/bundlemanager/bundle_framework|")
+    patch -p0 -d "$target_dir" &lt; "$patch"
+done
+
+# 2. 复制整文件和新文件
+cp $PATCHES/ability_rt/services/abilitymgr/include/mission/mission.h \
+   $OH_SRC/foundation/ability/ability_runtime/services/abilitymgr/include/mission/
+cp $PATCHES/ability_rt/services/abilitymgr/src/mission/mission.cpp \
+   $OH_SRC/foundation/ability/ability_runtime/services/abilitymgr/src/mission/
+cp $PATCHES/bundle_framework/services/bundlemgr/src/installd/installd_host_impl_android.cpp \
+   $OH_SRC/foundation/bundlemanager/bundle_framework/services/bundlemgr/src/installd/</code></pre>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch7">7. 构建策略</h1>
+<!-- ================================================================ -->
+
+<h2 id="ch7-1">7.1 方案 A：全量编译 + 模块裁剪</h2>
+
+<div class="card">
+  <p>使用 <code>dayu210</code> 标准产品配置进行完整编译，依赖自动解析：</p>
+
+<pre><code># 1. 应用补丁
+bash apply_oh_patches.sh
+
+# 2. 完整编译（首次，约 2-4 小时）
+cd /root/oh
+./build.sh --product-name dayu210 --ccache
+
+# 3. 产物位置
+# out/dayu210/packages/phone/system/lib64/  → 所有 .z.so
+# out/dayu210/packages/phone/system/bin/    → 可执行文件</code></pre>
+
+  <h4>优点</h4>
+  <ul>
+    <li>最简单，无需理解模块间依赖</li>
+    <li>保证所有依赖都被正确编译</li>
+    <li>产物完整，可直接刷机验证</li>
+    <li>后续增量编译很快（ccache + ninja 增量）</li>
+  </ul>
+
+  <h4>缺点</h4>
+  <ul>
+    <li>首次编译时间长（78 GB 源码，~2-4 小时）</li>
+    <li>编译了大量不需要的模块</li>
+    <li>磁盘消耗大（out/ 目录可达 80-100 GB）</li>
+  </ul>
+</div>
+
+<h2 id="ch7-2">7.2 方案 B：按需编译指定组件</h2>
+
+<div class="card">
+  <p>使用 <code>--build-target</code> 仅编译所需组件：</p>
+
+<pre><code># 1. 应用补丁
+bash apply_oh_patches.sh
+
+# 2. 编译核心系统服务（补丁影响的模块）
+cd /root/oh
+./build.sh --product-name dayu210 --ccache \
+    --build-target abilityms \          # → libabilityms.z.so (已打补丁)
+    --build-target appmgr \             # → libappmgr.z.so (已打补丁)
+    --build-target bms \                # → libbms.z.so (已打补丁)
+    --build-target installd             # → libinstalld.z.so (已打补丁)
+
+# 3. 编译适配层自有模块
+./build.sh --product-name dayu210 --ccache \
+    --build-target appspawnx_packages \ # → appspawn-x + 配置文件
+    --build-target apk_installer \      # → libapk_installer.z.so
+    --build-target oh_adapter_bridge    # → liboh_adapter_bridge.z.so
+
+# 4. Inner Kit 客户端库（作为上述目标的依赖自动编译）
+# 无需显式指定：ability_manager, app_manager, libwm, librender_service_client,
+# cesfwk_innerkits, appexecfwk_core, ipc_core, samgr_proxy, libhilog 等</code></pre>
+
+  <h4>优点</h4>
+  <ul>
+    <li>编译速度快（仅编译所需模块 + 依赖）</li>
+    <li>磁盘消耗小</li>
+    <li>迭代开发效率高</li>
+  </ul>
+
+  <h4>缺点</h4>
+  <ul>
+    <li>需要确保 <code>--build-target</code> 名称正确（需查阅 BUILD.gn）</li>
+    <li>GN 依赖解析可能拉入意外模块</li>
+    <li>首次仍需执行 gn gen（较慢），后续 ninja 增量很快</li>
+  </ul>
+</div>
+
+<h2 id="ch7-3">7.3 方案 C：自定义 Product 配置</h2>
+
+<div class="card">
+  <p>创建专属的产品配置文件，精确控制编译范围：</p>
+
+<pre><code># productdefine/common/products/oh_adapter.json
+{
+  "product_name": "oh_adapter",
+  "device_company": "hihope",
+  "device_build_path": "device/board/hihope/dayu210",
+  "target_cpu": "arm64",
+  "type": "standard",
+  "parts": {
+    "ability:ability_base": {},
+    "ability:ability_runtime": {},
+    "window:window_manager": {},
+    "graphic:graphic_2d": {},
+    "graphic:graphic_surface": {},
+    "bundlemanager:bundle_framework": {},
+    "notification:common_event_service": {},
+    "communication:ipc": {},
+    "distributedschedule:samgr": {},
+    "hiviewdfx:hilog": {},
+    "commonlibrary:c_utils": {},
+    "startup:appspawn": {},
+    "startup:init": {},
+    "security:access_token": {},
+    "security:selinux_adapter": {},
+    "oh_adapter:appspawn_x": {},
+    "oh_adapter:apk_installer": {},
+    "oh_adapter:oh_adapter_bridge": {}
+  }
+}</code></pre>
+
+<pre><code># 编译
+./build.sh --product-name oh_adapter --ccache</code></pre>
+
+  <h4>优点</h4>
+  <ul>
+    <li>精确控制编译范围，排除无关模块</li>
+    <li>可重复构建（配置文件版本化管理）</li>
+    <li>编译速度最快</li>
+    <li>适合 CI/CD 集成</li>
+  </ul>
+
+  <h4>缺点</h4>
+  <ul>
+    <li>配置工作量大，需理解 OH 产品配置体系</li>
+    <li>依赖链可能不完整，需逐步调试补全</li>
+    <li>设备底层驱动/HAL 需从 dayu210 产品继承</li>
+  </ul>
+</div>
+
+<h2 id="ch7-4">7.4 方案对比与建议</h2>
+
+<table>
+  <tr><th>维度</th><th>方案 A（全量编译）</th><th>方案 B（按需编译）</th><th>方案 C（自定义 Product）</th></tr>
+  <tr><td>启动成本</td><td>最低（直接可用）</td><td>低（需查目标名）</td><td>高（需创建配置）</td></tr>
+  <tr><td>首次编译时间</td><td>~2-4 小时</td><td>~30-60 分钟</td><td>~20-40 分钟</td></tr>
+  <tr><td>增量编译时间</td><td>快（ccache + ninja）</td><td>快</td><td>最快</td></tr>
+  <tr><td>磁盘消耗</td><td>大（~80-100 GB out/）</td><td>中（~20-30 GB）</td><td>小（~15-20 GB）</td></tr>
+  <tr><td>可维护性</td><td>低（无集中配置）</td><td>中（命令行参数）</td><td>高（配置文件管理）</td></tr>
+  <tr><td>可重复性</td><td>高（标准产品）</td><td>中（依赖手动参数）</td><td>高（产品定义文件）</td></tr>
+  <tr><td>适用阶段</td><td>首次验证</td><td>日常开发</td><td>持续集成</td></tr>
+</table>
+
+<div class="ok">
+  <strong>建议：三步走策略</strong>
+  <ol>
+    <li><strong>第一步：方案 A</strong> — 首次完整编译 dayu210 产品，验证 OH 构建环境正确性，获得完整的系统镜像基线</li>
+    <li><strong>第二步：方案 B</strong> — 日常开发使用 <code>--build-target</code> 按需编译打补丁的模块和适配层模块，快速迭代</li>
+    <li><strong>第三步：方案 C</strong> — 项目成熟后创建自定义 Product 配置，用于 CI/CD 自动化构建</li>
+  </ol>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch8">8. 构建产物清单</h1>
+<!-- ================================================================ -->
+
+<p>最终需要从 OH 编译中获取并部署到设备的产物：</p>
+
+<div class="card">
+  <h4>系统服务产物（需补丁重编的 SA）</h4>
+  <table>
+    <tr><th>产物</th><th>来源组件</th><th>部署位置</th><th>说明</th></tr>
+    <tr><td><code>libabilityms.z.so</code></td><td>ability_runtime</td><td>/system/lib64/</td><td>AMS — 含 Mission 多 Ability 栈补丁</td></tr>
+    <tr><td><code>libappmgr.z.so</code></td><td>ability_runtime</td><td>/system/lib64/</td><td>AppMgr — 含 APP_ANDROID 路由补丁</td></tr>
+    <tr><td><code>libbms.z.so</code></td><td>bundle_framework</td><td>/system/lib64/</td><td>BMS — 含 APK 安装流水线补丁</td></tr>
+    <tr><td><code>libinstalld.z.so</code></td><td>bundle_framework</td><td>/system/lib64/</td><td>installd — 含 Android 扩展方法</td></tr>
+  </table>
+
+  <h4>Inner Kit 客户端库（适配层 JNI 链接）</h4>
+  <table>
+    <tr><th>产物</th><th>来源组件</th><th>用途</th></tr>
+    <tr><td><code>libability_manager.z.so</code></td><td>ability_runtime</td><td>AbilityManager IPC 客户端</td></tr>
+    <tr><td><code>libapp_manager.z.so</code></td><td>ability_runtime</td><td>AppMgr IPC 客户端</td></tr>
+    <tr><td><code>libmission_manager.z.so</code></td><td>ability_runtime</td><td>Mission 查询客户端</td></tr>
+    <tr><td><code>libwm.z.so</code></td><td>window_manager</td><td>Window 管理客户端</td></tr>
+    <tr><td><code>libdm.z.so</code></td><td>window_manager</td><td>Display 管理客户端</td></tr>
+    <tr><td><code>librender_service_client.z.so</code></td><td>graphic_2d</td><td>RenderService 客户端</td></tr>
+    <tr><td><code>librender_service_base.z.so</code></td><td>graphic_2d</td><td>渲染基础库</td></tr>
+    <tr><td><code>libsurface.z.so</code></td><td>graphic_surface</td><td>Surface/BufferQueue</td></tr>
+    <tr><td><code>libsync_fence.z.so</code></td><td>graphic_surface</td><td>GPU 同步围栏</td></tr>
+    <tr><td><code>libappexecfwk_core.z.so</code></td><td>bundle_framework</td><td>BMS 接口客户端</td></tr>
+    <tr><td><code>libcesfwk_innerkits.z.so</code></td><td>common_event_service</td><td>CommonEvent 客户端</td></tr>
+    <tr><td><code>libipc_core.z.so</code></td><td>ipc</td><td>IPC 框架</td></tr>
+    <tr><td><code>libsamgr_proxy.z.so</code></td><td>samgr</td><td>SA 管理代理</td></tr>
+    <tr><td><code>libhilog.z.so</code></td><td>hilog</td><td>日志</td></tr>
+  </table>
+
+  <h4>适配层自有产物</h4>
+  <table>
+    <tr><th>产物</th><th>来源</th><th>部署位置</th><th>说明</th></tr>
+    <tr><td><code>appspawn-x</code></td><td>framework/appspawn-x</td><td>/system/bin/</td><td>混合进程孵化器</td></tr>
+    <tr><td><code>appspawn_x.cfg</code></td><td>framework/appspawn-x/config</td><td>/system/etc/init/</td><td>OH init 服务注册</td></tr>
+    <tr><td><code>appspawn_x_sandbox.json</code></td><td>framework/appspawn-x/config</td><td>/system/etc/</td><td>沙箱挂载规则</td></tr>
+    <tr><td><code>libapk_installer.z.so</code></td><td>framework/package-manager</td><td>/system/lib64/</td><td>APK 解析/安装</td></tr>
+    <tr><td><code>liboh_adapter_bridge.z.so</code></td><td>framework/*/jni</td><td>/system/lib64/</td><td>适配层 JNI 桥接核心</td></tr>
+  </table>
+</div>
+
+<div class="note">
+  <strong>部署方式：</strong>打补丁后重编译的 .z.so 文件通过 <code>hdc file send</code> 推送到 DAYU600 设备的 <code>/system/lib64/</code> 目录，替换原版文件后重启。上层 .z.so 为 aarch64 纯 CPU 架构，与 SoC（UMS9620）无关，dayu210 编译产物可直接使用。
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch9">9. 与 AOSP 构建的协调</h1>
+<!-- ================================================================ -->
+
+<div class="card">
+  <p>适配项目需要两套构建系统协调工作：</p>
+
+  <h4>两套构建系统的分工</h4>
+  <table>
+    <tr><th>构建系统</th><th>产出</th><th>工具链</th><th>目标 ABI</th></tr>
+    <tr>
+      <td><strong>AOSP Soong</strong><br>(Android.bp)</td>
+      <td>framework.jar、ART、bionic、libandroid_runtime<br>oh-adapter-framework.jar（Java 适配器）<br>dex2oat</td>
+      <td>AOSP 预置 Clang + JDK</td>
+      <td>ARM64 (android)</td>
+    </tr>
+    <tr>
+      <td><strong>OH GN/Ninja</strong><br>(BUILD.gn)</td>
+      <td>OH 系统服务 .z.so（含补丁）<br>appspawn-x、apk_installer<br>oh_adapter_bridge（OH 版本）</td>
+      <td>OH 预置 Clang</td>
+      <td>ARM64 (ohos)</td>
+    </tr>
+  </table>
+
+  <h4>交叉编译：核心架构问题</h4>
+
+  <div class="warn">
+    <strong>关键约束：</strong>AOSP 编译产物（libart.so 等）链接的是 bionic libc，而 OH 系统使用 musl libc。两种 C 运行时的 TLS、pthread、malloc 实现完全不同，<strong>无法直接将 bionic 编译的 .so 复制到 OH 上使用</strong>。必须用 OH 工具链（<code>--target=aarch64-linux-ohos</code>）重新编译 AOSP C++ 源码，使产物链接 musl libc。
+  </div>
+
+  <h4>4 层交叉编译策略</h4>
+
+  <p>由于 AOSP 的 C++ 源码依赖 Bionic 专有 API（系统属性、malloc 扩展、fdsan 等），需要先创建一个 Bionic 兼容层，然后分层编译：</p>
+
+  <div class="diagram">
+  第 1 层：libbionic_compat.so （OH 构建）
+    ├── Bionic 专有 API → OH 替代实现
+    │   ├── __system_property_set()  → OH SystemSetParameter()
+    │   ├── android_mallopt()        → 空实现
+    │   └── android_fdsan_*()        → 空实现
+    ├── 依赖：OH musl libc + init:libbegetutil
+    └── 产物：libbionic_compat.so + 兼容头文件
+
+  第 2 层：Android 基础库 （用 OH Clang 重编 AOSP 源码）
+    ├── liblog.so, libcutils.so, libutils.so, libbase.so, libnativehelper.so
+    ├── 依赖：第 1 层 + musl libc
+    └── 编译：OH Clang --target=aarch64-linux-ohos
+
+  第 3 层：ART 虚拟机 （用 OH Clang 重编 AOSP art/ 源码）
+    ├── libart.so, libart-compiler.so, libdexfile.so, libsigchain.so
+    ├── 依赖：第 1-2 层
+    └── 关键：ART 已有 #if !defined(__BIONIC__) fallback 路径
+
+  第 4 层：libandroid_runtime.so （裁剪版，用 OH Clang 重编）
+    ├── 保留 ~25 个 JNI 模块（去掉 HAL/蓝牙/NFC/系统服务 JNI）
+    ├── 依赖：第 1-3 层 + 图形库
+    └── 产物：libandroid_runtime.so（裁剪版）
+  </div>
+
+  <div class="ok">
+    <strong>可行性依据：</strong>ART 源码中已有大量 <code>#if defined(__BIONIC__) ... #else ...</code> 条件编译分支，因为 ART 支持在 Linux host 上编译运行（用于 dex2oat 等工具）。交叉编译时 <code>__BIONIC__</code> 未定义，自动走通用路径（如 pthread_setspecific 替代 bionic TLS slot）。
+  </div>
+
+  <h4>Java 产物：无需交叉编译</h4>
+  <p>framework.jar、core-oj.jar、core-libart.jar 等 Java 产物是平台无关的字节码，可以直接从 AOSP 编译产物复制到 OH 设备上使用，无需交叉编译。</p>
+
+  <h4>GN 构建集成</h4>
+<pre><code># third_party/android_runtime/BUILD.gn
+
+# 第 1 层：Bionic 兼容层
+ohos_shared_library("bionic_compat") {
+  sources = [
+    "bionic_compat/src/system_properties.cpp",
+    "bionic_compat/src/malloc_compat.cpp",
+    "bionic_compat/src/fdsan_compat.cpp",
+  ]
+  include_dirs = [ "bionic_compat/include" ]
+  external_deps = [ "init:libbegetutil" ]
+  part_name = "appspawnx"
+}
+
+# 第 2 层：Android 基础库（用 OH Clang 重编 AOSP 源码）
+ohos_shared_library("android_liblog") {
+  sources = [ ... ]  # AOSP system/logging/liblog/ 源文件
+  deps = [ ":bionic_compat" ]
+  defines = [ "ALOG_TO_HILOG=1" ]  # 日志输出到 OH hilog
+  part_name = "appspawnx"
+}
+
+# 第 3 层：ART（用 OH Clang 重编 AOSP art/ 源码）
+ohos_shared_library("android_libart") {
+  sources = [ ... ]  # AOSP art/runtime/ 源文件
+  deps = [ ":bionic_compat", ":android_liblog", ":android_libcutils", ... ]
+  cflags_cc = [ "-DART_TARGET", "-DART_DEFAULT_GC_TYPE=CMC" ]
+  part_name = "appspawnx"
+}
+
+# 第 4 层：框架 JNI（裁剪版）
+ohos_shared_library("android_libandroid_runtime") {
+  sources = [
+    "aosp/frameworks/base/core/jni/AndroidRuntime.cpp",
+    "aosp/frameworks/base/core/jni/android_app_ActivityThread.cpp",
+    "aosp/frameworks/base/core/jni/android_view_*.cpp",
+    "aosp/frameworks/base/core/jni/android_graphics_*.cpp",
+    "aosp/frameworks/base/core/jni/android_os_*.cpp",
+    # 不包含: android_hardware_*, android_bluetooth_*, android_nfc_* 等
+  ]
+  deps = [ ":android_libart", ":bionic_compat", ... ]
+  part_name = "appspawnx"
+}</code></pre>
+</div>
+
+<div class="info">
+  <strong>编译顺序：</strong>
+  <ol>
+    <li><strong>AOSP 编译</strong>（Soong）：获得 framework.jar、core-oj.jar 等 Java 产物 + boot.art boot image + dex2oat</li>
+    <li><strong>OH 交叉编译</strong>（GN）：用 OH Clang 重编 AOSP C++ 源码（bionic_compat → 基础库 → ART → 裁剪版 libandroid_runtime），产出链接 musl 的 .so</li>
+    <li><strong>OH 编译</strong>（GN）：编译 OH 系统服务（含补丁）+ 适配层模块（appspawn-x 链接第 2 步产物 + OH 系统库）</li>
+  </ol>
+  <p>详见 <code>doc/appspawn_x_design.html</code> 第 6.5 节"Android 运行时库交叉编译"。</p>
+</div>
+
+<!-- ================================================================ -->
+<h1 id="ch10">10. 结论</h1>
+<!-- ================================================================ -->
+
+<div class="card">
+  <h4>核心结论</h4>
+  <ol>
+    <li><strong>OH 构建体系采用 GN + Ninja</strong>，与 AOSP 的 Soong/Blueprint 完全不同。模块通过 <code>bundle.json</code> 声明元数据和依赖，通过 <code>BUILD.gn</code> 定义构建目标，inner_kits 机制实现组件间解耦。</li>
+    <li><strong>适配层需要 9 个核心 OH 组件</strong>：ability_runtime、ability_base、window_manager、graphic_2d、graphic_surface、bundle_framework、common_event_service、ipc、samgr。其中 ability_runtime 和 bundle_framework 需要打补丁后重新编译。</li>
+    <li><strong>补丁影响 2 个模块 9 个文件</strong>：ability_runtime（5 个文件 — Mission 多 Ability 栈 + AppSpawnX 路由）和 bundle_framework（4 个文件 — APK 安装流水线 + installd 扩展）。打补丁后需重编这两个模块的服务层 .z.so 并推送到设备。</li>
+    <li><strong>适配层有 3 个自有模块通过 OH 构建系统编译</strong>：appspawn-x（可执行文件）、apk_installer（共享库）、oh_adapter_bridge（JNI 共享库）。其中 appspawn-x 依赖 AOSP 交叉编译产物。</li>
+    <li><strong>两套构建系统需协调</strong>：先编译 AOSP 获得 Android 运行时库，再编译 OH（将 AOSP 产物作为预编译库引入）。两者通过文件系统交换产物，互不调用。</li>
+    <li><strong>建议三步走策略</strong>：首次全量编译验证环境 → 按需编译日常开发 → 自定义 Product 配置持续集成。</li>
+    <li><strong>服务器环境已就绪</strong>：oh-build 服务器（16 核、60 GB 内存、378 GB 可用磁盘）满足 OH 编译需求。使用 <code>dayu210</code> 产品目标，编译产物可直接推送到 DAYU600 设备。</li>
+  </ol>
+</div>
+
+<div class="ok">
+  <strong>下一步行动：</strong>
+  <ol>
+    <li>在 oh-build 服务器上执行首次 <code>./build.sh --product-name dayu210 --ccache</code> 完整编译</li>
+    <li>验证编译成功后，应用 ohos_patches/ 补丁并增量编译 abilityms + bms</li>
+    <li>在 OH 源码树中创建 <code>third_party/android/</code> 预编译库目录结构</li>
+    <li>编译适配层自有模块（appspawn-x、apk_installer、oh_adapter_bridge）</li>
+    <li>通过 hdc 将编译产物推送到 DAYU600 设备验证</li>
+  </ol>
+</div>
+
+<footer>
+  Android-OpenHarmony Adapter Project &mdash; OH 系统服务构建分析报告 v1.0 &mdash; 2026年3月20日
+</footer>
+
+</div>
+</body>
+</html>

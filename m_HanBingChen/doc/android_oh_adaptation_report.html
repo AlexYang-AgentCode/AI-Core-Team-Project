@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Android Framework 对接 OpenHarmony 系统服务 - 可行性分析与架构设计报告</title>
+<style>
+  @page { margin: 2cm; size: A4; }
+  body { font-family: "Microsoft YaHei", "SimSun", sans-serif; font-size: 12pt; line-height: 1.8; color: #333; max-width: 210mm; margin: 0 auto; padding: 2cm; }
+  h1 { font-size: 20pt; text-align: center; color: #1a1a2e; border-bottom: 3px solid #16213e; padding-bottom: 10px; margin-top: 40px; }
+  h2 { font-size: 16pt; color: #16213e; border-bottom: 2px solid #0f3460; padding-bottom: 5px; margin-top: 30px; }
+  h3 { font-size: 14pt; color: #0f3460; margin-top: 20px; }
+  h4 { font-size: 12pt; color: #533483; margin-top: 15px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; }
+  th { background-color: #16213e; color: white; padding: 8px 10px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 6px 10px; }
+  tr:nth-child(even) { background-color: #f2f2f2; }
+  code { background-color: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: Consolas, "Courier New", monospace; font-size: 10pt; }
+  pre { background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 5px; padding: 15px; overflow-x: auto; font-family: Consolas, "Courier New", monospace; font-size: 9pt; line-height: 1.5; }
+  .cover { text-align: center; page-break-after: always; padding-top: 150px; }
+  .cover h1 { font-size: 26pt; border: none; }
+  .cover .subtitle { font-size: 16pt; color: #555; margin-top: 20px; }
+  .cover .date { font-size: 14pt; color: #777; margin-top: 40px; }
+  .cover .author { font-size: 13pt; color: #666; margin-top: 10px; }
+  .tag-green { background-color: #d4edda; color: #155724; padding: 2px 8px; border-radius: 3px; }
+  .tag-yellow { background-color: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 3px; }
+  .tag-red { background-color: #f8d7da; color: #721c24; padding: 2px 8px; border-radius: 3px; }
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Android Framework 对接 OpenHarmony 系统服务</h1>
+  <div class="subtitle">可行性分析与架构设计报告</div>
+  <div class="date">2026年3月5日</div>
+  <div class="author">基于 Android 14 (AOSP) 与 OpenHarmony 源代码分析</div>
+</div>
+
+<h1>目录</h1>
+<p>一、项目背景与目标</p>
+<p>二、接口通信方向对照</p>
+<p>三、核心接口语义映射分析</p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;3.1 应用生命周期管理</p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;3.2 窗口管理</p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;3.3 生命周期状态机差异</p>
+<p>四、Android 侧核心接口详析</p>
+<p>五、OpenHarmony 侧核心接口详析</p>
+<p>六、核心技术挑战</p>
+<p>七、架构设计方案</p>
+<p>八、适配层核心模块设计</p>
+<p>九、可行性评估</p>
+<p>十、建议实施路径</p>
+<p>十一、结论</p>
+
+<div class="page-break"></div>
+
+<h2>一、项目背景与目标</h2>
+
+<p>本报告旨在评估将 Android Framework 与 OpenHarmony 系统服务进行对接的技术可行性。核心构想是在 Android Framework 中增加一个适配层（Adaptation Layer），实现以下两个目标：</p>
+
+<ol>
+  <li><strong>App &rarr; 系统服务方向：</strong>将 Android App 作为 Client 调用系统服务的接口，转换为调用 OpenHarmony 系统服务的接口；</li>
+  <li><strong>系统服务 &rarr; App 方向：</strong>将 OpenHarmony 系统服务调用 App 的接口，转换为 Android App 能够理解的接口。</li>
+</ol>
+
+<p>两个系统均采用 Binder 机制进行跨进程 IPC 通信，但其接口定义、数据结构和底层实现存在显著差异。</p>
+
+<h2>二、接口通信方向对照</h2>
+
+<table>
+  <tr><th>方向</th><th>Android 接口</th><th>OpenHarmony 接口</th></tr>
+  <tr><td rowspan="5"><strong>App &rarr; 系统服务</strong></td><td><code>IActivityManager</code></td><td><code>IAbilityManager</code></td></tr>
+  <tr><td><code>IActivityTaskManager</code></td><td><code>IMissionManager</code>, <code>IExtensionManager</code></td></tr>
+  <tr><td><code>IWindowManager</code></td><td><code>ISceneSessionManager</code>（SA 4607，继承自 IWindowManager(OH)）</td></tr>
+  <tr><td><code>IWindowSession</code></td><td><code>ISession</code>（每窗口代理，由 ISceneSessionManager 创建返回）</td></tr>
+  <tr><td>AttachApplication (via IAM)</td><td><code>IAppMgr</code></td></tr>
+  <tr><td rowspan="5"><strong>系统服务 &rarr; App</strong></td><td><code>IApplicationThread</code></td><td><code>IAppScheduler</code></td></tr>
+  <tr><td>Activity lifecycle (via IAT)</td><td><code>IAbilityScheduler</code></td></tr>
+  <tr><td><code>IWindow</code></td><td><code>ISessionStage</code></td></tr>
+  <tr><td>（无直接对应）</td><td><code>IWindowManagerAgent</code></td></tr>
+  <tr><td>（无直接对应）</td><td><code>IAbilityConnection</code>, <code>IForegroundAppConnection</code></td></tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>三、核心接口语义映射分析</h2>
+
+<h3>3.1 应用生命周期管理</h3>
+
+<table>
+  <tr><th>功能</th><th>Android</th><th>OpenHarmony</th><th>映射难度</th></tr>
+  <tr><td>应用附着</td><td><code>IActivityManager.attachApplication()</code></td><td><code>IAppMgr.AttachApplication()</code></td><td><span class="tag-yellow">中</span> 参数结构不同但语义相近</td></tr>
+  <tr><td>启动Activity/Ability</td><td><code>IActivityTaskManager.startActivity(Intent)</code></td><td><code>IAbilityManager.StartAbility(Want)</code></td><td><span class="tag-red">高</span> Intent与Want模型差异大</td></tr>
+  <tr><td>前台/后台切换通知</td><td><code>IApplicationThread.scheduleTransaction()</code></td><td><code>IAppScheduler.ScheduleForegroundApplication()</code></td><td><span class="tag-yellow">中</span> Android用ClientTransaction封装</td></tr>
+  <tr><td>生命周期回调</td><td><code>scheduleTransaction(LaunchActivityItem...)</code></td><td><code>IAbilityScheduler.ScheduleAbilityTransaction()</code></td><td><span class="tag-red">高</span> 生命周期状态机不同</td></tr>
+  <tr><td>Service绑定</td><td><code>IActivityManager.bindService()</code></td><td><code>IAbilityManager.ConnectAbility()</code></td><td><span class="tag-yellow">中</span> 语义类似，连接回调机制不同</td></tr>
+  <tr><td>内存通知</td><td><code>IApplicationThread.scheduleTrimMemory()</code></td><td><code>IAppScheduler.ScheduleMemoryLevel()</code></td><td><span class="tag-green">低</span> 可直接映射</td></tr>
+</table>
+
+<h3>3.2 窗口管理</h3>
+
+<table>
+  <tr><th>功能</th><th>Android</th><th>OpenHarmony</th><th>映射难度</th></tr>
+  <tr><td>创建窗口</td><td><code>IWindowSession.addToDisplay()</code></td><td><code>ISceneSessionManager.CreateAndConnectSpecificSession()</code>（SA 4607，返回 ISession 每窗口代理）</td><td><span class="tag-red">极高</span> Surface/图形系统完全不同</td></tr>
+  <tr><td>窗口布局</td><td><code>IWindowSession.relayout()</code></td><td><code>ISession.UpdateSessionRect()</code>（每窗口代理方法）</td><td><span class="tag-red">高</span> 布局参数、Insets模型不同</td></tr>
+  <tr><td>焦点管理</td><td>Android <code>IWindowManager</code> 内部</td><td><code>IWindowManagerAgent.UpdateFocusChangeInfo()</code></td><td><span class="tag-yellow">中</span></td></tr>
+  <tr><td>输入事件分发</td><td>通过 InputChannel</td><td>通过 Session 机制</td><td><span class="tag-red">极高</span> 底层通道机制完全不同</td></tr>
+</table>
+
+<h3>3.3 生命周期状态机差异</h3>
+
+<pre>
+Android Activity:
+  onCreate &rarr; onStart &rarr; onResume &rarr; onPause &rarr; onStop &rarr; onDestroy
+
+OpenHarmony Ability (Stage模型):
+  onCreate &rarr; onWindowStageCreate &rarr; onForeground &rarr; onBackground &rarr; onWindowStageDestroy &rarr; onDestroy
+</pre>
+
+<p><strong>关键差异：</strong>OpenHarmony 的 Ability 生命周期与 WindowStage 紧耦合，而 Android 的 Activity 生命周期与 Window 相对松耦合。适配层需要在两种状态机之间建立正确的映射关系。</p>
+
+<div class="page-break"></div>
+
+<h2>四、Android 侧核心接口详析</h2>
+
+<h3>4.1 IApplicationThread（SystemServer &rarr; App）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/app/IApplicationThread.aidl</code></td></tr>
+  <tr><td>方向</td><td>SystemServer &rarr; App（one-way 异步回调）</td></tr>
+  <tr><td>实现类</td><td><code>ActivityThread.ApplicationThread extends IApplicationThread.Stub</code></td></tr>
+  <tr><td>机制</td><td>AIDL 生成</td></tr>
+</table>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li><code>scheduleTransaction(ClientTransaction)</code> — 现代统一事务API，封装多个生命周期事件</li>
+  <li><code>bindApplication()</code> — 应用初始化绑定</li>
+  <li><code>scheduleLowMemory()</code> / <code>scheduleTrimMemory()</code> — 内存压力通知</li>
+  <li><code>scheduleReceiver()</code> — 广播接收器投递</li>
+  <li><code>scheduleCreateService()</code> / <code>scheduleBindService()</code> — Service 生命周期</li>
+</ul>
+
+<h3>4.2 IActivityManager（App &rarr; SystemServer）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/app/IActivityManager.aidl</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; SystemServer（同步调用）</td></tr>
+  <tr><td>实现类</td><td><code>ActivityManagerService extends IActivityManager.Stub</code></td></tr>
+  <tr><td>机制</td><td>AIDL 生成，927行接口定义</td></tr>
+</table>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li><code>startActivity()</code> / <code>startService()</code> / <code>bindService()</code></li>
+  <li><code>registerReceiver()</code> / <code>broadcastIntent()</code></li>
+  <li><code>attachApplication()</code> — 进程附着</li>
+  <li><code>getConfiguration()</code> / <code>getTasks()</code></li>
+</ul>
+
+<h3>4.3 IActivityTaskManager（App &rarr; SystemServer）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/app/IActivityTaskManager.aidl</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; SystemServer（同步调用）</td></tr>
+  <tr><td>实现类</td><td><code>ActivityTaskManagerService extends IActivityTaskManager.Stub</code></td></tr>
+  <tr><td>说明</td><td>Android 9+ 从 IActivityManager 拆分，专注任务和 Activity 状态管理</td></tr>
+</table>
+
+<h3>4.4 IWindow（SystemServer &rarr; App）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/view/IWindow.aidl</code></td></tr>
+  <tr><td>方向</td><td>SystemServer &rarr; App（one-way 异步）</td></tr>
+  <tr><td>说明</td><td>WindowManagerService 向 App 窗口推送事件</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>resized()</code>、<code>insetsControlChanged()</code>、<code>dispatchAppVisibility()</code>、<code>dispatchDragEvent()</code></p>
+
+<h3>4.5 IWindowManager（App &rarr; SystemServer）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/view/IWindowManager.aidl</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; SystemServer（同步调用）</td></tr>
+  <tr><td>实现类</td><td><code>WindowManagerService extends IWindowManager.Stub</code></td></tr>
+  <tr><td>说明</td><td>1018行接口定义，全局窗口管理</td></tr>
+</table>
+
+<h3>4.6 IWindowSession（App &harr; SystemServer）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>core/java/android/view/IWindowSession.aidl</code></td></tr>
+  <tr><td>方向</td><td>双向（每个 App 进程独有一个 Session）</td></tr>
+  <tr><td>实现类</td><td><code>Session extends IWindowSession.Stub</code></td></tr>
+  <tr><td>获取方式</td><td>通过 <code>IWindowManager.openSession()</code></td></tr>
+</table>
+<p><strong>关键方法：</strong><code>addToDisplay()</code>、<code>relayout()</code>、<code>remove()</code>、<code>finishDrawing()</code>、<code>performDrag()</code></p>
+
+<div class="page-break"></div>
+
+<h2>五、OpenHarmony 侧核心接口详析</h2>
+
+<h3>5.1 IAppScheduler（系统服务 &rarr; App）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/app_manager/include/appmgr/app_scheduler_interface.h</code></td></tr>
+  <tr><td>方向</td><td>AppMgr Service &rarr; App（调度任务到 App 进程）</td></tr>
+  <tr><td>Proxy</td><td><code>AppSchedulerProxy : IRemoteProxy&lt;IAppScheduler&gt;</code></td></tr>
+  <tr><td>Stub</td><td><code>AppSchedulerHost : IRemoteStub&lt;IAppScheduler&gt;</code></td></tr>
+</table>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li><code>ScheduleForegroundApplication()</code> / <code>ScheduleBackgroundApplication()</code></li>
+  <li><code>ScheduleLaunchApplication()</code> / <code>ScheduleTerminateApplication()</code></li>
+  <li><code>ScheduleLaunchAbility()</code> / <code>ScheduleCleanAbility()</code></li>
+  <li><code>ScheduleMemoryLevel()</code> / <code>ScheduleConfigurationUpdated()</code></li>
+</ul>
+
+<h3>5.2 IAbilityManager（App &rarr; 系统服务）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/ability_manager/include/ability_manager_interface.h</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; AbilityManager Service</td></tr>
+  <tr><td>Proxy</td><td><code>AbilityManagerProxy : IRemoteProxy&lt;IAbilityManager&gt;</code></td></tr>
+  <tr><td>Stub</td><td><code>AbilityManagerStub : IRemoteStub&lt;IAbilityManager&gt;</code></td></tr>
+</table>
+<p><strong>关键方法：</strong><code>StartAbility(Want)</code>、<code>ConnectAbility()</code>、<code>DisconnectAbility()</code>、<code>StartSelfUIAbility()</code></p>
+
+<h3>5.3 IAbilityScheduler（系统服务 &rarr; App）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/ability_manager/include/ability_scheduler_interface.h</code></td></tr>
+  <tr><td>方向</td><td>AbilityManager &rarr; App（通知 Ability 生命周期和数据事件）</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>ScheduleAbilityTransaction()</code>、<code>ScheduleConnectAbility()</code>、<code>SendResult()</code>、数据能力操作（Insert/Update/Delete/Query）</p>
+
+<h3>5.4 IAppMgr（App &rarr; 系统服务）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>ability_rt/interfaces/inner_api/app_manager/include/appmgr/app_mgr_interface.h</code></td></tr>
+  <tr><td>方向</td><td>App &rarr; AppMgr Service</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>AttachApplication()</code>、<code>ApplicationForegrounded()</code>、<code>ApplicationBackgrounded()</code>、<code>GetAllRunningProcesses()</code></p>
+
+<h3>5.5 ISceneSessionManager / IWindowManager（App &rarr; 窗口服务）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>IWindowManager(OH)</td><td><code>wms/wmserver/include/zidl/window_manager_interface.h</code>（SA 4606，31 个纯虚方法：CreateWindow、RequestFocus、GetSnapshot 等基础窗口操作）</td></tr>
+  <tr><td>ISceneSessionManager</td><td><code>wms/window_scene/session_manager/include/zidl/scene_session_manager_interface.h</code>（SA 4607，<strong>继承 IWindowManager 全部 31 个方法 + 新增 15 个会话管理方法</strong>）</td></tr>
+  <tr><td>ISession</td><td><code>wms/window_scene/session/host/include/zidl/session_interface.h</code>（<strong>每窗口代理</strong>，由 CreateAndConnectSpecificSession 返回，用于 UpdateSessionRect、DrawingCompleted、Foreground、Background、Disconnect 等每窗口操作）</td></tr>
+</table>
+<p><strong>继承关系：</strong><code>ISceneSessionManager : public IWindowManager</code>，是 IWindowManager 的<strong>超集</strong>。
+现代 OH 系统默认启用 SceneBoard，适配层只需连接 SA 4607（ISceneSessionManager），无需单独适配 SA 4606（IWindowManager）。</p>
+<p><strong>关键方法：</strong></p>
+<ul>
+  <li>ISceneSessionManager：<code>CreateAndConnectSpecificSession()</code>（创建会话，返回 ISession 代理）、<code>DestroyAndDisconnectSpecificSession()</code></li>
+  <li>ISession（每窗口）：<code>UpdateSessionRect()</code>、<code>DrawingCompleted()</code>、<code>Foreground()</code>、<code>Background()</code>、<code>Disconnect()</code></li>
+</ul>
+
+<h3>5.6 ISessionStage（窗口服务 &rarr; App）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>wms/window_scene/session/container/include/zidl/session_stage_interface.h</code></td></tr>
+  <tr><td>方向</td><td>WindowManager &harr; UIAbility/Extension</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>SetActive()</code>、<code>UpdateRect()</code>、<code>HandleBackEvent()</code>、<code>NotifyDestroy()</code>、<code>UpdateWindowMode()</code></p>
+
+<h3>5.7 IWindowManagerAgent（窗口服务 &rarr; App）</h3>
+<table>
+  <tr><th>属性</th><th>说明</th></tr>
+  <tr><td>定义文件</td><td><code>wms/wm/include/zidl/window_manager_agent_interface.h</code></td></tr>
+  <tr><td>方向</td><td>WindowManager &rarr; App/SystemService（通知推送）</td></tr>
+</table>
+<p><strong>关键方法：</strong><code>UpdateFocusChangeInfo()</code>、<code>UpdateWindowVisibilityInfo()</code>、<code>NotifyAccessibilityWindowInfo()</code></p>
+
+<div class="page-break"></div>
+
+<h2>六、核心技术挑战</h2>
+
+<h3>挑战1：Binder 跨系统互通</h3>
+<ul>
+  <li>Android Binder 和 OH IPC 框架是<strong>两套独立的内核驱动和用户态框架</strong></li>
+  <li>Android 使用 AIDL 生成 Java Proxy/Stub；OH 使用 C++ <code>IRemoteProxy</code>/<code>IRemoteStub</code></li>
+  <li><strong>必须解决</strong>：两个 Binder 域之间的消息转发机制</li>
+  <li>方案：在 App 进程内通过 JNI 桥接，Java 层拦截 Android Binder 调用，转入 C++ 层使用 OH IPC 框架发起跨进程调用</li>
+</ul>
+
+<h3>挑战2：Intent &harr; Want 转换</h3>
+<ul>
+  <li>Android <code>Intent</code> (Java)：action / category / data(URI) / extras(Bundle) / component</li>
+  <li>OH <code>Want</code> (C++)：bundleName / abilityName / action / entities / parameters</li>
+  <li>需要建立完整的映射规则和转换层，尤其是隐式 Intent 的解析</li>
+</ul>
+
+<h3>挑战3：图形渲染管道</h3>
+<ul>
+  <li>Android：SurfaceFlinger + BufferQueue + HWC</li>
+  <li>OH：RenderService + Surface + HWC</li>
+  <li>这是<strong>最大的难点</strong>，窗口合成和显示是底层紧耦合的</li>
+  <li>需要共享 GraphicBuffer 或建立 Surface 代理层</li>
+</ul>
+
+<h3>挑战4：输入系统</h3>
+<ul>
+  <li>Android：InputManagerService &rarr; InputChannel (socketpair) &rarr; App</li>
+  <li>OH：多模输入子系统 &rarr; Session &rarr; App</li>
+  <li>输入事件格式（MotionEvent vs. PointerEvent）和分发路径完全不同</li>
+</ul>
+
+<h3>挑战5：运行环境共存</h3>
+<ul>
+  <li>Android App 进程运行在 ART (Android Runtime) 上</li>
+  <li>OH IPC 客户端库是 C++ 实现</li>
+  <li>需要确保同一进程中可同时加载 ART 和 OH IPC 动态库</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>七、架构设计方案</h2>
+
+<pre>
++---------------------------------------------------+
+|              Android App Process                  |
+|                                                   |
+|  +----------+  +---------+  +--------------+      |
+|  | Activity |  | Service |  | ViewRootImpl |      |
+|  +----+-----+  +----+----+  +------+-------+      |
+|       |              |             |               |
+|  +----v--------------v-------------v-----------+   |
+|  |       Android Framework API Layer           |   |
+|  |  (ActivityManager, WindowManager, etc.)     |   |
+|  +---------------------+-----------------------+   |
+|                         |                          |
+|  +======================v========================+ |
+|  ||         Adaptation Layer (适配层)           || |
+|  ||                                             || |
+|  ||  +----------------+  +-------------------+  || |
+|  ||  |LifecycleAdapter|  |  WindowAdapter    |  || |
+|  ||  |                |  |                   |  || |
+|  ||  | Intent-&gt;Want   |  | Surface桥接      |  || |
+|  ||  | 生命周期映射   |  | 输入事件转换     |  || |
+|  ||  | 连接管理       |  | 布局参数转换     |  || |
+|  ||  +-------+--------+  +--------+---------+  || |
+|  ||          |                     |            || |
+|  ||  +-------v---------------------v---------+  || |
+|  ||  |    OH IPC Client (C++ / JNI Bridge)   |  || |
+|  ||  |                                       |  || |
+|  ||  |  AbilityManagerProxy                  |  || |
+|  ||  |  AppMgrProxy                          |  || |
+|  ||  |  SceneSessionManagerProxy (SA 4607)    |  || |
+|  ||  |  ISession Proxy (per-window)          |  || |
+|  ||  +-------+-------------------------------+  || |
+|  ||          |                                  || |
+|  ||  +-------v-------------------------------+  || |
+|  ||  | Callback Stub (OH-&gt;Android 反向通道)  |  || |
+|  ||  |                                       |  || |
+|  ||  | AppSchedulerHost -&gt; IApplicationThread|  || |
+|  ||  | AbilitySchedulerStub -&gt; Activity回调  |  || |
+|  ||  | SessionStageStub -&gt; IWindow回调       |  || |
+|  ||  +---------------------------------------+  || |
+|  +==============================================+ |
+|                    | OH Binder IPC                 |
++--------------------+------------------------------+
+                     |
++--------------------v------------------------------+
+|         OpenHarmony System Services               |
+|                                                   |
+|  +--------------+ +----------+ +---------------+  |
+|  |AbilityManager| |  AppMgr  | |SceneSession   |  |
+|  |   Service    | |  Service | |  Manager      |  |
+|  |  (SA 180)    | | (SA 501) | | (SA 4607)     |  |
+|  +--------------+ +----------+ +---------------+  |
+|  +--------------+ +---------------------------+   |
+|  | ISession     | |     RenderService         |   |
+|  | (per-window) | |     (图形合成)            |   |
+|  +--------------+ +---------------------------+   |
++---------------------------------------------------+
+</pre>
+
+<div class="page-break"></div>
+
+<h2>八、适配层核心模块设计</h2>
+
+<h3>模块1：LifecycleAdapter（生命周期适配）</h3>
+
+<h4>App &rarr; 系统服务方向</h4>
+<pre>
+ActivityManager.startActivity(Intent)
+  &rarr; LifecycleAdapter.convertIntent(Intent) &rarr; Want
+  &rarr; [JNI Bridge]
+  &rarr; AbilityManagerProxy.StartAbility(Want)
+</pre>
+
+<h4>系统服务 &rarr; App 方向</h4>
+<pre>
+IAppScheduler.ScheduleLaunchAbility()
+  &rarr; [JNI Bridge]
+  &rarr; LifecycleAdapter.convertToClientTransaction()
+  &rarr; IApplicationThread.scheduleTransaction(ClientTransaction)
+</pre>
+
+<h3>模块2：WindowAdapter（窗口适配）</h3>
+
+<h4>App &rarr; 系统服务方向</h4>
+<pre>
+ViewRootImpl &rarr; IWindowSession.addToDisplay()
+  &rarr; WindowSessionAdapter.addToDisplay()
+  &rarr; [JNI Bridge]
+  &rarr; ISceneSessionManager.CreateAndConnectSpecificSession() (SA 4607)
+  &rarr; 返回 ISession 每窗口代理（存储供后续使用）
+
+ViewRootImpl &rarr; IWindowSession.relayout()
+  &rarr; WindowSessionAdapter.relayout()
+  &rarr; [JNI Bridge]
+  &rarr; ISession.UpdateSessionRect()  (每窗口代理，非 ISceneSessionManager)
+</pre>
+
+<h4>系统服务 &rarr; App 方向</h4>
+<pre>
+ISessionStage.UpdateRect()
+  &rarr; [JNI Bridge] &rarr; SessionStageBridge
+  &rarr; IWindow.resized()
+</pre>
+
+<h3>模块3：IPC Bridge（跨 Binder 域桥接）</h3>
+<p>核心设计思路：</p>
+<ol>
+  <li><strong>拦截点：</strong>在 Android Framework 的 <code>ServiceManager.getService()</code> 处拦截，返回适配层的 Proxy 替代原 SystemServer 的 Binder</li>
+  <li><strong>JNI 层：</strong>Java Proxy 通过 JNI 调用 C++ 适配代码</li>
+  <li><strong>OH IPC 调用：</strong>C++ 层使用 OH 的 <code>IRemoteProxy</code> 发起真正的跨进程调用</li>
+  <li><strong>反向回调：</strong>C++ 层实现 OH 的 <code>IRemoteStub</code> 接收系统服务回调，通过 JNI 调回 Java 层</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>九、可行性评估</h2>
+
+<table>
+  <tr><th>维度</th><th>评估</th><th>说明</th></tr>
+  <tr><td>基本生命周期</td><td><span class="tag-green">可行</span></td><td>startAbility、前后台切换、销毁等核心流程可映射</td></tr>
+  <tr><td>Service 绑定</td><td><span class="tag-green">可行</span></td><td>bindService &harr; ConnectAbility 语义相近</td></tr>
+  <tr><td>简单 UI 渲染</td><td><span class="tag-yellow">有条件可行</span></td><td>需要桥接图形 Surface，工作量极大</td></tr>
+  <tr><td>输入事件</td><td><span class="tag-yellow">有条件可行</span></td><td>需要转换输入事件格式和分发通道</td></tr>
+  <tr><td>多窗口/分屏</td><td><span class="tag-red">极难</span></td><td>两套窗口模型差异太大</td></tr>
+  <tr><td>ContentProvider / DataAbility</td><td><span class="tag-yellow">有条件可行</span></td><td>数据访问模式不同但可桥接</td></tr>
+  <tr><td>通知/广播</td><td><span class="tag-yellow">需额外适配</span></td><td>OH 无广播机制，需用 CommonEvent 替代</td></tr>
+  <tr><td>权限模型</td><td><span class="tag-yellow">需映射</span></td><td>两套权限系统不同</td></tr>
+</table>
+
+<h2>十、建议实施路径</h2>
+
+<h3>阶段一：最小闭环验证（POC）</h3>
+<ol>
+  <li>实现 IPC Bridge 基础框架（JNI 桥接 Android Binder &rarr; OH IPC）</li>
+  <li>打通 <code>startActivity(Intent)</code> &rarr; 适配层 &rarr; OH <code>AbilityManager.StartAbility(Want)</code> 一条链路</li>
+  <li>实现反向回调：OH 通知 App 进入前台</li>
+</ol>
+
+<h3>阶段二：生命周期完整覆盖</h3>
+<ol start="4">
+  <li>完成完整的 Activity/Ability 生命周期映射</li>
+  <li>实现 Service/ServiceExtension 绑定</li>
+  <li>实现 <code>attachApplication</code> 流程</li>
+</ol>
+
+<h3>阶段三：窗口系统（最难）</h3>
+<ol start="7">
+  <li>桥接 Surface 系统（可能需要修改 OH RenderService 或引入共享内存方案）</li>
+  <li>桥接输入事件分发</li>
+  <li>实现窗口创建、布局、销毁完整流程</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>十一、结论</h2>
+
+<p><strong>技术上有条件可行，但工程量巨大。</strong>核心判断如下：</p>
+
+<ol>
+  <li><strong>生命周期和服务管理层</strong>的适配是可行的。两套系统的概念模型足够相似（Activity &harr; Ability, Service &harr; ServiceExtension, Intent &harr; Want），可以建立合理的映射关系。</li>
+
+  <li><strong>图形/窗口系统</strong>是最大瓶颈。Surface 和输入通道是底层紧耦合的，需要 kernel 层面的协调或图形缓冲区共享机制。</li>
+
+  <li><strong>前提条件</strong>：Android App 进程需要能同时加载 Android Runtime (ART) 和 OH IPC 动态库，即运行环境需要支持两套框架共存。这要求底层 Linux 内核同时加载两个 Binder 驱动（或 OH 使用用户态 IPC 方案）。</li>
+
+  <li><strong>建议</strong>：先用阶段一做最小 POC 验证，打通一条完整的调用链路（startActivity &rarr; Ability 启动 &rarr; 前台回调），再决定是否全面推进。</li>
+</ol>
+
+<p>该方案的本质类似于 Android 兼容层（如 Windows Subsystem for Android 的逆向思路），在工业界有类似先例，但需要大量底层系统级开发工作。</p>
+
+</body>
+</html>

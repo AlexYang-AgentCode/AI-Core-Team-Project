@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Android Task → OH Mission 多 Ability 栈适配设计方案</title>
+<style>
+body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; line-height: 1.8; color: #333; }
+h1 { color: #1a237e; border-bottom: 3px solid #1a237e; padding-bottom: 10px; }
+h2 { color: #283593; border-bottom: 2px solid #5c6bc0; padding-bottom: 6px; margin-top: 40px; }
+h3 { color: #3949ab; margin-top: 30px; }
+h4 { color: #5c6bc0; }
+pre { background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 12px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+th { background: #e8eaf6; color: #1a237e; }
+tr:nth-child(even) { background: #fafafa; }
+.note { background: #fff3e0; border-left: 4px solid #ff9800; padding: 12px 16px; margin: 16px 0; }
+.warn { background: #fce4ec; border-left: 4px solid #e53935; padding: 12px 16px; margin: 16px 0; }
+.info { background: #e3f2fd; border-left: 4px solid #1e88e5; padding: 12px 16px; margin: 16px 0; }
+.ok { background: #e8f5e9; border-left: 4px solid #43a047; padding: 12px 16px; margin: 16px 0; }
+.diagram { background: #fafafa; border: 2px solid #90a4ae; border-radius: 8px; padding: 16px; margin: 16px 0; font-family: "Consolas", "Courier New", monospace; white-space: pre; font-size: 12px; line-height: 1.4; overflow-x: auto; }
+.version { color: #666; font-size: 14px; }
+.deleted { text-decoration: line-through; color: #999; }
+</style>
+</head>
+<body>
+
+<h1>Android Task → OH Mission 多 Ability 栈适配设计方案</h1>
+<p class="version">版本：v2.0 | 日期：2026年3月11日 | 作者：Adapter Team</p>
+<p class="version">v2.0 变更：废弃 MissionGroup 方案，改为 Mission 内 Ability 栈方案。修改集中在 Mission 类内部，
+无需修改 MissionInfo/InnerMissionInfo/MissionInfoMgr/IMissionManager 等外层接口。</p>
+
+<!-- ============================================================ -->
+<h2>1. 问题分析</h2>
+<!-- ============================================================ -->
+
+<h3>1.1 核心差异</h3>
+
+<table>
+<tr><th>概念</th><th>Android</th><th>OpenHarmony</th></tr>
+<tr>
+  <td>任务容器</td>
+  <td><b>Task</b>：包含多个 ActivityRecord 的栈</td>
+  <td><b>Mission</b>：仅包含一个 AbilityRecord</td>
+</tr>
+<tr>
+  <td>打开新页面</td>
+  <td>新 Activity 入栈到当前 Task</td>
+  <td>创建新 Mission + 新 Ability</td>
+</tr>
+<tr>
+  <td>最近任务列表</td>
+  <td>每个 Task 一条，显示栈顶 Activity</td>
+  <td>每个 Mission 一条，显示其唯一 Ability</td>
+</tr>
+<tr>
+  <td>后退/返回</td>
+  <td>弹出栈顶 Activity，回到栈内前一个</td>
+  <td>销毁当前 Mission，回到前一个 Mission</td>
+</tr>
+</table>
+
+<h3>1.2 设计目标</h3>
+
+<ol>
+<li><b>OH 原生应用</b>：行为完全不变，Mission 内始终只有 1 个 Ability</li>
+<li><b>Android 适配应用</b>：同一应用的多个 Activity 共用同一个 Mission，形成 Ability 栈</li>
+<li><b>最近任务列表</b>：每个 Mission 显示栈顶 Ability，Android 应用自然只显示一条</li>
+<li><b>后退行为</b>：弹出栈顶 Ability 后露出前一个 Ability，栈空时销毁 Mission</li>
+<li><b>OH Launcher 无需修改</b>：GetMissionInfos 接口语义不变</li>
+<li><b>IMissionManager 接口无需扩展</b>：所有变更封闭在 Mission 类内部</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2>2. 方案对比</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th></th><th>v1.0 MissionGroup 方案</th><th>v2.0 Mission 内 Ability 栈方案</th></tr>
+<tr>
+  <td>核心思路</td>
+  <td>在 Mission 之上引入 MissionGroup 分组层</td>
+  <td>将 Mission 的 <code>abilityRecord_</code> 扩展为 Ability 栈</td>
+</tr>
+<tr>
+  <td>MissionInfo 修改</td>
+  <td class="warn">需增加 groupId, groupSize, isGroupTop 字段</td>
+  <td class="ok">无需修改</td>
+</tr>
+<tr>
+  <td>InnerMissionInfo 修改</td>
+  <td class="warn">需增加 groupId, groupOrder, isAndroidApp 字段</td>
+  <td class="ok">无需修改</td>
+</tr>
+<tr>
+  <td>MissionInfoMgr 修改</td>
+  <td class="warn">需增加 GetGroupedMissionInfos 等 6 个方法</td>
+  <td class="ok">无需修改</td>
+</tr>
+<tr>
+  <td>IMissionManager 接口</td>
+  <td class="warn">需增加 6 个 IPC 方法 + IPC code</td>
+  <td class="ok">无需修改</td>
+</tr>
+<tr>
+  <td>OH Launcher</td>
+  <td class="warn">需修改以使用新接口或过滤 isGroupTop</td>
+  <td class="ok">无需修改</td>
+</tr>
+<tr>
+  <td>修改范围</td>
+  <td>8 个 OH 系统文件 + 6 个 Adapter 文件</td>
+  <td><b>3 个 OH 系统文件 + 3 个 Adapter 文件</b></td>
+</tr>
+<tr>
+  <td>对 OH 系统的侵入性</td>
+  <td>高（接口扩展、数据结构修改、持久化修改）</td>
+  <td><b>低（仅 Mission 类内部实现变更）</b></td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>3. 总体架构</h2>
+<!-- ============================================================ -->
+
+<h3>3.1 核心概念：Mission 内 Ability 栈</h3>
+
+<div class="diagram">
+【OH 原生应用 — 行为不变】                   【Android 适配应用 — Ability 栈】
+
+┌─────────────────────────┐               ┌─────────────────────────┐
+│ Mission (id=1)          │               │ Mission (id=2)          │
+│                         │               │                         │
+│ abilityStack_:          │               │ abilityStack_:          │
+│ ┌─────────────────────┐ │               │ ┌─────────────────────┐ │
+│ │ WeatherAbility      │ │               │ │ ThirdActivity     ←─┼─── 栈顶 (top)
+│ │ (唯一, 即栈顶也是底) │ │               │ ├─────────────────────┤ │
+│ └─────────────────────┘ │               │ │ SecondActivity      │ │
+│                         │               │ ├─────────────────────┤ │
+│ GetAbilityRecord()      │               │ │ MainActivity      ←─┼─── 栈底 (bottom)
+│  → WeatherAbility       │               │ └─────────────────────┘ │
+│                         │               │                         │
+│ GetAbilityStackSize()   │               │ GetAbilityRecord()      │
+│  → 1                    │               │  → ThirdActivity        │
+└─────────────────────────┘               │                         │
+                                          │ GetAbilityStackSize()   │
+最近任务列表显示:                            │  → 3                    │
+  WeatherAbility (1条)                    └─────────────────────────┘
+
+                                          最近任务列表显示:
+                                            ThirdActivity (1条)
+</div>
+
+<h3>3.2 架构分层</h3>
+
+<div class="diagram">
+┌──────────────────────────────────────────────────────────────────┐
+│                     Android Framework                            │
+│  IActivityTaskManager.startActivity()                            │
+│  IActivityTaskManager.getRecentTasks()                           │
+│  IActivityTaskManager.removeTask()                               │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │ JNI
+┌────────────────────────▼─────────────────────────────────────────┐
+│                  Adapter Layer                                    │
+│                                                                   │
+│  ActivityTaskManagerAdapter                                       │
+│    startActivity():                                               │
+│      → 判断是否应复用现有 Mission (同 bundleName 已有 Mission)    │
+│      → 是: 调用 OH StartAbilityInMission(missionId, want)       │
+│      → 否: 调用 OH StartAbility(want) (创建新 Mission)           │
+│                                                                   │
+│    getRecentTasks():                                              │
+│      → 直接调用 OH GetMissionInfos()                              │
+│      → 每个 Mission 已经只显示栈顶 Ability，无需额外过滤         │
+│                                                                   │
+│    removeTask(taskId):                                            │
+│      → 直接映射 OH CleanMission(missionId)                       │
+│      → Mission 清理时自动销毁栈内所有 Ability                     │
+└────────────────────────┬─────────────────────────────────────────┘
+                         │ OH IPC
+┌────────────────────────▼─────────────────────────────────────────┐
+│               OH AbilityManagerService                            │
+│                                                                   │
+│  Mission (修改):                                                  │
+│    abilityRecord_ → abilityStack_ (vector)                       │
+│    GetAbilityRecord() → 返回栈顶                                 │
+│    PushAbility(record) → 入栈                                    │
+│    PopAbility() → 弹出栈顶                                       │
+│    GetAbilityStackSize() → 栈深度                                 │
+│                                                                   │
+│  MissionListManager (修改):                                       │
+│    StartAbilityInMission() → 新入口，将 Ability 推入已有 Mission  │
+│    TerminateAbilityLocked() → 弹栈逻辑，栈空时销毁 Mission       │
+│                                                                   │
+│  IAbilityManager (修改):                                          │
+│    StartAbilityInMission(want, missionId) → 新增 1 个接口方法     │
+│                                                                   │
+│  其他组件（不修改）:                                               │
+│    MissionInfo, InnerMissionInfo, MissionInfoMgr, IMissionManager │
+│    MissionList, OH Launcher                                       │
+└──────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>3.3 设计原则</h3>
+
+<div class="ok">
+<b>封闭修改原则</b>：所有核心变更封闭在 Mission 类内部。
+<ul>
+<li><code>Mission::GetAbilityRecord()</code> 返回栈顶 — 所有调用方（MissionListManager、MissionInfoMgr、MissionSnapshot）<b>无需修改</b>，自动获取栈顶 Ability 的信息</li>
+<li><code>MissionInfo</code> 的 label/icon/want 来源于 <code>mission->GetAbilityRecord()</code>，栈顶变化时自然更新</li>
+<li><code>GetMissionInfos()</code> 每个 Mission 返回一条 — Android 应用一个 Mission 自然只显示一条</li>
+<li>OH Launcher 调用 <code>GetMissionInfos()</code> 和 <code>GetMissionSnapshot()</code> — 行为完全兼容</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Mission 类修改详细设计</h2>
+<!-- ============================================================ -->
+
+<h3>4.1 数据结构变更</h3>
+
+<p>文件：<code>ability_rt/services/abilitymgr/include/mission/mission.h</code></p>
+
+<pre>
+class Mission : public std::enable_shared_from_this&lt;Mission&gt; {
+public:
+    Mission(int32_t id, MissionAbilityRecordPtr abilityRecord,
+            const std::string &missionName = "", int32_t startMethod = 0);
+
+    // ==================== 现有方法（行为保持兼容）====================
+
+    /**
+     * 获取当前活跃的 AbilityRecord。
+     *
+     * 修改前：return abilityRecord_;
+     * 修改后：return abilityStack_.back(); (栈顶)
+     *
+     * 所有调用方（MissionListManager, MissionInfoMgr, Launcher 等）
+     * 通过此方法获取 Ability 信息，修改后自动获取栈顶 Ability。
+     */
+    MissionAbilityRecordPtr GetAbilityRecord() const;
+
+    /**
+     * 判断 launch mode。
+     * 修改后：使用栈顶 Ability 的 abilityInfo 判断。
+     */
+    bool IsSingletonAbility() const;
+    bool IsSpecifiedAbility() const;
+    bool IsStandardAbility() const;
+
+    int32_t GetMissionId() const { return missionId_; }
+    void SetMissionList(std::shared_ptr&lt;MissionList&gt; missionList);
+    std::shared_ptr&lt;MissionList&gt; GetMissionList() const;
+    // ... 其他现有方法保持不变 ...
+
+    // ==================== 新增方法 ====================
+
+    /**
+     * 将新的 AbilityRecord 推入栈顶。
+     * 用于 Android 应用在同一 Mission 内打开新 Activity。
+     *
+     * @param abilityRecord  新的 AbilityRecord
+     */
+    void PushAbility(MissionAbilityRecordPtr abilityRecord);
+
+    /**
+     * 弹出栈顶的 AbilityRecord。
+     * 用于 Android 应用按返回键关闭当前 Activity。
+     *
+     * @return 被弹出的 AbilityRecord，如果栈只剩一个则返回 nullptr（不弹出）
+     */
+    MissionAbilityRecordPtr PopAbility();
+
+    /**
+     * 获取栈中 Ability 数量。
+     */
+    size_t GetAbilityStackSize() const;
+
+    /**
+     * 获取栈底的 AbilityRecord（最初启动的 Ability）。
+     * 用于 Android RecentTaskInfo.baseActivity。
+     */
+    MissionAbilityRecordPtr GetBaseAbilityRecord() const;
+
+    /**
+     * 查找栈中指定 abilityName 的 AbilityRecord。
+     * 用于 FLAG_ACTIVITY_CLEAR_TOP 等场景。
+     *
+     * @param abilityName  目标 Ability 名称
+     * @return 找到的 AbilityRecord，未找到返回 nullptr
+     */
+    MissionAbilityRecordPtr FindAbilityByName(const std::string &abilityName) const;
+
+    /**
+     * 弹出指定 Ability 之上的所有 AbilityRecord（含自身可选）。
+     * 用于 FLAG_ACTIVITY_CLEAR_TOP：弹出目标之上的所有 Ability。
+     *
+     * @param abilityName    目标 Ability 名称
+     * @param includeSelf    是否也弹出目标自身
+     * @return 被弹出的 AbilityRecord 列表（需逐个 Terminate）
+     */
+    std::vector&lt;MissionAbilityRecordPtr&gt; PopAbilitiesAbove(
+        const std::string &abilityName, bool includeSelf = false);
+
+    /**
+     * 检查此 Mission 是否支持多 Ability 栈（Android 适配模式）。
+     * OH 原生应用返回 false，Android 适配应用返回 true。
+     */
+    bool IsMultiAbilityMode() const { return multiAbilityMode_; }
+    void SetMultiAbilityMode(bool enabled) { multiAbilityMode_ = enabled; }
+
+private:
+    int32_t missionId_;
+    int32_t startMethod_;
+    std::string missionName_;
+    std::weak_ptr&lt;MissionList&gt; ownerMissionList_;
+    bool lockedState_ = false;
+    bool isMovingToFront_ = false;
+    bool isANRState_ = false;
+    bool needNotify_ = true;
+    bool unclearable_ = false;
+    std::string specifiedFlag_;
+    std::string missionTime_;
+
+    // ========== 核心修改 ==========
+    // 修改前: MissionAbilityRecordPtr abilityRecord_;
+    // 修改后: Ability 栈（back = 栈顶, front = 栈底）
+    std::vector&lt;MissionAbilityRecordPtr&gt; abilityStack_;
+
+    // 标记是否为多 Ability 模式（Android 适配应用）
+    // OH 原生应用: false, 栈中始终只有 1 个 Ability
+    // Android 适配应用: true, 栈中可有多个 Ability
+    bool multiAbilityMode_ = false;
+};
+</pre>
+
+<h3>4.2 Mission 方法实现</h3>
+
+<p>文件：<code>ability_rt/services/abilitymgr/src/mission/mission.cpp</code></p>
+
+<pre>
+// ==================== 构造函数（兼容修改）====================
+
+Mission::Mission(int32_t id, MissionAbilityRecordPtr abilityRecord,
+                 const std::string &missionName, int32_t startMethod)
+    : missionId_(id), startMethod_(startMethod), missionName_(missionName)
+{
+    // 修改前: abilityRecord_ = abilityRecord;
+    // 修改后: 初始 Ability 作为栈底（也是栈顶）
+    if (abilityRecord) {
+        abilityStack_.push_back(abilityRecord);
+    }
+}
+
+// ==================== 核心访问方法（行为兼容）====================
+
+MissionAbilityRecordPtr Mission::GetAbilityRecord() const
+{
+    // 修改前: return abilityRecord_;
+    // 修改后: 返回栈顶
+    if (abilityStack_.empty()) return nullptr;
+    return abilityStack_.back();
+}
+
+bool Mission::IsSingletonAbility() const
+{
+    auto record = GetAbilityRecord();
+    return record && record->GetAbilityInfo().launchMode ==
+           AppExecFwk::LaunchMode::SINGLETON;
+}
+
+bool Mission::IsSpecifiedAbility() const
+{
+    // 使用栈底 Ability 判断（Mission 的 launch mode 由首个 Ability 决定）
+    if (abilityStack_.empty()) return false;
+    return abilityStack_.front()->GetAbilityInfo().launchMode ==
+           AppExecFwk::LaunchMode::SPECIFIED;
+}
+
+bool Mission::IsStandardAbility() const
+{
+    if (abilityStack_.empty()) return false;
+    return abilityStack_.front()->GetAbilityInfo().launchMode ==
+           AppExecFwk::LaunchMode::STANDARD;
+}
+
+// ==================== 新增栈操作方法 ====================
+
+void Mission::PushAbility(MissionAbilityRecordPtr abilityRecord)
+{
+    if (!abilityRecord) return;
+    abilityRecord->SetMissionId(missionId_);
+    abilityStack_.push_back(abilityRecord);
+
+    TAG_LOGI(AAFwkTag::ABILITYMGR,
+        "Mission %{public}d: pushed ability, stack size=%{public}zu",
+        missionId_, abilityStack_.size());
+}
+
+MissionAbilityRecordPtr Mission::PopAbility()
+{
+    // 不允许弹出最后一个 Ability（Mission 至少需要一个）
+    // 最后一个 Ability 的移除走 Mission 销毁流程
+    if (abilityStack_.size() <= 1) {
+        return nullptr;
+    }
+
+    auto top = abilityStack_.back();
+    abilityStack_.pop_back();
+
+    TAG_LOGI(AAFwkTag::ABILITYMGR,
+        "Mission %{public}d: popped ability, stack size=%{public}zu",
+        missionId_, abilityStack_.size());
+
+    return top;
+}
+
+size_t Mission::GetAbilityStackSize() const
+{
+    return abilityStack_.size();
+}
+
+MissionAbilityRecordPtr Mission::GetBaseAbilityRecord() const
+{
+    if (abilityStack_.empty()) return nullptr;
+    return abilityStack_.front();
+}
+
+MissionAbilityRecordPtr Mission::FindAbilityByName(
+    const std::string &abilityName) const
+{
+    for (auto it = abilityStack_.rbegin(); it != abilityStack_.rend(); ++it) {
+        if ((*it)->GetAbilityInfo().name == abilityName) {
+            return *it;
+        }
+    }
+    return nullptr;
+}
+
+std::vector&lt;MissionAbilityRecordPtr&gt; Mission::PopAbilitiesAbove(
+    const std::string &abilityName, bool includeSelf)
+{
+    std::vector&lt;MissionAbilityRecordPtr&gt; popped;
+
+    // Find the target ability in stack
+    auto targetIt = abilityStack_.end();
+    for (auto it = abilityStack_.begin(); it != abilityStack_.end(); ++it) {
+        if ((*it)->GetAbilityInfo().name == abilityName) {
+            targetIt = it;
+            break;
+        }
+    }
+
+    if (targetIt == abilityStack_.end()) return popped;
+
+    // Pop everything above target
+    auto startPop = includeSelf ? targetIt : targetIt + 1;
+    for (auto it = startPop; it != abilityStack_.end(); ++it) {
+        popped.push_back(*it);
+    }
+    abilityStack_.erase(startPop, abilityStack_.end());
+
+    return popped;
+}
+</pre>
+
+<h3>4.3 兼容性分析：GetAbilityRecord() 的调用方</h3>
+
+<div class="info">
+<p><code>GetAbilityRecord()</code> 返回栈顶后，以下所有调用方<b>无需修改</b>，自动获得正确的栈顶 Ability 信息：</p>
+</div>
+
+<table>
+<tr><th>调用方</th><th>使用方式</th><th>兼容性</th></tr>
+<tr>
+  <td>MissionListManager::MoveMissionToFront</td>
+  <td><code>mission->GetAbilityRecord()->ProcessForegroundAbility()</code></td>
+  <td>自动将栈顶 Ability 前台化</td>
+</tr>
+<tr>
+  <td>MissionInfoMgr::BuildInnerMissionInfo</td>
+  <td><code>targetRecord->GetLabel()</code> → MissionInfo.label</td>
+  <td>label 自动使用栈顶 Ability 的标签</td>
+</tr>
+<tr>
+  <td>MissionInfoMgr::GetMissionSnapshot</td>
+  <td><code>missionInfo.want.GetElement()</code> → topAbility</td>
+  <td>want 来自栈顶 Ability，topAbility 自动正确</td>
+</tr>
+<tr>
+  <td>MissionListManager::TerminateAbilityLocked</td>
+  <td>查找 ability 所在 mission</td>
+  <td>需要修改：改为栈式弹出逻辑（见 §5）</td>
+</tr>
+<tr>
+  <td>MissionList::RemoveMissionByAbilityRecord</td>
+  <td>按 AbilityRecord 指针查找 Mission</td>
+  <td>需要修改：在栈中搜索而非直接比较单个指针（见 §5）</td>
+</tr>
+<tr>
+  <td>Mission::Dump</td>
+  <td><code>abilityRecord_->Dump()</code></td>
+  <td>自动 dump 栈顶；可增强为 dump 全栈</td>
+</tr>
+<tr>
+  <td>Mission::IsSingletonAbility</td>
+  <td>判断 launchMode</td>
+  <td>使用栈顶/栈底判断，行为正确</td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>5. MissionListManager 修改</h2>
+<!-- ============================================================ -->
+
+<h3>5.1 新增 StartAbilityInMission 入口</h3>
+
+<p>文件：<code>ability_rt/services/abilitymgr/src/mission/mission_list_manager.cpp</code></p>
+
+<p>现有 <code>StartAbility()</code> 流程始终创建新 Mission。新增 <code>StartAbilityInMission()</code>，
+将新 Ability 推入已有 Mission 的栈中。</p>
+
+<pre>
+/**
+ * 在已有 Mission 中启动新 Ability（推入栈顶）。
+ *
+ * 与 StartAbility() 的区别：
+ *   - StartAbility(): 创建新 Mission + 新 Ability
+ *   - StartAbilityInMission(): 在已有 Mission 内创建新 Ability 并入栈
+ *
+ * 仅被 Android 适配层调用。OH 原生应用走 StartAbility()。
+ *
+ * @param abilityRequest  Ability 启动请求（包含 Want、AbilityInfo 等）
+ * @param missionId       目标 Mission ID
+ * @return ERR_OK on success
+ */
+int MissionListManager::StartAbilityInMission(
+    AbilityRequest &abilityRequest, int32_t missionId)
+{
+    std::lock_guard&lt;std::recursive_mutex&gt; guard(managerLock_);
+
+    TAG_LOGI(AAFwkTag::ABILITYMGR,
+        "StartAbilityInMission: missionId=%{public}d, ability=%{public}s",
+        missionId, abilityRequest.abilityInfo.name.c_str());
+
+    // 1. 查找目标 Mission
+    std::shared_ptr&lt;Mission&gt; targetMission = nullptr;
+    bool isReachToLimit = false;
+    auto targetList = GetTargetMissionList(missionId, targetMission, isReachToLimit);
+
+    if (!targetMission) {
+        TAG_LOGE(AAFwkTag::ABILITYMGR,
+            "StartAbilityInMission: Mission %{public}d not found", missionId);
+        return ERR_INVALID_VALUE;
+    }
+
+    // 2. 创建新的 AbilityRecord
+    auto newRecord = MissionAbilityRecord::CreateAbilityRecord(abilityRequest);
+    if (!newRecord) {
+        TAG_LOGE(AAFwkTag::ABILITYMGR, "Failed to create AbilityRecord");
+        return ERR_INVALID_VALUE;
+    }
+
+    // 3. 将当前栈顶 Ability 调度到后台
+    auto currentTop = targetMission->GetAbilityRecord();
+    if (currentTop && currentTop->GetAbilityState() == AbilityState::FOREGROUND) {
+        currentTop->ProcessBackgroundAbility();
+    }
+
+    // 4. 推入新 Ability 到 Mission 栈
+    targetMission->PushAbility(newRecord);
+
+    // 5. 将 Mission 移到 MissionList 顶部
+    targetList->AddMissionToTop(targetMission);
+
+    // 6. 调度新 Ability 前台化
+    newRecord->ProcessForegroundAbility(...);
+
+    // 7. 更新 MissionInfo（label/want 自动更新为栈顶）
+    UpdateMissionInfo(targetMission);
+
+    return ERR_OK;
+}
+</pre>
+
+<h3>5.2 修改 TerminateAbilityLocked — 栈式弹出</h3>
+
+<p>文件：<code>ability_rt/services/abilitymgr/src/mission/mission_list_manager.cpp</code></p>
+
+<p>现有逻辑：Ability 终止时从 MissionList 中移除对应 Mission。<br>
+修改后：如果 Mission 有多个 Ability（多 Ability 模式），弹出栈顶而非移除整个 Mission。</p>
+
+<pre>
+int MissionListManager::TerminateAbilityLocked(
+    const std::shared_ptr&lt;AbilityRecord&gt; &abilityRecord, int flag)
+{
+    auto missionId = abilityRecord->GetMissionId();
+    auto mission = GetMissionById(missionId);
+    if (!mission) {
+        return ERR_INVALID_VALUE;
+    }
+
+    // ========== 新增逻辑：多 Ability 栈模式 ==========
+    if (mission->IsMultiAbilityMode() && mission->GetAbilityStackSize() > 1) {
+        // 弹出栈顶 Ability
+        auto popped = mission->PopAbility();
+
+        if (popped) {
+            // 添加到终止队列
+            terminateAbilityList_.push_back(popped);
+
+            // 调度弹出后的新栈顶 Ability 到前台
+            auto newTop = mission->GetAbilityRecord();
+            if (newTop) {
+                newTop->ProcessForegroundAbility(...);
+            }
+
+            // 更新 Mission 的 MissionInfo（label/want 变为新栈顶）
+            UpdateMissionInfo(mission);
+
+            // 通知 MissionListener 更新（可选，用于 Launcher 刷新快照）
+            listenerController_->NotifyMissionSnapshotChanged(missionId);
+
+            TAG_LOGI(AAFwkTag::ABILITYMGR,
+                "TerminateAbility: popped from stack, mission %{public}d "
+                "remaining=%{public}zu", missionId, mission->GetAbilityStackSize());
+        }
+
+        return ERR_OK;
+    }
+
+    // ========== 现有逻辑（OH 原生应用，栈内只有 1 个 Ability）==========
+    // 原有的 RemoveTerminatingAbility + Terminate 流程完全不变
+    RemoveTerminatingAbility(abilityRecord, flag);
+    abilityRecord->SendResultToCallers();
+    // ... (现有代码不修改) ...
+
+    return ERR_OK;
+}
+</pre>
+
+<h3>5.3 修改 MissionList::RemoveMissionByAbilityRecord</h3>
+
+<p>文件：<code>ability_rt/services/abilitymgr/src/mission/mission_list.cpp</code></p>
+
+<p>现有逻辑：按 <code>mission->GetAbilityRecord() == abilityRecord</code> 精确匹配。<br>
+修改后：如果是多 Ability 模式，在栈中搜索。</p>
+
+<pre>
+std::shared_ptr&lt;Mission&gt; MissionList::GetMissionByAbilityRecord(
+    const std::shared_ptr&lt;AbilityRecord&gt; &abilityRecord) const
+{
+    for (auto &mission : missions_) {
+        if (mission->IsMultiAbilityMode()) {
+            // 多 Ability 模式：在栈中搜索
+            if (mission->FindAbilityByName(abilityRecord->GetAbilityInfo().name)) {
+                return mission;
+            }
+        } else {
+            // 单 Ability 模式：原有比较逻辑
+            if (mission->GetAbilityRecord() == abilityRecord) {
+                return mission;
+            }
+        }
+    }
+    return nullptr;
+}
+</pre>
+
+<h3>5.4 新增 UpdateMissionInfo 辅助方法</h3>
+
+<pre>
+/**
+ * 更新 Mission 在 MissionInfoMgr 中的信息。
+ * 当栈顶 Ability 变化时（push/pop），需要更新 label、want 等。
+ */
+void MissionListManager::UpdateMissionInfo(const std::shared_ptr&lt;Mission&gt; &mission)
+{
+    auto topRecord = mission->GetAbilityRecord();
+    if (!topRecord) return;
+
+    InnerMissionInfo info;
+    if (DelayedSingleton&lt;MissionInfoMgr&gt;::GetInstance()
+            ->GetInnerMissionInfoById(mission->GetMissionId(), info) != ERR_OK) {
+        return;
+    }
+
+    // 更新为栈顶 Ability 的信息
+    info.missionInfo.want = topRecord->GetWant();
+    info.missionInfo.label = topRecord->GetLabel();
+    info.missionInfo.time = GetCurrentTime();
+
+    DelayedSingleton&lt;MissionInfoMgr&gt;::GetInstance()
+        ->UpdateMissionInfo(info);
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2>6. IAbilityManager 接口扩展</h2>
+<!-- ============================================================ -->
+
+<h3>6.1 新增 1 个方法</h3>
+
+<p>文件：<code>ability_rt/interfaces/inner_api/ability_manager/include/ability_manager_interface.h</code></p>
+
+<div class="note">
+仅在 IAbilityManager 新增 1 个方法 <code>StartAbilityInMission()</code>。
+IMissionManager 接口<b>完全不修改</b>。
+</div>
+
+<pre>
+class IAbilityManager : public OHOS::IRemoteBroker {
+public:
+    // ... 现有 248 个方法 ...
+
+    // ========== 新增 1 个方法 ==========
+    /**
+     * 在已有 Mission 中启动新 Ability（推入 Ability 栈）。
+     *
+     * 仅被 Android 适配层调用。OH 原生应用不使用此接口。
+     *
+     * @param want       启动参数
+     * @param missionId  目标 Mission ID
+     * @return ERR_OK on success
+     */
+    virtual int StartAbilityInMission(const Want &want, int32_t missionId) = 0;
+
+    // IPC Code
+    enum {
+        // ... 现有 code ...
+        START_ABILITY_IN_MISSION = 249,  // 追加到最后
+    };
+};
+</pre>
+
+<h3>6.2 AbilityManagerService 实现</h3>
+
+<pre>
+int AbilityManagerService::StartAbilityInMission(
+    const Want &want, int32_t missionId)
+{
+    TAG_LOGI(AAFwkTag::ABILITYMGR,
+        "StartAbilityInMission: mission=%{public}d, ability=%{public}s",
+        missionId, want.GetElement().GetAbilityName().c_str());
+
+    // Build AbilityRequest from Want
+    AbilityRequest abilityRequest;
+    int result = GenerateAbilityRequest(want, -1, abilityRequest, nullptr, 0);
+    if (result != ERR_OK) {
+        return result;
+    }
+
+    // Delegate to MissionListManager
+    auto userId = GetUserId();
+    auto missionListMgr = GetMissionListManagerByUserId(userId);
+    if (!missionListMgr) {
+        return ERR_INVALID_VALUE;
+    }
+
+    return missionListMgr->StartAbilityInMission(abilityRequest, missionId);
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2>7. Adapter 层实现</h2>
+<!-- ============================================================ -->
+
+<h3>7.1 Adapter 层 C++ 客户端扩展</h3>
+
+<p>文件：<code>framework/activity/jni/oh_ability_manager_client.h</code></p>
+
+<pre>
+class OHAbilityManagerClient {
+public:
+    // ... 现有方法 ...
+    int startAbility(const WantParams& want);
+    int connectAbility(const WantParams& want);
+    int disconnectAbility(int connectionId);
+
+    // ========== 新增方法 ==========
+    /**
+     * 在已有 Mission 中启动新 Ability。
+     * 将新 Ability 推入 Mission 的 Ability 栈。
+     */
+    int startAbilityInMission(const WantParams& want, int32_t missionId);
+
+    /**
+     * 获取最近任务列表。
+     * 调用 IMissionManager.GetMissionInfos()。
+     * 由于 Mission 内栈化，每个 Mission 自动只显示栈顶 Ability。
+     */
+    int getMissionInfos(int32_t numMax,
+                        std::vector&lt;MissionInfoData&gt;& missionInfos);
+
+    /**
+     * 获取指定 bundleName 当前活跃的 Mission ID。
+     * 用于判断 startActivity 时是否复用已有 Mission。
+     */
+    int32_t getActiveMissionId(const std::string& bundleName);
+
+    /**
+     * 移除 Mission（清理栈内所有 Ability）。
+     */
+    int cleanMission(int32_t missionId);
+
+    /**
+     * 将 Mission 的栈顶 Ability 移到前台。
+     */
+    int moveMissionToFront(int32_t missionId);
+};
+</pre>
+
+<h3>7.2 ActivityTaskManagerAdapter 核心适配逻辑</h3>
+
+<p>文件：<code>framework/activity/java/ActivityTaskManagerAdapter.java</code></p>
+
+<h4>7.2.1 Android → OH 接口映射表</h4>
+
+<table>
+<tr><th>Android IActivityTaskManager 方法</th><th>OH 适配方案</th></tr>
+<tr>
+  <td><code>startActivity()</code></td>
+  <td>判断同 bundleName 是否已有活跃 Mission：<br>
+  → <b>有</b>：调用 <code>StartAbilityInMission(want, missionId)</code> 推入栈<br>
+  → <b>无</b>：调用 <code>StartAbility(want)</code> 创建新 Mission</td>
+</tr>
+<tr>
+  <td><code>getRecentTasks()</code></td>
+  <td>直接调用 <code>GetMissionInfos()</code><br>
+  每个 Mission 返回栈顶 Ability 信息（无需额外处理）</td>
+</tr>
+<tr>
+  <td><code>getTasks()</code></td>
+  <td>同上</td>
+</tr>
+<tr>
+  <td><code>removeTask(taskId)</code></td>
+  <td>调用 <code>CleanMission(missionId)</code><br>
+  Mission 销毁时自动终止栈内所有 Ability</td>
+</tr>
+<tr>
+  <td><code>moveTaskToFront(taskId)</code></td>
+  <td>调用 <code>MoveMissionToFront(missionId)</code><br>
+  自动将栈顶 Ability 前台化</td>
+</tr>
+<tr>
+  <td><code>startActivityFromRecents(taskId)</code></td>
+  <td>调用 <code>MoveMissionToFront(missionId)</code></td>
+</tr>
+</table>
+
+<h4>7.2.2 startActivity 适配实现</h4>
+
+<pre>
+// ActivityTaskManagerAdapter.java
+
+// 跟踪 Android bundleName → OH missionId 的映射
+private final Map&lt;String, Integer&gt; mActiveMissions = new HashMap&lt;&gt;();
+
+@Override
+public int startActivity(IApplicationThread caller, String callingPackage,
+        String callingFeatureId, Intent intent, String resolvedType,
+        IBinder resultTo, String resultWho, int requestCode,
+        int flags, ProfilerInfo profilerInfo, Bundle options) throws RemoteException {
+    logBridged("startActivity", "-> OH StartAbility / StartAbilityInMission");
+
+    String bundleName = ...; // 从 intent.getComponent() 提取
+    String abilityName = ...;
+
+    // 判断是否需要创建新 Task
+    boolean forceNewTask = (flags & Intent.FLAG_ACTIVITY_NEW_TASK) != 0
+                        && (flags & Intent.FLAG_ACTIVITY_MULTIPLE_TASK) != 0;
+
+    if (!forceNewTask && mActiveMissions.containsKey(bundleName)) {
+        // 复用已有 Mission：将新 Activity 推入 Ability 栈
+        int missionId = mActiveMissions.get(bundleName);
+
+        // 处理 FLAG_ACTIVITY_CLEAR_TOP
+        if ((flags & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0) {
+            nativeClearAbilitiesAbove(missionId, abilityName);
+        }
+
+        // 处理 FLAG_ACTIVITY_SINGLE_TOP
+        if ((flags & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0) {
+            if (nativeIsTopAbility(missionId, abilityName)) {
+                // 栈顶已是目标 Ability，发送 onNewIntent 而不创建新实例
+                nativeDeliverNewIntent(missionId, abilityName, intent);
+                return 0;
+            }
+        }
+
+        int result = nativeStartAbilityInMission(bundleName, abilityName,
+                                                  missionId, ...);
+        return result;
+    } else {
+        // 创建新 Mission
+        int missionId = nativeStartAbility(bundleName, abilityName, ...);
+        if (missionId >= 0) {
+            // 标记 Mission 为多 Ability 模式
+            nativeSetMultiAbilityMode(missionId, true);
+            mActiveMissions.put(bundleName, missionId);
+        }
+        return missionId >= 0 ? 0 : missionId;
+    }
+}
+</pre>
+
+<h4>7.2.3 getRecentTasks 适配实现</h4>
+
+<pre>
+@Override
+public ParceledListSlice&lt;ActivityManager.RecentTaskInfo&gt; getRecentTasks(
+        int maxNum, int flags, int userId) throws RemoteException {
+    logBridged("getRecentTasks", "-> OH GetMissionInfos (栈顶自动正确)");
+
+    // 直接调用 OH GetMissionInfos — 无需额外分组或过滤！
+    // 因为 Android 应用的多个 Activity 已在同一 Mission 内，
+    // 每个 Mission 自然只返回一条，且信息来自栈顶 Ability。
+    MissionInfoData[] missions = nativeGetMissionInfos(maxNum);
+
+    List&lt;ActivityManager.RecentTaskInfo&gt; result = new ArrayList&lt;&gt;();
+    for (MissionInfoData mission : missions) {
+        ActivityManager.RecentTaskInfo taskInfo = new ActivityManager.RecentTaskInfo();
+        taskInfo.taskId = mission.id;
+        taskInfo.persistentId = mission.id;
+        taskInfo.topActivity = new ComponentName(
+            mission.bundleName, mission.topAbilityName);
+        // numActivities = Mission 的 AbilityStackSize
+        taskInfo.numActivities = mission.stackSize;
+        taskInfo.isRunning = mission.runningState >= 0;
+        taskInfo.lastActiveTime = mission.lastActiveTime;
+        taskInfo.taskDescription = new ActivityManager.TaskDescription(
+            mission.label, 0, 0);
+        taskInfo.baseIntent = new Intent();
+        taskInfo.baseIntent.setComponent(taskInfo.topActivity);
+        result.add(taskInfo);
+    }
+
+    return new ParceledListSlice&lt;&gt;(result);
+}
+</pre>
+
+<h4>7.2.4 removeTask 适配实现</h4>
+
+<pre>
+@Override
+public boolean removeTask(int taskId) throws RemoteException {
+    logBridged("removeTask", "-> OH CleanMission");
+    // taskId 直接映射为 OH missionId
+    // CleanMission 会终止栈内所有 Ability 并销毁 Mission
+    int result = nativeCleanMission(taskId);
+
+    // 清理本地映射
+    mActiveMissions.values().removeIf(id -> id == taskId);
+
+    return result == 0;
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2>8. 完整数据流</h2>
+<!-- ============================================================ -->
+
+<h3>8.1 启动 Activity 流程（复用已有 Mission）</h3>
+
+<div class="diagram">
+Android App: startActivity(SecondActivity)    // MainActivity 已在运行
+    │
+    ▼
+ActivityTaskManagerAdapter.startActivity()
+    │
+    ├─ 检查 mActiveMissions: bundleName 已有 missionId=5
+    │
+    ├─ [JNI] nativeStartAbilityInMission("com.example", "SecondActivity", missionId=5)
+    │       │
+    │       ▼
+    │    OHAbilityManagerClient.startAbilityInMission(want, 5)
+    │       │
+    │       ▼
+    │    OH IAbilityManager.StartAbilityInMission(want, 5)
+    │       │
+    │       ▼
+    │    AbilityManagerService.StartAbilityInMission()
+    │       │
+    │       ▼
+    │    MissionListManager.StartAbilityInMission(request, missionId=5)
+    │       │
+    │       ├─ 1. 查找 Mission #5
+    │       ├─ 2. CreateAbilityRecord(request) → newRecord
+    │       ├─ 3. Mission#5 当前栈顶 MainActivity → ProcessBackgroundAbility()
+    │       ├─ 4. Mission#5.PushAbility(newRecord)  // SecondActivity 入栈
+    │       │      abilityStack_: [MainActivity, SecondActivity]
+    │       ├─ 5. SecondActivity → ProcessForegroundAbility()
+    │       └─ 6. UpdateMissionInfo: label/want 更新为 SecondActivity 的
+    │
+    └─ 返回 OK
+
+Mission #5 状态:
+  abilityStack_ = [MainActivity(后台), SecondActivity(前台)]
+  GetAbilityRecord() → SecondActivity
+  GetAbilityStackSize() → 2
+</div>
+
+<h3>8.2 返回键流程（弹出栈顶）</h3>
+
+<div class="diagram">
+用户按返回键 (SecondActivity 当前在前台)
+    │
+    ▼
+OH Ability 生命周期: SecondActivity.onBackPressed()
+    │
+    ▼
+OH Framework: AbilityManagerService.TerminateAbility(secondActivityToken)
+    │
+    ▼
+MissionListManager.TerminateAbilityLocked(secondActivity)
+    │
+    ├─ 查找 Mission: mission #5
+    ├─ 检查: mission->IsMultiAbilityMode() == true
+    ├─ 检查: mission->GetAbilityStackSize() == 2 (> 1)
+    │
+    ├─ mission->PopAbility()
+    │     → 弹出 SecondActivity
+    │     → abilityStack_: [MainActivity]
+    │
+    ├─ 将 SecondActivity 加入 terminateAbilityList_
+    │
+    ├─ newTop = mission->GetAbilityRecord() → MainActivity
+    │     → MainActivity.ProcessForegroundAbility()  // 回到前台
+    │
+    ├─ UpdateMissionInfo: label/want 更新为 MainActivity 的
+    │
+    └─ 通知 MissionListener: SnapshotChanged(missionId=5)
+
+Mission #5 状态:
+  abilityStack_ = [MainActivity(前台)]
+  GetAbilityRecord() → MainActivity
+  GetAbilityStackSize() → 1
+</div>
+
+<h3>8.3 最后一个 Activity 返回（Mission 销毁）</h3>
+
+<div class="diagram">
+用户按返回键 (MainActivity 是最后一个)
+    │
+    ▼
+MissionListManager.TerminateAbilityLocked(mainActivity)
+    │
+    ├─ 检查: mission->GetAbilityStackSize() == 1
+    │
+    ├─ 走现有逻辑（不进入多 Ability 分支）:
+    │     RemoveTerminatingAbility(mainActivity)
+    │       → MissionList::RemoveMissionByAbilityRecord()
+    │       → Mission 从 MissionList 中移除
+    │     Mission 销毁
+    │
+    ├─ MissionInfoMgr::DeleteMissionInfo(missionId=5)
+    │
+    └─ NotifyMissionDestroyed(missionId=5)
+
+Adapter 层:
+  ActivityTaskManagerAdapter.mActiveMissions.remove("com.example")
+</div>
+
+<h3>8.4 获取最近任务列表</h3>
+
+<div class="diagram">
+Android SystemUI: getRecentTasks(10, 0, 0)
+    │
+    ▼
+ActivityTaskManagerAdapter.getRecentTasks()
+    │
+    ├─ [JNI] nativeGetMissionInfos(10)
+    │       │
+    │       ▼
+    │    OH IMissionManager.GetMissionInfos("", 10, missionInfos)
+    │       │
+    │       ▼
+    │    MissionInfoMgr::GetMissionInfos()
+    │       │
+    │       ├─ Mission #3 (OH 天气): abilityStack_.size()=1 → 返回 WeatherAbility
+    │       ├─ Mission #5 (Android): abilityStack_.size()=3 → 返回 ThirdActivity (栈顶)
+    │       └─ Mission #7 (OH 设置): abilityStack_.size()=1 → 返回 SettingsAbility
+    │
+    │    返回 3 条 MissionInfo
+    │
+    ├─ 转换为 RecentTaskInfo[]:
+    │     [0] WeatherAbility  (taskId=3, numActivities=1)
+    │     [1] ThirdActivity   (taskId=5, numActivities=3)
+    │     [2] SettingsAbility  (taskId=7, numActivities=1)
+    │
+    └─ 返回 ParceledListSlice (3 条)
+
+结果：
+  OH 天气应用: 1 条 ✓
+  Android 应用: 1 条 ✓  (而非 3 条)
+  OH 设置应用: 1 条 ✓
+</div>
+
+<!-- ============================================================ -->
+<h2>9. Mission 清理（CleanMission）</h2>
+<!-- ============================================================ -->
+
+<h3>9.1 多 Ability Mission 的清理流程</h3>
+
+<p>当用户在最近任务列表中划掉一个 Android 应用的 Mission 时：</p>
+
+<pre>
+// MissionListManager::CleanMission 修改
+int MissionListManager::CleanMission(int32_t missionId)
+{
+    auto mission = GetMissionById(missionId);
+    if (!mission) return ERR_INVALID_VALUE;
+
+    // 如果是多 Ability 模式，需要终止栈内所有 Ability
+    if (mission->IsMultiAbilityMode()) {
+        // 从栈顶到栈底逐个终止
+        while (mission->GetAbilityStackSize() > 1) {
+            auto popped = mission->PopAbility();
+            if (popped) {
+                popped->Terminate(/* cleanup */);
+                terminateAbilityList_.push_back(popped);
+            }
+        }
+    }
+
+    // 最后一个 Ability 走现有清理逻辑
+    // (移除 Mission from MissionList, DeleteMissionInfo, 等)
+    return CleanMissionLocked(missionId, mission);
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2>10. Intent Flags 处理</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>Android Intent Flag</th><th>在 Mission Ability 栈中的行为</th></tr>
+<tr>
+  <td><code>FLAG_ACTIVITY_NEW_TASK</code><br>(无 MULTIPLE_TASK)</td>
+  <td>查找该 bundleName 的活跃 Mission：<br>
+  → 存在：复用 Mission，新 Ability 入栈<br>
+  → 不存在：创建新 Mission<br>
+  <i>等同于默认行为（Adapter 层已实现此逻辑）</i></td>
+</tr>
+<tr>
+  <td><code>FLAG_ACTIVITY_NEW_TASK<br>| FLAG_ACTIVITY_MULTIPLE_TASK</code></td>
+  <td>强制创建新 Mission（不复用已有 Mission）<br>
+  <i>用于多窗口/文档模式</i></td>
+</tr>
+<tr>
+  <td><code>FLAG_ACTIVITY_CLEAR_TOP</code></td>
+  <td>在栈中查找目标 Ability：<br>
+  → 找到：<code>PopAbilitiesAbove(abilityName)</code> 弹出其上方所有 Ability<br>
+  → 未找到：正常入栈</td>
+</tr>
+<tr>
+  <td><code>FLAG_ACTIVITY_SINGLE_TOP</code></td>
+  <td>检查栈顶 Ability 是否为目标：<br>
+  → 是：不创建新实例，调用 <code>onNewIntent()</code><br>
+  → 否：正常入栈</td>
+</tr>
+<tr>
+  <td><code>FLAG_ACTIVITY_CLEAR_TASK</code></td>
+  <td>清空整个栈，然后新 Ability 作为唯一成员<br>
+  <i>等同于重新创建 Mission</i></td>
+</tr>
+<tr>
+  <td><code>FLAG_ACTIVITY_REORDER_TO_FRONT</code></td>
+  <td>在栈中查找目标 Ability，将其移到栈顶<br>
+  <i>不新建实例，仅调整栈序</i></td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>11. MissionInfo 更新时机</h2>
+<!-- ============================================================ -->
+
+<div class="info">
+<p><code>MissionInfo</code> 的 <code>label</code>、<code>want</code>、<code>time</code> 字段需要在栈顶变化时同步更新，
+以确保最近任务列表显示正确的栈顶 Ability 信息。</p>
+</div>
+
+<table>
+<tr><th>事件</th><th>MissionInfo 更新</th><th>MissionSnapshot 更新</th></tr>
+<tr>
+  <td>PushAbility（新 Activity 入栈）</td>
+  <td>label/want/time 更新为新栈顶</td>
+  <td>延迟更新（新 Ability 渲染完成后）</td>
+</tr>
+<tr>
+  <td>PopAbility（返回弹出栈顶）</td>
+  <td>label/want/time 更新为新栈顶</td>
+  <td>更新为新栈顶的画面</td>
+</tr>
+<tr>
+  <td>PopAbilitiesAbove（CLEAR_TOP）</td>
+  <td>label/want/time 更新为目标 Ability</td>
+  <td>更新为目标 Ability 的画面</td>
+</tr>
+<tr>
+  <td>CleanMission（用户划掉任务）</td>
+  <td>删除 MissionInfo</td>
+  <td>删除快照文件</td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>12. 持久化</h2>
+<!-- ============================================================ -->
+
+<h3>12.1 现有持久化机制（不修改）</h3>
+
+<p>OH Mission 的持久化存储在 <code>/data/service/el1/public/AbilityManagerService/MissionInfo/</code> 中，
+每个 Mission 一个 JSON 文件 (<code>mission_{id}.json</code>) + 快照图片 (<code>mission_{id}.jpg</code>)。</p>
+
+<h3>12.2 Ability 栈的持久化</h3>
+
+<p>Ability 栈的持久化通过在现有 JSON 中增加可选字段实现：</p>
+
+<pre>
+// mission_5.json (现有格式，向后兼容)
+{
+    "missionId": 5,
+    "bundleName": "com.example.app",
+    "missionName": "com.example.app#MainActivity",
+    "launchMode": 0,
+    "missionInfo": {
+        "id": 5,
+        "label": "ThirdActivity",        // 始终为栈顶 Ability 的 label
+        "want": { ... },                  // 始终为栈顶 Ability 的 want
+        "time": "2026-03-11 10:30:00"
+    },
+
+    // ========== 新增可选字段 ==========
+    "multiAbilityMode": true,
+    "abilityStack": [
+        // 栈底 → 栈顶
+        { "abilityName": "MainActivity", "want": { ... } },
+        { "abilityName": "SecondActivity", "want": { ... } },
+        { "abilityName": "ThirdActivity", "want": { ... } }
+    ]
+}
+</pre>
+
+<div class="note">
+<b>向后兼容</b>：
+<ul>
+<li><code>multiAbilityMode</code> 和 <code>abilityStack</code> 为可选字段</li>
+<li>OH 原生应用的 JSON 文件没有这些字段，现有解析逻辑不受影响</li>
+<li>系统重启后，如果存在 <code>abilityStack</code>，则恢复整个栈；否则按现有逻辑恢复单个 Ability</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>13. 文件清单与修改范围</h2>
+<!-- ============================================================ -->
+
+<h3>13.1 OH 系统侧修改（3 个文件）</h3>
+
+<table>
+<tr><th>文件</th><th>修改类型</th><th>说明</th><th>侵入度</th></tr>
+<tr>
+  <td><code>ability_rt/.../mission/mission.h/cpp</code></td>
+  <td>修改</td>
+  <td><code>abilityRecord_</code> → <code>abilityStack_</code> + 新增 Push/Pop/Find 方法</td>
+  <td>中（类内部重构）</td>
+</tr>
+<tr>
+  <td><code>ability_rt/.../mission/mission_list_manager.h/cpp</code></td>
+  <td>修改</td>
+  <td>新增 <code>StartAbilityInMission()</code>；<code>TerminateAbilityLocked()</code> 增加栈式弹出分支</td>
+  <td>低（新增方法 + 条件分支）</td>
+</tr>
+<tr>
+  <td><code>ability_rt/.../ability_manager_interface.h</code><br>
+      + stub.cpp + proxy.cpp</td>
+  <td>修改</td>
+  <td>新增 1 个 IPC 方法 <code>StartAbilityInMission()</code></td>
+  <td>低（追加 1 个方法）</td>
+</tr>
+</table>
+
+<h3>13.2 Adapter 层修改（3 个文件）</h3>
+
+<table>
+<tr><th>文件</th><th>修改类型</th><th>说明</th></tr>
+<tr>
+  <td><code>framework/activity/java/<br>ActivityTaskManagerAdapter.java</code></td>
+  <td>修改</td>
+  <td>startActivity 判断复用/新建 Mission；<br>getRecentTasks 直接转换；removeTask 直接映射</td>
+</tr>
+<tr>
+  <td><code>framework/activity/jni/<br>oh_ability_manager_client.h/cpp</code></td>
+  <td>修改</td>
+  <td>增加 startAbilityInMission、getMissionInfos、cleanMission 等 IPC 调用</td>
+</tr>
+<tr>
+  <td><code>framework/core/jni/adapter_bridge.cpp</code></td>
+  <td>修改</td>
+  <td>新增 JNI 方法 nativeStartAbilityInMission、nativeGetMissionInfos 等</td>
+</tr>
+</table>
+
+<h3>13.3 与 v1.0 方案对比</h3>
+
+<table>
+<tr><th></th><th>v1.0 MissionGroup</th><th>v2.0 Ability 栈</th></tr>
+<tr>
+  <td>OH 系统文件修改数</td>
+  <td>8 个（含接口/数据结构/持久化/Stub/Proxy）</td>
+  <td><b>3 个</b>（Mission + MissionListManager + IAbilityManager）</td>
+</tr>
+<tr>
+  <td>Adapter 层文件修改数</td>
+  <td>6 个（含新增 MissionGroupManager）</td>
+  <td><b>3 个</b>（无需新增类）</td>
+</tr>
+<tr>
+  <td>新增 IPC 方法</td>
+  <td>6 个（在 IMissionManager 中）</td>
+  <td><b>1 个</b>（在 IAbilityManager 中）</td>
+</tr>
+<tr>
+  <td>MissionInfo 修改</td>
+  <td>需要</td>
+  <td><b>不需要</b></td>
+</tr>
+<tr>
+  <td>OH Launcher 修改</td>
+  <td>需要（可选但推荐）</td>
+  <td><b>不需要</b></td>
+</tr>
+<tr>
+  <td>总侵入度</td>
+  <td>高</td>
+  <td><b>低</b></td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>14. 工作量估算</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>阶段</th><th>工作项</th><th>估算</th></tr>
+<tr>
+  <td>Phase 1: Mission 栈化</td>
+  <td>Mission 类 abilityStack_ 重构 + Push/Pop/Find 方法 + 构造函数/GetAbilityRecord 兼容</td>
+  <td>1 人周</td>
+</tr>
+<tr>
+  <td>Phase 2: 启动与终止</td>
+  <td>MissionListManager.StartAbilityInMission + TerminateAbilityLocked 栈式弹出 + IAbilityManager 接口 + Stub/Proxy</td>
+  <td>1.5 人周</td>
+</tr>
+<tr>
+  <td>Phase 3: Adapter 层</td>
+  <td>ActivityTaskManagerAdapter 适配（startActivity/getRecentTasks/removeTask）+ JNI + IPC 客户端</td>
+  <td>1 人周</td>
+</tr>
+<tr>
+  <td>Phase 4: Intent Flags + 持久化</td>
+  <td>CLEAR_TOP/SINGLE_TOP/CLEAR_TASK 处理 + abilityStack JSON 持久化 + 系统重启恢复</td>
+  <td>1 人周</td>
+</tr>
+<tr>
+  <td>Phase 5: 测试</td>
+  <td>多 Activity 跳转测试 + 返回键行为 + 最近任务列表 + 进程杀死恢复 + OH 原生应用回归测试</td>
+  <td>0.5 人周</td>
+</tr>
+<tr>
+  <td><b>合计</b></td>
+  <td></td>
+  <td><b>5 人周</b>（比 v1.0 减少 1 人周）</td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>15. 风险与缓解</h2>
+<!-- ============================================================ -->
+
+<table>
+<tr><th>风险</th><th>影响</th><th>缓解措施</th></tr>
+<tr>
+  <td>Mission 其他方法假设只有一个 Ability</td>
+  <td>调用 <code>GetAbilityRecord()</code> 后可能有隐含假设</td>
+  <td>全面搜索 <code>GetAbilityRecord()</code> 的调用点，逐个验证兼容性。<br>
+  核心保证：GetAbilityRecord() 返回栈顶，语义从 "唯一" 变为 "当前活跃"，大多数场景兼容。</td>
+</tr>
+<tr>
+  <td>OH 版本升级后 Mission 类变更</td>
+  <td>栈化修改需要重新适配</td>
+  <td>修改范围仅限 Mission 内部，且保持 GetAbilityRecord() 签名不变。OH 升级时只需 rebase mission.h/cpp。</td>
+</tr>
+<tr>
+  <td>多 Ability 模式下内存占用增加</td>
+  <td>Android 应用的 Activity 栈可能较深</td>
+  <td>设置栈深度上限（如 20），超限时弹出最底部的 Ability；与 Android 的 Activity 数量限制一致。</td>
+</tr>
+<tr>
+  <td>Ability 生命周期回调顺序</td>
+  <td>栈内非顶 Ability 处于后台，需正确处理 onStop/onStart</td>
+  <td>Push 时对当前栈顶调用 ProcessBackgroundAbility()；Pop 时对新栈顶调用 ProcessForegroundAbility()。</td>
+</tr>
+</table>
+
+<!-- ============================================================ -->
+<h2>16. 实现状态</h2>
+<!-- ============================================================ -->
+
+<p class="version">更新日期：2026年3月11日</p>
+
+<table>
+<tr><th>阶段</th><th>工作项</th><th>状态</th><th>文件</th></tr>
+<tr>
+  <td rowspan="3">Phase 1: Mission 栈化</td>
+  <td>Mission 类 abilityStack_ 重构</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../mission.h</code></td>
+</tr>
+<tr>
+  <td>Push/Pop/Find/PopAbilitiesAbove 方法</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../mission.cpp</code></td>
+</tr>
+<tr>
+  <td>GetAbilityRecord() 栈顶兼容 + multiAbilityMode_ 标志</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../mission.h/cpp</code></td>
+</tr>
+<tr>
+  <td rowspan="4">Phase 2: 启动与终止</td>
+  <td>StartAbilityInMission() 方法</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../mission_list_manager_patch.cpp</code></td>
+</tr>
+<tr>
+  <td>TerminateAbilityLocked 栈式弹出</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../mission_list_manager_patch.cpp</code></td>
+</tr>
+<tr>
+  <td>CleanMissionLocked 栈清理</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../mission_list_manager_patch.cpp</code></td>
+</tr>
+<tr>
+  <td>IAbilityManager 接口扩展 (StartAbilityInMission IPC)</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ohos_patches/.../ability_manager_interface.h.patch</code></td>
+</tr>
+<tr>
+  <td rowspan="4">Phase 3: Adapter 层</td>
+  <td>OHAbilityManagerClient C++ IPC 客户端</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>jni/client/oh_ability_manager_client.h/cpp</code></td>
+</tr>
+<tr>
+  <td>JNI 方法 (6个: startAbilityInMission, cleanMission, moveMissionToFront, isTopAbility, clearAbilitiesAbove, getMissionIdForBundle)</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>jni/core/adapter_bridge.cpp</code></td>
+</tr>
+<tr>
+  <td>ActivityTaskManagerAdapter Java 适配 (bridgeStartActivityWithStack, removeTask, moveTaskToFront, startActivityFromRecents)</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>java/adapter/client/ActivityTaskManagerAdapter.java</code></td>
+</tr>
+<tr>
+  <td>mActiveMissions 跟踪 + nativeGetMissionIdForBundle 查询</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ActivityTaskManagerAdapter.java + adapter_bridge.cpp</code></td>
+</tr>
+<tr>
+  <td rowspan="3">Phase 4: Intent Flags</td>
+  <td>FLAG_ACTIVITY_CLEAR_TOP（通过 android_clear_top Want 参数 + PopAbilitiesAbove）</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ActivityTaskManagerAdapter.java + mission_list_manager_patch.cpp</code></td>
+</tr>
+<tr>
+  <td>FLAG_ACTIVITY_SINGLE_TOP（nativeIsTopAbility 检查 + onNewIntent 触发）</td>
+  <td class="ok" style="background:#e8f5e9;">✅ 已完成</td>
+  <td><code>ActivityTaskManagerAdapter.java</code></td>
+</tr>
+<tr>
+  <td>abilityStack JSON 持久化 + 系统重启恢复</td>
+  <td class="note" style="background:#fff3e0;">⏳ 待实现</td>
+  <td>需修改 MissionInfoMgr 序列化逻辑</td>
+</tr>
+<tr>
+  <td>Phase 5: 测试</td>
+  <td>多 Activity 跳转 + 返回键 + 最近任务 + OH 原生回归</td>
+  <td class="note" style="background:#fff3e0;">⏳ 待实现</td>
+  <td>需要硬件或模拟器环境</td>
+</tr>
+</table>
+
+<div class="info">
+<b>JNI 字符串安全修复（2026-03-11）：</b>修复了 adapter_bridge.cpp 中所有 JNI 方法的 GetStringUTFChars/ReleaseStringUTFChars 配对错误。
+原代码将 <code>const char*</code> 隐式转为 <code>std::string</code> 后，用 <code>std::string::c_str()</code> 调用 ReleaseStringUTFChars，传入了错误的指针。
+已重构为统一的 <code>jstringToString()</code> 辅助函数，先复制再立即释放原始指针。
+</div>
+
+</body>
+</html>
